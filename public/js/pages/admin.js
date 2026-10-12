@@ -1,4 +1,5 @@
-import { backend, getUser, isAdmin, getSite, CONTENT, seed } from '../backend.js';
+import { backend, getUser, isAdmin, getSite, CONTENT, seed, shrinkImage } from '../backend.js';
+import { imgAttrs, hydrateMedia } from '../media.js';
 import { esc, $, $$, modal, toast, confirmBox, formData, statusTag, fmtDate } from '../ui.js';
 import { clearCache } from './common.js';
 import { refreshSite } from '../app.js';
@@ -20,6 +21,7 @@ const SCHEMA = {
       ['start', '개강', 'text', '예: 10/18(일)'],
       ['time', '수업 시간', 'text', '예: 토 13:00-16:00 / 수 17:00-20:00'],
       ['status', '상태', 'select', S(['', '마감임박', '마감', '진행중'])],
+      ['planPost', '강의계획 안내 고정 (안내 ID, 비우면 선생님·학교로 자동 선택)', 'text'],
       ['order', '정렬 순서', 'number'],
       ['hidden', '숨기기', 'bool'],
     ],
@@ -40,6 +42,7 @@ const SCHEMA = {
       ['type', '구분', 'select', S(['설명회', '특강', '진단고사'])], ['title', '제목', 'text'],
       ['date', '날짜', 'date'], ['time', '시간', 'text'], ['dateNote', '날짜 메모', 'text'], ['place', '장소', 'text'], ['target', '대상', 'text'],
       ['speakers', '연사', 'text'], ['benefit', '참석 혜택', 'text'], ['program', '프로그램', 'list'], ['body', '안내문', 'textarea'],
+      ['bandPosts', '연결할 설명회 안내 ID (첫 번째가 대표, 한 줄에 하나)', 'list'], ['src', '포스터 번호 (예: P85,P86)', 'text'],
       ['status', '상태', 'select', S(['모집중', '마감임박', '마감', '종료'])], ['hidden', '숨기기', 'bool'],
     ],
   },
@@ -63,6 +66,17 @@ const SCHEMA = {
     title: '자주 묻는 질문', cols: ['category', 'q'],
     fields: [['category', '분류', 'select', S(['수강', '수업', '설명회', '기타'])], ['q', '질문', 'text'], ['a', '답변', 'textarea'], ['hidden', '숨기기', 'bool']],
   },
+  bandPosts: {
+    title: '강의계획·설명회 안내', cols: ['id', 'kind', 'date', 'title', 'teachers'],
+    help: '강의계획 보기 팝업과 설명회 상세 페이지에 나오는 글과 이미지입니다. <b>강좌 소개</b>는 선생님·학교·학년이 맞는 반의 강의계획에 자동으로 나오고(강좌·시간표에서 특정 안내를 고정할 수도 있습니다), <b>설명회 안내</b>는 설명회·특강에서 ID를 연결하면 나옵니다.',
+    fields: [
+      ['kind', '구분', 'select', S([['class', '강좌 소개(강의계획)'], ['event', '설명회 안내']])],
+      ['title', '제목', 'text'], ['date', '게시일', 'text', '예: 2026.10.12'],
+      ['teachers', '선생님 (한 줄에 한 명)', 'list'], ['schools', '학교 (한 줄에 하나, 예: 대성고)', 'list'], ['grades', '학년 (예: 고1, 고2, 예비고1)', 'list'],
+      ['text', '본문', 'textarea'], ['imgs', '이미지 (위에서부터 순서대로)', 'images'],
+      ['bandUrl', '밴드 원문 주소', 'text', 'https://band.us/band/61446116/post/...'], ['hidden', '숨기기', 'bool'],
+    ],
+  },
   schools: {
     title: '학교', cols: ['id', 'full', 'type', 'grades'],
     fields: [['id', '짧은 이름(시간표 표기)', 'text'], ['full', '정식 이름', 'text'], ['type', '구분', 'text'], ['grades', '학년', 'list'], ['hidden', '숨기기', 'bool']],
@@ -79,7 +93,7 @@ const REQ = {
 
 const NAV = [
   ['', '대시보드'], ['applications', '수강 신청'], ['reservations', '설명회 예약'], ['consults', '온라인 상담'], ['visits', '방문 상담'],
-  ['classes', '강좌·시간표'], ['teachers', '선생님'], ['events', '설명회·특강'], ['results', '시험 결과'], ['notices', '공지사항'], ['faqs', 'FAQ'], ['schools', '학교'],
+  ['classes', '강좌·시간표'], ['teachers', '선생님'], ['events', '설명회·특강'], ['bandPosts', '강의계획·설명회 안내'], ['results', '시험 결과'], ['notices', '공지사항'], ['faqs', 'FAQ'], ['schools', '학교'],
   ['users', '회원'], ['settings', '사이트 설정'], ['data', '데이터 관리'],
 ];
 
@@ -141,7 +155,7 @@ async function requests(main, col) {
   const cfg = REQ[col];
   let rows = (await backend.db.list(col)).sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
   const st = { status: '전체', q: '' };
-  main.innerHTML = `<h1>${cfg.title}</h1>
+  main.innerHTML = `<h1>${cfg.title}</h1>${cfg.help ? `<p class="notice-line">${cfg.help}</p>` : ''}
     <div class="toolbar"><select class="select" id="fs"><option>전체</option>${cfg.statuses.map((s) => `<option>${s}</option>`).join('')}</select>
     <input class="input" id="fq" placeholder="이름·연락처·내용 검색"><button class="btn sm ghost" id="csv">CSV 내려받기</button></div>
     <div style="overflow-x:auto"><table class="grid-table"><thead><tr>${cfg.head.map((h) => `<th>${h}</th>`).join('')}<th>상태</th><th></th></tr></thead><tbody id="tb"></tbody></table></div>`;
@@ -187,9 +201,47 @@ function fieldHTML([key, label, type, opt], v) {
   if (type === 'select') return `<label class="field"><span>${label}</span><select class="select" name="${key}">${opt.map(([val, t]) => `<option value="${esc(val)}" ${String(v ?? '') === String(val) ? 'selected' : ''}>${esc(t || '(없음)')}</option>`).join('')}</select></label>`;
   if (type === 'textarea') return `<label class="field"><span>${label}</span><textarea class="textarea" name="${key}">${esc(v || '')}</textarea></label>`;
   if (type === 'list') return `<label class="field"><span>${label}</span><textarea class="textarea" style="min-height:90px" name="${key}" placeholder="한 줄에 하나씩">${esc((v || []).join('\n'))}</textarea><small>한 줄에 하나씩 적습니다.</small></label>`;
+  if (type === 'images') return `<div class="field"><span>${label}</span>
+    <div class="img-list" data-imgs="${key}">${(v || []).map((f) => imgItem(f)).join('')}</div>
+    <div class="toolbar" style="margin-top:8px"><label class="btn sm ghost" style="cursor:pointer">사진 올리기<input type="file" accept="image/*" multiple data-imgs-upload="${key}" hidden></label>
+      <input class="input" style="flex:1;min-width:200px" data-imgs-url="${key}" placeholder="또는 이미지 주소 붙여넣고 Enter (밴드 이미지 우클릭 → 이미지 주소 복사)"></div>
+    <small>올린 사진은 가로 1600px로 줄여 저장합니다. ↑↓로 순서를 바꾸고 ✕로 뺍니다.</small></div>`;
   if (type === 'image') return `<div class="field"><span>${label}</span>${v ? `<img src="${esc(v)}" alt="" style="max-height:140px;border-radius:6px">` : ''}
     <input class="input" name="${key}" value="${esc(v || '')}" placeholder="이미지 주소 또는 아래에서 파일 올리기"><input type="file" accept="image/*" data-upload="${key}" id="${id}"></div>`;
   return `<label class="field"><span>${label}</span><input class="input" type="${type === 'number' ? 'number' : type === 'date' ? 'date' : 'text'}" name="${key}" value="${esc(v ?? '')}" ${opt && typeof opt === 'string' ? `placeholder="${esc(opt)}"` : ''}></label>`;
+}
+
+const imgItem = (f) => `<figure class="img-item" data-f="${esc(f)}"><img ${imgAttrs(f)} alt=""><div><button type="button" data-mv="-1" aria-label="위로">↑</button><button type="button" data-mv="1" aria-label="아래로">↓</button><button type="button" data-rm aria-label="빼기">✕</button></div></figure>`;
+function bindImages(box, col) {
+  hydrateMedia(box);
+  const wire = (list) => {
+    list.querySelectorAll('[data-mv]').forEach((b) => (b.onclick = () => {
+      const it = b.closest('.img-item'); const d = Number(b.dataset.mv);
+      if (d < 0 && it.previousElementSibling) it.parentNode.insertBefore(it, it.previousElementSibling);
+      if (d > 0 && it.nextElementSibling) it.parentNode.insertBefore(it.nextElementSibling, it);
+    }));
+    list.querySelectorAll('[data-rm]').forEach((b) => (b.onclick = () => b.closest('.img-item').remove()));
+  };
+  box.querySelectorAll('[data-imgs]').forEach(wire);
+  const add = (key, f) => { const list = box.querySelector(`[data-imgs="${key}"]`); list.insertAdjacentHTML('beforeend', imgItem(f)); hydrateMedia(list); wire(list); };
+  box.querySelectorAll('[data-imgs-url]').forEach((inp) => (inp.onkeydown = (e) => {
+    if (e.key !== 'Enter') return; e.preventDefault();
+    const u = inp.value.trim().split('?')[0]; if (!/^https?:\/\//.test(u)) { toast('http로 시작하는 이미지 주소를 넣어 주세요.'); return; }
+    add(inp.dataset.imgsUrl, u); inp.value = '';
+  }));
+  box.querySelectorAll('[data-imgs-upload]').forEach((inp) => (inp.onchange = async () => {
+    for (const file of inp.files) {
+      if (file.size > 15 * 1024 * 1024) { toast(`${file.name}: 15MB 이하만 올릴 수 있습니다.`); continue; }
+      toast(`${file.name} 올리는 중…`);
+      try {
+        let data = await shrinkImage(file, 1600);
+        if (data.length > 950000) data = await shrinkImage(file, 1100);
+        const id = await backend.db.add('media', { data, name: file.name, from: col });
+        add(inp.dataset.imgsUpload, `media:${id}`);
+      } catch (e) { toast(`올리지 못했습니다: ${e.message}`); }
+    }
+    inp.value = ''; toast('사진을 올렸습니다.');
+  }));
 }
 
 function readForm(form, fields) {
@@ -197,6 +249,7 @@ function readForm(form, fields) {
   for (const [key, , type] of fields) {
     if (type === 'bool') out[key] = form[key].checked;
     else if (type === 'list') out[key] = (d[key] || '').split('\n').map((s) => s.trim()).filter(Boolean);
+    else if (type === 'images') out[key] = [...form.querySelectorAll(`[data-imgs="${key}"] .img-item`)].map((x) => x.dataset.f);
     else if (type === 'number') out[key] = d[key] === '' ? null : Number(d[key]);
     else out[key] = (d[key] ?? '').trim();
   }
@@ -208,17 +261,19 @@ async function content(main, col) {
   let rows = await backend.db.list(col);
   const seeded = await backend.db.isSeeded(col);
   const st = { q: '', term: col === 'classes' ? 'final' : '' };
-  main.innerHTML = `<h1>${cfg.title}</h1>
+  main.innerHTML = `<h1>${cfg.title}</h1>${cfg.help ? `<p class="notice-line">${cfg.help}</p>` : ''}
     ${backend.mode === 'firebase' && !seeded ? `<div class="callout seal">아직 Firestore에 ${cfg.title} 데이터가 없어 기본 데이터를 보여주는 중입니다. 수정하려면 먼저 <a class="link" href="#/admin/data">데이터 관리</a>에서 기본 데이터를 올리세요.</div>` : ''}
     <div class="toolbar">${col === 'classes' ? `<select class="select" id="ft"><option value="">전체 과정</option>${seed.terms.map((t) => `<option value="${t.id}" ${st.term === t.id ? 'selected' : ''}>${t.name}</option>`).join('')}</select>` : ''}
       <input class="input" id="fq" placeholder="검색"><button class="btn sm" id="add">새로 추가</button></div>
-    <div style="overflow-x:auto"><table class="grid-table"><thead><tr>${cfg.cols.map((c) => `<th>${esc(cfg.fields.find((f) => f[0] === c)?.[1] || (c === 'id' ? '짧은 이름' : c))}</th>`).join('')}<th></th></tr></thead><tbody id="tb"></tbody></table></div>`;
+    <div style="overflow-x:auto"><table class="grid-table"><thead><tr>${cfg.cols.map((c) => `<th>${esc(cfg.fields.find((f) => f[0] === c)?.[1] || (c === 'id' ? (col === 'bandPosts' ? 'ID' : '짧은 이름') : c))}</th>`).join('')}<th></th></tr></thead><tbody id="tb"></tbody></table></div>`;
   const cell = (r, c) => {
     const v = r[c];
     if (c === 'status') return statusTag(v);
     if (typeof v === 'boolean') return v ? '✓' : '';
     if (Array.isArray(v)) return esc(v.join(', '));
     if (c === 'term') return esc(seed.terms.find((t) => t.id === v)?.short || v);
+    if (c === 'kind') return v === 'event' ? '<span class="tag">설명회</span>' : '<span class="tag">강좌</span>';
+    if (c === 'id' && col === 'bandPosts') return `<code>${esc(v)}</code>`;
     return esc(v ?? '');
   };
   const draw = () => {
@@ -243,6 +298,7 @@ async function content(main, col) {
       content: `<form novalidate>${cfg.fields.map((f) => fieldHTML(f, base[f[0]])).join('')}<p class="form-error"></p><button class="btn block">${isNew ? '추가' : '저장'}</button></form>`,
       onMount(box, close) {
         const f = box.querySelector('form');
+        bindImages(box, col);
         $$('[data-upload]', box).forEach((inp) => (inp.onchange = async () => {
           const file = inp.files[0]; if (!file) return;
           if (file.size > 3 * 1024 * 1024) { toast('3MB 이하 이미지만 올릴 수 있습니다.'); return; }

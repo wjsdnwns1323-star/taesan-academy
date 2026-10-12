@@ -22,8 +22,8 @@ service cloud.firestore {
 
     // 공개 콘텐츠
     match /{col}/{id} {
-      allow read: if col in ['teachers', 'leaders', 'classes', 'results', 'events', 'notices', 'faqs', 'schools', 'settings'];
-      allow write: if isAdmin() && col in ['teachers', 'leaders', 'classes', 'results', 'events', 'notices', 'faqs', 'schools', 'settings'];
+      allow read: if col in ['teachers', 'leaders', 'classes', 'results', 'events', 'notices', 'faqs', 'schools', 'settings', 'bandPosts', 'media'];
+      allow write: if isAdmin() && col in ['teachers', 'leaders', 'classes', 'results', 'events', 'notices', 'faqs', 'schools', 'settings', 'bandPosts', 'media'];
     }
 
     // 회원

@@ -2,6 +2,7 @@
 // firebaseConfig.apiKey가 있으면 Firebase(Auth, Firestore, Storage)를, 없으면 브라우저 저장소(체험 모드)를 씁니다.
 import { firebaseConfig, adminEmails } from './config.js';
 import * as seed from './data/seed.js';
+import { BAND_POSTS } from './data/band.js';
 
 const SDK = 'https://www.gstatic.com/firebasejs/10.12.2';
 
@@ -15,6 +16,8 @@ export const CONTENT = {
   notices: seed.notices,
   faqs: seed.faqs,
   schools: seed.schools.map((s) => ({ ...s })),
+  // 강의계획·설명회 안내(밴드 게시글 정리본)
+  bandPosts: BAND_POSTS.map((p) => ({ ...p, id: String(p.id), bandUrl: `https://band.us/band/61446116/post/${p.id}` })),
 };
 
 const listeners = new Set();

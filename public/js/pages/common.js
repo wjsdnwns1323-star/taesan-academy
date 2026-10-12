@@ -1,7 +1,7 @@
 import { backend, getUser } from '../backend.js';
 import { esc, modal, toast, formData, CONSENT, phoneOk, statusTag } from '../ui.js';
 import { POSTERS, TEACHER_POSTERS, posterCodes, posterUrl } from '../data/posters.js';
-import { BAND_POSTS } from '../data/band.js';
+import { imgAttrs, linkAttrs, hydrateMedia } from '../media.js';
 
 // 같은 화면에서 여러 번 읽지 않도록 잠깐 보관
 const cache = {};
@@ -108,9 +108,10 @@ export function applyClass(c) {
 
 // 강의계획 보기: 밴드에 선생님이 올린 강좌 소개·교재 소개를 강의계획서처럼 보여 줍니다.
 const termLabel = { final: '2학기 기말대비', mid: '2학기 중간대비', pre: '예비고1' };
-function planPosts(c) {
+function planPosts(c, all) {
+  if (c.planPost) { const fixed = all.find((p) => String(p.id) === String(c.planPost)); if (fixed) return [fixed]; }
   const name = c.teacherName || '';
-  const scored = BAND_POSTS.filter((p) => p.kind !== 'event' && p.teachers.includes(name)).map((p) => {
+  const scored = all.filter((p) => p.kind !== 'event' && p.teachers.includes(name)).map((p) => {
     let sc = 0;
     if (c.school && p.text.includes(c.school.replace('공주사대부고', '공주사대부'))) sc += 4;
     if (c.school && (p.schools || []).includes(c.school)) sc += 2;
@@ -120,16 +121,17 @@ function planPosts(c) {
     if (/교재|커리큘럼|진도|계획|수업/.test(p.text)) sc += 1;
     if (p.teachers.length === 1) sc += 3;
     return { p, sc };
-  }).sort((a, b) => b.sc - a.sc || b.p.id - a.p.id);
+  }).sort((a, b) => b.sc - a.sc || String(b.p.date || '').localeCompare(String(a.p.date || '')));
   return scored.slice(0, 1).map((x) => x.p);
 }
-export function showClassPlan(c, teacher) {
-  const posts = planPosts(c);
+export async function showClassPlan(c, teacher) {
+  const all = visible(await load('bandPosts').catch(() => []));
+  const posts = planPosts(c, all);
   const main = posts[0];
   const codes = posterCodes(c.src).concat((TEACHER_POSTERS[teacher?.id || c.teacherId] || [])).filter((v, i, a) => a.indexOf(v) === i && POSTERS[v]).slice(0, 6);
   const photo = teacher && teacher.photo ? photoOf(teacher) : '';
   const head = (main && main.title) || (teacher && teacher.highlights && teacher.highlights[0]) || '';
-  const img = (f, cap) => `<figure class="pc-card"><a href="${esc(f)}" target="_blank" rel="noopener" title="원본 크게 보기"><img src="${esc(f)}" alt="${esc(cap)}" loading="lazy"></a></figure>`;
+  const img = (f, cap) => `<figure class="pc-card"><a ${linkAttrs(f)} title="원본 크게 보기"><img ${imgAttrs(f)} alt="${esc(cap)}" loading="lazy"></a></figure>`;
   modal({
     title: '강의계획',
     content: `<div class="plan">
@@ -145,8 +147,8 @@ export function showClassPlan(c, teacher) {
       ${posts.length ? posts.map((p) => `<section class="plan-sec">
         <h4>강좌 소개 <small>${esc(p.date)} · 밴드 게시글</small></h4>
         ${p.text ? `<div class="plan-text">${esc(p.text)}</div>` : ''}
-        ${p.imgs.length ? `<div class="pc-list">${p.imgs.map((f) => img(f, p.title)).join('')}</div>` : ''}
-        <p class="plan-src"><a class="link" href="https://band.us/band/61446116/post/${p.id}" target="_blank" rel="noopener">밴드 원문 보기 ›</a></p>
+        ${p.imgs.length ? `<div class="pc-list">${(p.imgs || []).map((f) => img(f, p.title)).join('')}</div>` : ''}
+        ${p.bandUrl ? `<p class="plan-src"><a class="link" href="${esc(p.bandUrl)}" target="_blank" rel="noopener">밴드 원문 보기 ›</a></p>` : ''}
       </section>`).join('') : ''}
       ${!posts.length && codes.length ? `<section class="plan-sec"><h4>수업 안내</h4><div class="pc-list">${codes.map((k) => img(posterUrl(k), POSTERS[k])).join('')}</div></section>` : ''}
       ${!posts.length && !codes.length ? '<p class="empty">밴드에 올라온 강좌 소개가 아직 없습니다. 학원(042-321-5788)으로 문의해 주세요.</p>' : ''}
@@ -154,6 +156,7 @@ export function showClassPlan(c, teacher) {
     </div>`,
     onMount(box, close) {
       box.closest('.modal').classList.add('modal-plan');
+      hydrateMedia(box);
       box.querySelectorAll('.pc-card img').forEach((im) => (im.onerror = () => im.closest('.pc-card').remove()));
       box.querySelector('[data-apply-now]').onclick = () => { close(); applyClass(c); };
     },

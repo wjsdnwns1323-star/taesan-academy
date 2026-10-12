@@ -1,25 +1,27 @@
 import { backend, getUser, seed } from '../backend.js';
 import { esc, $, statusTag, dayParts, isPast, formData, toast, CONSENT, phoneOk } from '../ui.js';
 import { load, visible, pageHead, clearCache } from './common.js';
-import { BAND_POSTS } from '../data/band.js';
+import { imgAttrs, linkAttrs, hydrateMedia, isMedia } from '../media.js';
 import { POSTERS, posterCodes, posterUrl } from '../data/posters.js';
 
 const baseOf = (e) => (seed.events || []).find((x) => x.id === e.id) || {};
+let POSTS = [];
+const postsOf = (e) => (e.bandPosts || baseOf(e).bandPosts || []).map((id) => POSTS.find((x) => String(x.id) === String(id) && !x.hidden)).filter(Boolean);
 function thumbOf(e) {
-  const ids = e.bandPosts || baseOf(e).bandPosts || [];
-  for (const id of ids) { const p = BAND_POSTS.find((x) => x.id === id); if (p && p.imgs.length) return p.imgs[0]; }
+  for (const p of postsOf(e)) if ((p.imgs || []).length) return p.imgs[0];
   const c = posterCodes(e.src || baseOf(e).src)[0];
   return c ? posterUrl(c) : '';
 }
 const isOpen = (e) => e.status !== '종료' && e.status !== '마감' && !isPast(e.date);
 
 export async function list({ el }) {
-  const events = visible(await load('events'));
+  const [events0, posts] = await Promise.all([load('events'), load('bandPosts').catch(() => [])]);
+  POSTS = posts; const events = visible(events0);
   const open = events.filter(isOpen).sort((a, b) => (a.date || '9').localeCompare(b.date || '9'));
   const past = events.filter((e) => !isOpen(e)).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-  const small = (f) => (f.startsWith('images/band/') ? f.replace('images/band/', 'images/band/t/').replace(/\.\w+$/, '.jpg') : f);
+  const small = (f) => (!isMedia(f) && f.startsWith('images/band/') ? f.replace('images/band/', 'images/band/t/').replace(/\.\w+$/, '.jpg') : f);
   const card = (e) => { const d = dayParts(e.date); const th = thumbOf(e) && small(thumbOf(e)); return `<a class="ev-card" href="#/events/${esc(e.id)}">
-    <div class="ev-thumb">${th ? `<img src="${esc(th)}" alt="" loading="lazy" onerror="this.onerror=null;this.src='${esc(thumbOf(e))}'">` : ''}
+    <div class="ev-thumb">${th ? `<img ${imgAttrs(th)} alt="" loading="lazy" ${isMedia(th) ? '' : `onerror="this.onerror=null;this.src='${esc(thumbOf(e))}'"`}>` : ''}
       <div class="ev-date">${d ? `<b class="num">${d.m}.${d.d}</b><span>${d.w}</span>` : '<b>상시</b><span>신청</span>'}</div></div>
     <div class="ev-body"><p class="ev-tags"><span class="tag">${esc(e.type)}</span> ${statusTag(isOpen(e) ? e.status : '종료')}</p>
     <h4>${esc(e.title)}</h4>
@@ -32,31 +34,33 @@ export async function list({ el }) {
     <h2 class="ev-h" style="margin-top:48px">지난 설명회·특강</h2>
     <div class="ev-grid">${past.map(card).join('')}</div>
   </div>`;
+  hydrateMedia(el);
 }
 
 export async function detail({ el, params }) {
-  const e = await backend.db.get('events', params.id);
+  const [e, posts0] = await Promise.all([backend.db.get('events', params.id), load('bandPosts').catch(() => [])]);
+  POSTS = posts0;
   if (!e) { el.innerHTML = `<div class="wrap page"><div class="empty"><p>설명회를 찾을 수 없습니다.</p><p><a class="btn" href="#/events">목록으로</a></p></div></div>`; return; }
   const u = getUser();
   const open = isOpen(e);
   const diag = e.type === '진단고사';
   // 밴드에 올라온 설명회 안내(글·고화질 이미지)와 포스터. Firestore에 없으면 기본 데이터에서 가져옵니다.
   const base = (seed.events || []).find((x) => x.id === e.id) || {};
-  const posts = (e.bandPosts || base.bandPosts || []).map((id) => BAND_POSTS.find((p) => p.id === id)).filter(Boolean).slice(0, 1);
+  const posts = postsOf(e).slice(0, 1);
   const shown = new Set();
   const hero = thumbOf(e);
-  const fig = (src, cap) => `<figure class="pc-card"><a href="${esc(src)}" target="_blank" rel="noopener" title="크게 보기"><img src="${esc(src)}" alt="${esc(cap)}" loading="lazy"></a></figure>`;
+  const fig = (src, cap) => `<figure class="pc-card"><a ${linkAttrs(src)} title="크게 보기"><img ${imgAttrs(src)} alt="${esc(cap)}" loading="lazy"></a></figure>`;
   const posterHtml = posterCodes(e.src || base.src).filter((c) => posterUrl(c) !== hero && !shown.has(c) && shown.add(c)).map((c) => fig(posterUrl(c), POSTERS[c])).join('');
   const bandHtml = posts.map((p) => `<section class="plan-sec ev-band">
       <h4>설명회 안내 <small>${esc(p.date)} · 밴드 게시글</small></h4>
       ${p.text ? `<div class="plan-text">${esc(p.text)}</div>` : ''}
-      ${p.imgs.filter((f) => f !== hero).length ? `<div class="pc-list">${p.imgs.filter((f) => f !== hero).map((f) => fig(f, p.title)).join('')}</div>` : ''}
-      <p class="plan-src"><a class="link" href="https://band.us/band/61446116/post/${p.id}" target="_blank" rel="noopener">밴드 원문 보기 ›</a></p>
+      ${(p.imgs || []).filter((f) => f !== hero).length ? `<div class="pc-list">${(p.imgs || []).filter((f) => f !== hero).map((f) => fig(f, p.title)).join('')}</div>` : ''}
+      ${p.bandUrl ? `<p class="plan-src"><a class="link" href="${esc(p.bandUrl)}" target="_blank" rel="noopener">밴드 원문 보기 ›</a></p>` : ''}
     </section>`).join('') + (posterHtml ? `<section class="plan-sec ev-band"><h4>포스터</h4><div class="pc-list" style="margin-top:12px">${posterHtml}</div></section>` : '');
   el.innerHTML = `${pageHead(e.title, '', [['설명회·특강', '#/events'], [e.type]])}
   <div class="wrap page"><div class="profile ev">
     <div>
-      ${thumbOf(e) ? `<a class="ev-hero" href="${esc(thumbOf(e))}" target="_blank" rel="noopener"><img src="${esc(thumbOf(e))}" alt="${esc(e.title)}"></a>` : ''}
+      ${thumbOf(e) ? `<a class="ev-hero" ${linkAttrs(thumbOf(e))}><img ${imgAttrs(thumbOf(e))} alt="${esc(e.title)}"></a>` : ''}
       <dl class="kv">
         <dt>일시</dt><dd>${e.date ? esc(e.date.replace(/-/g, '.')) + ' ' : ''}${esc(e.time)}${e.dateNote ? ` <small style="color:var(--muted)">(${esc(e.dateNote)})</small>` : ''}</dd>
         <dt>장소</dt><dd>${esc(e.place)}</dd>
@@ -85,6 +89,7 @@ export async function detail({ el, params }) {
       </form>` : `<p>${e.status === '마감' ? '예약이 마감되었습니다.' : '종료된 설명회입니다.'}</p><p style="margin-top:12px"><a class="btn ghost block" href="#/events">다른 설명회 보기</a></p>`}
     </div>
   </div></div>`;
+  hydrateMedia(el);
   const f = $('#rsv', el);
   if (!f) return;
   f.onsubmit = async (ev) => {

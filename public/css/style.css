@@ -610,3 +610,11 @@ ul { margin: 0; padding: 0; }
 .ev-hero img { width: 100%; height: auto; }
 @media (max-width: 960px) { .ev-grid { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 640px) { .ev-grid { grid-template-columns: 1fr; } }
+
+/* 관리자: 이미지 목록 편집 */
+.img-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; }
+.img-item { margin: 0; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--bg-gray); }
+.img-item img { width: 100%; aspect-ratio: 1; object-fit: cover; }
+.img-item div { display: flex; }
+.img-item button { flex: 1; border: 0; background: #fff; padding: 4px 0; border-top: 1px solid var(--line); }
+.img-item button + button { border-left: 1px solid var(--line); }
