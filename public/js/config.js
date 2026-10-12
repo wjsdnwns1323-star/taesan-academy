@@ -8,6 +8,8 @@ export const firebaseConfig = {
   storageBucket: '',
   messagingSenderId: '',
   appId: '',
+  // Storage(유료 Blaze 요금제 필요)를 쓰지 않으면 false. 사진은 줄여서 Firestore에 저장합니다.
+  useStorage: false,
 };
 
 // 관리자 이메일. 이 주소로 가입하고 이메일 인증을 마치면 관리자 화면이 열립니다.

@@ -47,6 +47,23 @@ function applyQuery(rows, opts = {}) {
   return out;
 }
 
+// Storage를 쓰지 않을 때: 이미지를 가로 600px JPEG로 줄여 문서에 바로 저장(약 100KB 이하)
+export function shrinkImage(file, max = 600) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const k = Math.min(1, max / img.width);
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(img.src);
+      resolve(c.toDataURL('image/jpeg', 0.82));
+    };
+    img.onerror = reject;
+    img.src = URL.createObjectURL(file);
+  });
+}
+
 /* ---------------- 체험 모드(브라우저 저장소) ---------------- */
 function localAdapter() {
   const key = (c) => `taesan:${c}`;
@@ -124,28 +141,23 @@ function localAdapter() {
     async resendVerification() {},
   };
 
-  const storage = {
-    async upload(_path, file) {
-      return new Promise((res, rej) => {
-        const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(file);
-      });
-    },
-  };
+  const storage = { upload: (_path, file) => shrinkImage(file) };
   return { mode: 'local', db, auth, storage };
 }
 
 /* ---------------- Firebase ---------------- */
 async function firebaseAdapter() {
+  const useStorage = !!firebaseConfig.storageBucket && firebaseConfig.useStorage !== false;
   const [{ initializeApp }, A, F, S] = await Promise.all([
     import(`${SDK}/firebase-app.js`),
     import(`${SDK}/firebase-auth.js`),
     import(`${SDK}/firebase-firestore.js`),
-    import(`${SDK}/firebase-storage.js`),
+    useStorage ? import(`${SDK}/firebase-storage.js`) : Promise.resolve(null),
   ]);
   const app = initializeApp(firebaseConfig);
   const fa = A.getAuth(app);
   const fs = F.getFirestore(app);
-  const st = S.getStorage(app);
+  const st = useStorage ? S.getStorage(app) : null;
   const seededCache = {};
 
   const toRows = (snap) => snap.docs.map((d) => ({ ...d.data(), id: d.id }));
@@ -256,6 +268,7 @@ async function firebaseAdapter() {
 
   const storage = {
     async upload(path, file) {
+      if (!st) return shrinkImage(file);
       const r = S.ref(st, path);
       await S.uploadBytes(r, file, { contentType: file.type });
       return S.getDownloadURL(r);
