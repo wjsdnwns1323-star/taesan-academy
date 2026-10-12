@@ -48,7 +48,7 @@ ul { margin: 0; padding: 0; }
 .blue { color: var(--blue); }
 
 /* ---------- 상단 ---------- */
-.util { height: 56px; }
+.util { height: 48px; }
 .util .wrap { display: flex; align-items: center; justify-content: space-between; height: 100%; gap: 16px; }
 .util-left { display: flex; align-items: center; gap: 12px; font-size: 15px; color: var(--sub); white-space: nowrap; }
 .dday { display: inline-flex; align-items: center; gap: 6px; color: var(--text); font-weight: 500; }
@@ -67,10 +67,10 @@ ul { margin: 0; padding: 0; }
 .mode-badge { background: var(--marker); color: var(--text); border-radius: 999px; padding: 1px 9px; font-weight: 700; font-size: 12px; }
 
 .header { position: sticky; top: 0; z-index: 50; background: #fff; border-bottom: 1px solid var(--line); }
-.header > .wrap { display: flex; align-items: center; gap: 24px; height: 84px; }
+.header > .wrap { display: flex; align-items: center; gap: 24px; height: 104px; }
 .logo { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
 .logo .tag-line { font-size: 12px; font-weight: 800; letter-spacing: -0.04em; color: var(--text); line-height: 1.1; }
-.logo .logo-img { height: 50px; width: auto; display: block; }
+.logo .logo-img { height: 80px; width: auto; display: block; }
 .logo .mark-icon { width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, #5a7bff, #2f49d8); display: grid; place-items: center; color: #fff; }
 .logo .mark-icon svg { width: 22px; height: 22px; }
 .logo b { font-size: 26px; font-weight: 900; letter-spacing: -0.06em; }
@@ -449,7 +449,7 @@ ul { margin: 0; padding: 0; }
 }
 @media (max-width: 1000px) {
   .gnb, .searchbox, .allmenu { display: none !important; }
-  .header > .wrap { justify-content: space-between; height: 68px; }
+  .header > .wrap { justify-content: space-between; height: 80px; }
   .logo b { font-size: 22px; }
   .logo .tag-line { display: none; }
   .recruit, .r-ctrl { grid-template-columns: 1fr; }
@@ -539,4 +539,4 @@ ul { margin: 0; padding: 0; }
 .t-card:has(.ph img) .hl { display: none; }
 .t-card .ph:has(img) { width: 46%; height: 76%; justify-content: flex-end; }
 .logo .tag-line { display: none; }
-@media (max-width: 640px) { .logo .logo-img { height: 40px; } .t-card .ph:has(img) { width: 44%; height: 50%; right: 10px; } .t-card .tags { max-width: 100%; } .t-card h3 { position: relative; z-index: 1; } }
+@media (max-width: 640px) { .logo .logo-img { height: 54px; } .t-card .ph:has(img) { width: 44%; height: 50%; right: 10px; } .t-card .tags { max-width: 100%; } .t-card h3 { position: relative; z-index: 1; } }

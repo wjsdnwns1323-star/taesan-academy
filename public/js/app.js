@@ -113,11 +113,8 @@ const groupHTML = (cls) => (g) => {
 
 function topbar() {
   const u = getUser();
-  const dd = ddayText();
   return `<div class="util"><div class="wrap">
     <div class="util-left">
-      ${dd ? `<span class="dday">${ICON.check}수능 <b class="num">${dd}</b></span><span class="bar"></span>` : ''}
-      <a class="hide-m" href="#/timetable?term=final">기말대비 개강 중</a>
       ${backend.mode === 'local' ? '<span class="mode-badge" title="Firebase 연결 전입니다. 입력한 내용은 이 브라우저에만 저장됩니다.">체험 모드</span>' : ''}
     </div>
     <div class="util-right">
