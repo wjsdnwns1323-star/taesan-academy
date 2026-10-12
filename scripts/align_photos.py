@@ -31,11 +31,14 @@ def detect_face(img):
     bg.paste(img, mask=img.split()[3])
     gray = cv2.cvtColor(np.array(bg), cv2.COLOR_RGB2GRAY)
     min_side = max(40, img.width // 5)  # 상반신 사진: 얼굴이 가로의 20% 이상
-    faces = CASCADE.detectMultiScale(gray, scaleFactor=1.05, minNeighbors=5, minSize=(min_side, min_side))
-    if len(faces) == 0:
+    found = list(CASCADE.detectMultiScale(gray, scaleFactor=1.05, minNeighbors=5, minSize=(min_side, min_side)))
+    # 얼굴이 아주 크게 찍힌 사진은 원본 크기에서 놓칠 수 있어, 절반으로 줄여 한 번 더 찾습니다
+    small = cv2.resize(gray, (gray.shape[1] // 2, gray.shape[0] // 2))
+    for (x, y, w, h) in CASCADE.detectMultiScale(small, scaleFactor=1.05, minNeighbors=5, minSize=(min_side // 2, min_side // 2)):
+        found.append((x * 2, y * 2, w * 2, h * 2))
+    if not found:
         return None
-    # 위쪽 절반에 있는 가장 큰 얼굴
-    faces = [f for f in faces if f[1] < img.height * 0.6] or list(faces)
+    faces = [f for f in found if f[1] + f[3] / 2 < img.height * 0.5] or found
     x, y, w, h = (int(v) for v in max(faces, key=lambda f: f[2] * f[3]))
     # Haar 상자는 눈썹~입 아래 정도라서 이마~턱으로 넓힙니다
     return (x, int(y - h * 0.12), w, int(h * 1.22))
