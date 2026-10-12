@@ -55,3 +55,19 @@ export async function location({ el, site }) {
     </div>
   </div></div></div>`;
 }
+
+export async function privacy({ el, site }) {
+  el.innerHTML = `${pageHead('개인정보처리방침', '', [['개인정보처리방침']])}
+  <div class="wrap page"><article class="article"><div class="body" style="white-space:normal">
+    <p>태산학원(이하 "학원")은 상담·신청 확인에 필요한 최소한의 개인정보만 수집하고, 목적 외로 사용하지 않습니다.</p>
+    <div class="block"><h3>수집 항목과 목적</h3><ul>
+      <li>수강 신청: 학생 이름, 연락처, 학교·학년, 남긴 말 — 등록 안내 연락</li>
+      <li>설명회·진단고사 예약: 이름, 연락처, 학교, 인원·과목·희망 일시 — 예약 확인 연락</li>
+      <li>온라인·방문 상담: 이름, 연락처, 학교·학년, 상담 내용 — 상담 답변</li>
+      <li>회원가입: 이메일, 이름, 연락처, 학생 학교·학년·이름, 문자 수신 동의 여부 — 회원 관리, 신청 내역 제공</li></ul></div>
+    <div class="block"><h3>보관 기간</h3><ul><li>신청·상담 정보: 목적 달성 후 1년 또는 삭제 요청 시까지</li><li>회원 정보: 회원 탈퇴 시까지</li></ul></div>
+    <div class="block"><h3>처리 위탁</h3><ul><li>Google Firebase(데이터 저장·로그인 처리)</li></ul></div>
+    <div class="block"><h3>정보 주체의 권리</h3><p>언제든지 열람·정정·삭제를 요청할 수 있습니다. 문의: <a class="link" href="tel:${esc(site.phone.replace(/-/g, ''))}">${esc(site.phone)}</a></p></div>
+    <p class="notice-line" style="margin-top:28px">※ 개인정보 보호책임자 성명과 시행일은 학원에서 확인 후 입력해 주세요.</p>
+  </div></article></div>`;
+}

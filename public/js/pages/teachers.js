@@ -5,22 +5,28 @@ import { load, visible, byOrder, pageHead, teacherCard, monogram, applyClass } f
 export async function list({ el, query }) {
   const teachers = visible(await load('teachers')).sort(byOrder);
   const leaders = visible(await load('leaders'));
-  const cur = query.subject || '전체';
-  el.innerHTML = `${pageHead('선생님', '맡은 학교, 교재, 시험 결과까지 선생님별로 정리했습니다.', [['선생님']])}
+  const subjects = seed.subjects.filter((s) => teachers.some((t) => t.subject === s));
+  let cur = query.subject || '전체';
+  el.innerHTML = `${pageHead('선생님', '', [['선생님']])}
   <div class="wrap page">
-    <div class="tabs" role="tablist">${['전체', ...seed.subjects].map((s) => `<button role="tab" aria-selected="${s === cur}" data-s="${esc(s)}">${esc(s)} <small class="num">${s === '전체' ? teachers.length : teachers.filter((t) => t.subject === s).length}</small></button>`).join('')}</div>
-    <div class="t-grid" id="grid"></div>
-    <div class="block" style="margin-top:56px"><h3>입시·설명회</h3>
-      <div class="t-grid">${leaders.map((l) => `<div class="t-card"><div class="t-body"><span class="subj">${esc(l.title)}</span><h3>${esc(l.name)}</h3><p>${esc(l.role)}</p>
-        ${(l.bio || []).length ? `<ul style="margin:8px 0 0;padding-left:18px;font-size:13px;color:var(--muted)">${l.bio.map((b) => `<li>${esc(b)}</li>`).join('')}</ul>` : ''}</div></div>`).join('')}</div>
+    <div class="tabs" role="tablist">${['전체', ...subjects].map((s) => `<button role="tab" aria-selected="${s === cur}" data-s="${esc(s)}">${esc(s)}</button>`).join('')}</div>
+    <div id="groups"></div>
+    <div class="sub-group"><h2>입시·설명회</h2>
+      <div class="t-grid">${leaders.map((l) => `<div class="t-card"><span class="tags"><span class="tag">${esc(l.title)}</span></span>
+        <span class="subj">입시 전략</span><h3>${esc(l.name)}</h3><p class="hl">${esc(l.role)}</p>
+        <span class="ph">${monogram(l)}</span></div>`).join('')}</div>
     </div>
   </div>`;
-  const draw = (s) => { el.querySelector('#grid').innerHTML = teachers.filter((t) => s === '전체' || t.subject === s).map(teacherCard).join(''); };
+  const draw = () => {
+    const show = cur === '전체' ? subjects : [cur];
+    el.querySelector('#groups').innerHTML = show.map((s) => `<section class="sub-group"><h2>${esc(s)}</h2>
+      <div class="t-grid">${teachers.filter((t) => t.subject === s).map(teacherCard).join('')}</div></section>`).join('');
+  };
   $$('[data-s]', el).forEach((b) => (b.onclick = () => {
-    $$('[data-s]', el).forEach((x) => x.setAttribute('aria-selected', x === b)); draw(b.dataset.s);
-    history.replaceState(null, '', b.dataset.s === '전체' ? '#/teachers' : `#/teachers?subject=${encodeURIComponent(b.dataset.s)}`);
+    cur = b.dataset.s; $$('[data-s]', el).forEach((x) => x.setAttribute('aria-selected', x === b)); draw();
+    history.replaceState(null, '', cur === '전체' ? '#/teachers' : `#/teachers?subject=${encodeURIComponent(cur)}`);
   }));
-  draw(cur);
+  draw();
 }
 
 const listBlock = (title, items, cls = '') => (items && items.length ? `<div class="block"><h3>${title}</h3><ul class="${cls}">${items.map((i) => `<li>${esc(i)}</li>`).join('')}</ul></div>` : '');
@@ -35,7 +41,7 @@ export async function detail({ el, params }) {
 
   el.innerHTML = `${pageHead(`${t.name} 선생님`, '', [['선생님', '#/teachers'], [t.name]])}
   <div class="wrap page"><div class="profile">
-    <div><div class="t-photo">${monogram(t)}</div>
+    <div><div class="p-photo">${monogram(t)}</div>
       <div class="toolbar" style="margin-top:14px"><a class="btn block" href="#/timetable?teacher=${encodeURIComponent(t.name)}&term=final">시간표 보기</a></div>
     </div>
     <div>

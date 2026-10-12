@@ -28,7 +28,7 @@ const SCHEMA = {
     title: '선생님', cols: ['name', 'subject', 'schools'],
     fields: [
       ['name', '이름', 'text'], ['subject', '과목', 'select', S([...seed.subjects, '통합과학', '화학'])],
-      ['photo', '사진', 'image'], ['brand', '브랜드명', 'text'],
+      ['photo', '사진', 'image'], ['grades', '학년 태그(비우면 자동)', 'list'], ['brand', '브랜드명', 'text'],
       ['bio', '약력', 'list'], ['schools', '담당 학교·반', 'list'], ['highlights', '대표 결과', 'list'],
       ['method', '수업 방식', 'list'], ['materials', '교재', 'list'], ['prehigh', '예비고1 과정', 'list'], ['roles', '설명회·특강', 'list'],
       ['order', '정렬 순서', 'number'], ['hidden', '숨기기', 'bool'],
@@ -48,7 +48,8 @@ const SCHEMA = {
     fields: [
       ['exam', '시험', 'text', '예: 2026 2학기 중간'], ['teacherName', '선생님', 'text'], ['subject', '과목', 'select', S(seed.subjects)],
       ['school', '학교', 'select', S(schoolOpts())], ['grade', '학년', 'text'], ['headline', '대표 문구', 'text'], ['detail', '세부 내용', 'textarea'],
-      ['provisional', '가채점(확정 전)', 'bool'], ['featured', '메인에 노출', 'bool'], ['hidden', '숨기기', 'bool'],
+      ['provisional', '가채점(확정 전)', 'bool'], ['featured', '메인에 노출', 'bool'],
+      ['bandLabel', '보라 띠 문구(비우면 미노출)', 'text'], ['bandValue', '보라 띠 숫자', 'text'], ['bandUnit', '보라 띠 단위', 'text'], ['bandOrder', '보라 띠 순서', 'number'], ['hidden', '숨기기', 'bool'],
     ],
   },
   notices: {

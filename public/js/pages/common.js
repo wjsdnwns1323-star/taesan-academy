@@ -20,16 +20,33 @@ export function pageHead(title, desc = '', crumbs = []) {
   </div></div>`;
 }
 
+const initials = (name = '') => name.slice(-2);
 export function monogram(t) {
   if (t.photo) return `<img src="${esc(t.photo)}" alt="${esc(t.name)} 선생님" loading="lazy">`;
-  return `<div class="monogram" aria-hidden="true"><b>${esc((t.name || '').slice(-2))}</b><small>${esc(t.subject || '')}</small></div>`;
+  return `<span class="mono" aria-hidden="true">${esc(initials(t.name))}</span>`;
+}
+export function avatar(t) {
+  if (t && t.photo) return `<span class="avatar"><img src="${esc(t.photo)}" alt="" loading="lazy"></span>`;
+  return `<span class="avatar" aria-hidden="true">${esc(initials(t?.name || '?'))}</span>`;
+}
+
+// 담당 학교 목록에서 학년 태그를 뽑습니다(예: 대성고1 → 고1)
+export function gradeTags(t) {
+  if (t.grades && t.grades.length) return t.grades;
+  const g = new Set();
+  (t.schools || []).forEach((s) => { const m = s.match(/고\s?([123])|([123])\s*(?:$|[^\d])/); if (/고3|수능/.test(s)) g.add('고3'); else if (m) g.add(`고${m[1] || m[2]}`); });
+  if (/연합|확통|기하|공통수학/.test((t.schools || []).join(' ')) && !g.size) g.add('고1').add('고2');
+  if ((t.prehigh || []).length) g.add('예비고1');
+  return ['예비고1', '고1', '고2', '고3'].filter((x) => g.has(x));
 }
 
 export function teacherCard(t) {
-  const line = (t.highlights && t.highlights[0]) || (t.schools || []).slice(0, 3).join(' · ');
+  const line = (t.highlights && t.highlights[0]) || '';
   return `<a class="t-card" href="#/teachers/${esc(t.id)}">
-    <div class="t-photo">${monogram(t)}</div>
-    <div class="t-body"><span class="subj">${esc(t.subject)}</span><h3>${esc(t.name)}</h3><p>${esc(line)}</p></div>
+    <span class="tags">${gradeTags(t).map((x) => `<span class="tag">${x}</span>`).join('')}</span>
+    <span class="subj">${esc(t.subject)}</span><h3>${esc(t.name)}</h3>
+    ${line ? `<p class="hl">${esc(line)}</p>` : ''}
+    <span class="ph">${monogram(t)}</span>
   </a>`;
 }
 
