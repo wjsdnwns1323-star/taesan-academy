@@ -17,8 +17,9 @@ export async function list({ el }) {
   const events = visible(await load('events'));
   const open = events.filter(isOpen).sort((a, b) => (a.date || '9').localeCompare(b.date || '9'));
   const past = events.filter((e) => !isOpen(e)).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-  const card = (e) => { const d = dayParts(e.date); const th = thumbOf(e); return `<a class="ev-card" href="#/events/${esc(e.id)}">
-    <div class="ev-thumb">${th ? `<img src="${esc(th)}" alt="" loading="lazy">` : ''}
+  const small = (f) => (f.startsWith('images/band/') ? f.replace('images/band/', 'images/band/t/').replace(/\.\w+$/, '.jpg') : f);
+  const card = (e) => { const d = dayParts(e.date); const th = thumbOf(e) && small(thumbOf(e)); return `<a class="ev-card" href="#/events/${esc(e.id)}">
+    <div class="ev-thumb">${th ? `<img src="${esc(th)}" alt="" loading="lazy" onerror="this.onerror=null;this.src='${esc(thumbOf(e))}'">` : ''}
       <div class="ev-date">${d ? `<b class="num">${d.m}.${d.d}</b><span>${d.w}</span>` : '<b>상시</b><span>신청</span>'}</div></div>
     <div class="ev-body"><p class="ev-tags"><span class="tag">${esc(e.type)}</span> ${statusTag(isOpen(e) ? e.status : '종료')}</p>
     <h4>${esc(e.title)}</h4>

@@ -32,3 +32,14 @@ while IFS=$'\t' read -r pid n path out; do
   [ -s "public/$out" ] || curl -fsSL "https://coresos-phinf.pstatic.net/$path" -o "public/$out" || echo "실패: $pid-$n"
 done < scripts/band_images.tsv
 echo "밴드 이미지 $(ls public/images/band | wc -l)장"
+# 목록용 작은 이미지(가로 640px JPG)
+python3 - <<'PY'
+from pathlib import Path
+from PIL import Image
+out = Path('public/images/band/t'); out.mkdir(parents=True, exist_ok=True)
+for p in Path('public/images/band').glob('*.*'):
+    if p.is_file():
+        im = Image.open(p).convert('RGB'); im.thumbnail((640, 640), Image.LANCZOS)
+        im.save(out / (p.stem + '.jpg'), quality=82, optimize=True, progressive=True)
+print('밴드 썸네일', len(list(out.glob('*.jpg'))), '장')
+PY
