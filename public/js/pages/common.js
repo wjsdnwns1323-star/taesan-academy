@@ -28,11 +28,11 @@ export function photoOf(t) {
   return /^images\/people\/[\w-]+\.jpe?g$/.test(t.photo) ? t.photo.replace(/\.jpe?g$/, '.png') : t.photo;
 }
 export function monogram(t) {
-  if (t.photo) return `<img src="${esc(photoOf(t))}" alt="${esc(t.name)} 선생님" loading="lazy">`;
+  if (t.photo) return `<img src="${esc(photoOf(t))}" alt="${esc(t.name)} 선생님" loading="lazy" onerror="this.onerror=null;this.src=this.src.replace(/\\.png$/,'.jpg')">`;
   return `<span class="mono" aria-hidden="true">${esc(initials(t.name))}</span>`;
 }
 export function avatar(t) {
-  if (t && t.photo) return `<span class="avatar"><img src="${esc(photoOf(t))}" alt="" loading="lazy"></span>`;
+  if (t && t.photo) return `<span class="avatar"><img src="${esc(photoOf(t))}" alt="" loading="lazy" onerror="this.onerror=null;this.src=this.src.replace(/\\.png$/,'.jpg')"></span>`;
   return `<span class="avatar" aria-hidden="true">${esc(initials(t?.name || '?'))}</span>`;
 }
 
