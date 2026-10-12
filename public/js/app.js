@@ -1,5 +1,5 @@
 import { initBackend, backend, getSite, getUser, isAdmin, onUser, seed } from './backend.js';
-import { esc, $, $$ } from './ui.js';
+import { esc, $, $$, toast } from './ui.js';
 
 const PAGES = {
   home: () => import('./pages/home.js'),
@@ -119,8 +119,8 @@ function topbar() {
     </div>
     <div class="util-right">
       <div class="util-links">
-        ${u ? `${isAdmin() ? '<a href="#/admin">관리자</a>' : ''}<a href="#/mypage">${esc(u.name || '내 정보')}님</a><a href="#" data-logout>로그아웃</a>`
-            : '<a href="#/login">Google 로그인</a>'}
+        ${u ? `<span class="u-txt who">${esc(u.name || '회원')}님</span><a class="u-link" href="#/mypage">마이페이지</a>${isAdmin() ? '<a class="u-link" href="#/admin">관리자</a>' : ''}<button class="u-link" type="button" data-logout>로그아웃</button>`
+            : '<a class="u-link" href="#/login">로그인</a><a class="u-link" href="#/join">회원가입</a>'}
       </div>
       <form class="searchbox" role="search" data-search><span class="pill">검색</span>
         <label class="sr" for="g-q">사이트 검색</label><input id="g-q" name="q" placeholder="강사명, 과목명, 학교명을 입력하세요." autocomplete="off">
@@ -156,7 +156,7 @@ function drawer() {
       </div>
       <form data-search style="display:flex;gap:6px;margin-top:16px"><input class="input" name="q" placeholder="강사·과목·학교 검색" style="min-height:40px"><button class="btn sm">검색</button></form>
       <div class="toolbar" style="margin-top:12px">
-        ${u ? '<a class="btn sm ghost" href="#/mypage">내 신청 내역</a><a class="btn sm gray" href="#" data-logout>로그아웃</a>' : '<a class="btn sm" href="#/login">로그인</a><a class="btn sm ghost" href="#/join">회원가입</a>'}
+        ${u ? '<a class="btn sm ghost" href="#/mypage">마이페이지</a><button class="btn sm dark" type="button" data-logout>로그아웃</button>' : '<a class="btn sm" href="#/login">로그인</a><a class="btn sm ghost" href="#/join">회원가입</a>'}
         ${isAdmin() ? '<a class="btn sm gray" href="#/admin">관리자</a>' : ''}
       </div>
       ${MENU.map((m) => `<h4>${m.label}</h4>${m.groups.map(([t, h]) => `<a href="${h}">${esc(t)}</a>`).join('')}`).join('')}
@@ -227,7 +227,7 @@ function bindShell() {
   if (dimAll) dimAll.onclick = () => setAll(false);
   $$('a', am).forEach((a) => a.addEventListener('click', () => setAll(false)));
   $$('[data-logout]').forEach((a) => a.addEventListener('click', async (e) => {
-    e.preventDefault(); await backend.auth.signOut(); go('#/');
+    e.preventDefault(); await backend.auth.signOut(); toast('로그아웃했습니다.'); go('#/');
   }));
   const dr = $('#drawer');
   $$('[data-close]', dr).forEach((b) => (b.onclick = () => { dr.classList.remove('open'); dr.setAttribute('aria-hidden', 'true'); }));
