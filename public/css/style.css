@@ -708,3 +708,107 @@ button.u-link:hover, a.u-link:hover { color: #111; }
 .sp-list li.none:hover { background: none; }
 .sp-hint { font-size: 12px; color: var(--muted); margin-top: 4px; display: block; }
 .row2 { align-items: start; } .field { align-content: start; }
+
+/* =========================================================
+   첫 화면 영상(스크롤 월드) + 카드 디자인 통일
+   선생님 카드·영상 위 소개 카드·선생님 소개 화면을 모집안내 카드(r-card)와 같은 짜임으로 맞춥니다:
+   연한 바탕 + 테두리 태그 → 한 줄 소개 → 과목(보통) / 이름(굵게, 청록) → 아래 담당 학교
+   ========================================================= */
+
+/* ---------- 스크롤 월드 ---------- */
+.sw { position: relative; background: #1a2129; }
+.sw-stage { position: sticky; top: var(--hdr, 0px); height: calc(100vh - var(--hdr, 0px)); height: calc(100svh - var(--hdr, 0px)); overflow: hidden; }
+.sw-stage img, .sw-stage video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.sw-stage video { opacity: 0; transition: opacity .5s; }
+.sw-stage.ready video { opacity: 1; }
+.sw-stage::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(120% 90% at 50% 42%, transparent 55%, rgba(10, 16, 22, .35)); }
+.sw-load { position: absolute; right: 16px; bottom: 16px; z-index: 2; font-size: 12.5px; color: #f4f1e8; background: rgba(15, 22, 30, .55); padding: 4px 10px; border-radius: 999px; }
+.sw-stage.ready .sw-load { display: none; }
+.sw-steps { position: relative; margin-top: calc(-100vh + var(--hdr, 0px)); margin-top: calc(-100svh + var(--hdr, 0px)); z-index: 2; }
+.sw-step { display: flex; align-items: center; padding: 0 clamp(16px, 4vw, 64px); }
+.sw-hero { min-height: calc(100svh - var(--hdr, 0px)); align-items: flex-end; padding-bottom: 8svh; }
+.sw-dissolve { min-height: 120svh; }
+.sw-reveal { min-height: 150svh; }
+.sw-settle { min-height: 70svh; }
+.sw-t { min-height: 135svh; justify-content: flex-end; }
+
+.sw-panel, .sw-card { background: rgba(238, 243, 242, .96); border-radius: var(--radius); padding: 40px 36px 34px; box-shadow: 0 24px 60px -30px rgba(10, 20, 30, .55); min-width: 0; }
+.sw-intro { max-width: 560px; }
+.sw-intro h1 { font-size: clamp(40px, 5vw, 58px); font-weight: 800; letter-spacing: -0.04em; }
+.sw-intro p { margin-top: 12px; color: var(--sub); font-size: 18px; line-height: 1.5; max-width: 40ch; }
+.sw-intro .sw-act { margin-top: 22px; }
+.sw-cue { font-size: 15px; color: var(--blue) !important; font-weight: 700; }
+.sw-whisper { font-size: clamp(24px, 3vw, 34px); font-weight: 700; color: #fffaf0; text-shadow: 0 2px 18px rgba(0, 0, 0, .5); max-width: 16em; letter-spacing: -0.03em; }
+.sw-roster { max-width: 470px; }
+.sw-roster h2 { font-size: 30px; font-weight: 800; }
+.sw-roster > p { color: var(--sub); margin: 6px 0 18px; }
+.sw-roster dl { display: grid; grid-template-columns: max-content 1fr; gap: 10px 18px; margin: 0; align-items: baseline; }
+.sw-roster dt { color: var(--sub); font-size: 15px; }
+.sw-roster dd { margin: 0; display: flex; flex-wrap: wrap; gap: 4px 14px; }
+.sw-roster button { border: 0; background: none; padding: 0; font-weight: 700; font-size: 17px; color: var(--text); border-bottom: 1.5px solid transparent; }
+.sw-roster button:hover { color: var(--blue); border-color: var(--blue); }
+
+/* 영상 위 소개 카드 = 모집안내 카드 짜임 */
+.sw-card { width: min(500px, 40vw); display: grid; gap: 16px; }
+.sw-card header { display: grid; grid-template-columns: 1fr 128px; gap: 12px; align-items: end; }
+.sw-card .tag, .t-card .tags .tag, .profile .chips .tag { font-size: 15px; background: transparent; border: 1px solid #6b707a; color: var(--sub); padding: 2px 10px; border-radius: 4px; }
+.sw-card .copy { margin-top: 22px; font-size: 17px; line-height: 1.45; }
+.sw-card .t1 { margin-top: 10px; font-size: 26px; line-height: 1.25; font-weight: 500; }
+.sw-card .t2 { font-size: 30px; line-height: 1.25; font-weight: 800; color: var(--blue); letter-spacing: -0.03em; }
+.sw-ph { height: 156px; display: flex; align-items: flex-end; justify-content: center; margin-bottom: -34px; }
+.sw-ph img { max-width: 100%; max-height: 100%; object-fit: contain; object-position: bottom; }
+.sw-chips { display: flex; flex-wrap: wrap; gap: 6px; padding-top: 14px; border-top: 1px solid #d5ddd9; }
+.sw-chips span { font-size: 15px; font-weight: 600; color: var(--text); }
+.sw-chips span + span::before { content: '· '; color: var(--muted); font-weight: 400; }
+.sw-block h4 { font-size: 14px; color: var(--muted); font-weight: 700; margin-bottom: 4px; }
+.sw-block ul { padding-left: 18px; font-size: 15px; line-height: 1.55; }
+.sw-block li + li { margin-top: 2px; }
+.sw-win li::marker { color: var(--blue); }
+.sw-tt { border-top: 1px solid #d5ddd9; padding-top: 12px; }
+.sw-tt summary { cursor: pointer; font-weight: 700; color: var(--blue); }
+.sw-tt table { width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 8px; }
+.sw-tt td { padding: 6px; border-bottom: 1px solid #dfe5e2; vertical-align: top; }
+.sw-g { font-weight: 700; white-space: nowrap; }
+.sw-nw { white-space: nowrap; }
+.sw-more { font-size: 13px; color: var(--muted); margin-top: 6px; }
+.sw-act { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* ---------- 강사소개 바로가기(모집안내 자리) ---------- */
+.r-card.t-short { position: relative; }
+.r-card.t-short .copy { max-width: 62%; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.r-card.t-short .t1, .r-card.t-short .t2, .r-card.t-short .when { position: relative; z-index: 1; max-width: 60%; }
+.r-card.t-short .t2 { white-space: nowrap; }
+.r-card.t-short .when { font-size: 17px; }
+.r-ph { position: absolute; right: 0; bottom: 0; width: 48%; height: 72%; display: flex; align-items: flex-end; justify-content: flex-end; pointer-events: none; }
+.r-ph img { max-width: 100%; max-height: 100%; object-fit: contain; object-position: bottom right; }
+
+/* ---------- 선생님 카드 = 모집안내 카드 ---------- */
+.t-card { border: 0; background: var(--lav); padding: 40px 36px 0; }
+.t-grid > .t-card:nth-child(even) { background: var(--lav-2); }
+.t-card:hover { border-color: transparent; box-shadow: inset 0 0 0 2px rgba(27, 107, 123, .35); }
+.t-card .subj { margin-top: 26px; color: var(--text); font-size: 22px; font-weight: 500; }
+.t-card h3 { font-size: 28px; font-weight: 800; color: var(--blue); }
+.t-card .hl { color: var(--text); font-size: 15px; }
+
+/* ---------- 선생님 소개 화면 ---------- */
+.p-photo, .p-photo:has(img) { border: 0; background: var(--lav); }
+.profile .subj { color: var(--text); font-weight: 500; font-size: 24px; }
+.profile h2 { color: var(--blue); }
+
+@media (max-width: 760px) {
+  .sw-t { justify-content: center; align-items: flex-start; padding-top: 70svh; min-height: 160svh; }
+  .sw-card { width: 100%; padding: 30px 24px 26px; }
+  .sw-card header { grid-template-columns: 1fr 96px; }
+  .sw-ph { height: 120px; margin-bottom: -26px; }
+  .sw-card .t1 { font-size: 22px; } .sw-card .t2 { font-size: 26px; }
+  .sw-panel { padding: 30px 24px 26px; }
+  .sw-reveal { min-height: 190svh; align-items: flex-end; padding-bottom: 8svh; }
+  .sw-intro .btn { flex: 1 1 auto; }
+  .sw-dissolve { justify-content: center; } .sw-whisper { text-align: center; }
+  .t-card { padding: 22px 18px 0; }
+  .t-card h3 { font-size: 22px; } .t-card .subj { font-size: 16px; margin-top: 14px; }
+}
+@media (prefers-reduced-motion: reduce) { .sw-stage video { transition: none; } }
+/* 영상 위에서는 오른쪽 빠른 상담 버튼을 숨겨 카드와 겹치지 않게 */
+.quick { transition: opacity .3s; }
+body.sw-on .quick { opacity: 0; pointer-events: none; }

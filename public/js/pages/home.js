@@ -1,15 +1,16 @@
 import { seed } from '../backend.js';
 import { esc, $, $$, isPast, WEEK } from '../ui.js';
-import { load, visible, byOrder, teacherCard } from './common.js';
+import { load, visible, byOrder, teacherCard, gradeTags, photoOf } from './common.js';
+import { mountWorld } from './world.js';
 
-// 모집안내 카드 (관리자에서 바꾸려면 공지·강좌를 수정하세요. 카드 문구는 여기서 관리)
-const RECRUIT = [
-  { for: 'grade', tag: '고1·고2', copy: '학교마다 시험 범위가 다르니까\n반도 학교별로', t1: '2학기', t2: '기말대비 내신반', when: '10월 순차 개강', href: '#/timetable?term=final' },
-  { for: 'pre', tag: '예비고1', copy: '수능까지 이어지는 국어 공부법,\n중3부터 시작', t1: '올인원 국어', t2: 'SEASON 3 문법', when: '10. 25(일) 개강', href: '#/timetable?term=pre&subject=국어', alt: true },
-  { for: 'pre', tag: '예비고1', copy: 'PRE 대성 · PRE 대신 · PRE 대전외고\n원하는 고등학교에 맞춘 실전반', t1: '영어', t2: '고등 내신 실전반', when: '11. 20(금)부터 순차 개강', href: '#/timetable?term=pre&subject=영어' },
-  { for: 'grade', tag: '고1 연합반', copy: '학교 무관,\n진도에 맞춰 신청', t1: '통합사회', t2: '경제단원 집중특강', when: '11. 15(일)·22(일)', href: '#/timetable?term=final&school=연합반', alt: true, violet: true },
-  { for: 'pre', tag: '예비고1', copy: '16주 완성\n모의고사 + 핵심개념', t1: '국어', t2: '1% 완성반', when: '11. 21(토) 개강', href: '#/timetable?term=pre&subject=국어' },
-  { for: 'grade', tag: '대성고·대신고', copy: '원하는 날짜·시간에 응시,\n개별 성적표 발송', t1: '대성대신', t2: '진단고사', when: '상시 신청', href: '#/events/e-diag', alt: true, violet: true },
+// 강사소개 바로가기 카드 묶음: [필터 키, 버튼 이름, 해당 과목]
+const T_FILTERS = [
+  ['all', '전체', null],
+  ['kor', '국어', ['국어']],
+  ['eng', '영어', ['영어']],
+  ['math', '수학', ['수학']],
+  ['etc', '과학·사회', ['물리', '통합사회·한국사', '과학', '화학']],
+  ['lead', '입시전략', []],
 ];
 
 const I = {
@@ -28,7 +29,7 @@ const fmtDay = (iso) => {
 const shortDay = (iso) => { const d = new Date(`${iso}T00:00:00`); return `${d.getMonth() + 1}. ${d.getDate()}(${WEEK[d.getDay()]})`; };
 
 export async function render({ el }) {
-  const [teachers, results, events, notices] = await Promise.all([load('teachers'), load('results'), load('events'), load('notices')]);
+  const [teachers, results, events, notices, leaders, classes] = await Promise.all([load('teachers'), load('results'), load('events'), load('notices'), load('leaders'), load('classes')]);
   const upcoming = visible(events).filter((e) => e.status !== '종료' && !isPast(e.date)).sort((a, b) => (a.date || '9').localeCompare(b.date || '9'));
   const dated = upcoming.filter((e) => e.date);
   const recent = [...visible(notices)].sort((a, b) => (Number(!!b.pinned) - Number(!!a.pinned)) || b.date.localeCompare(a.date)).slice(0, 5);
@@ -36,13 +37,13 @@ export async function render({ el }) {
   const highlights = visible(results).filter((r) => r.featured).slice(0, 2);
   const vt = visible(teachers).sort(byOrder);
 
-  el.innerHTML = `<div class="home wrap">
+  el.innerHTML = `<div id="sw-root"></div><div class="home wrap">
   <section class="h-sec" aria-labelledby="rc-t">
     <div class="recruit">
       <div>
-        <div class="h-head"><h2 id="rc-t">모집안내</h2>
-          <div class="seg" role="group" aria-label="대상 선택">
-            <button data-rf="all" aria-pressed="true">전체</button><button data-rf="grade" aria-pressed="false">고1·고2</button><button data-rf="pre" aria-pressed="false">예비고1</button>
+        <div class="h-head"><h2 id="rc-t">강사소개 바로가기</h2>
+          <div class="seg" role="group" aria-label="과목 선택">
+            ${T_FILTERS.map(([k, label], i) => `<button data-rf="${k}" aria-pressed="${i === 0}">${label}</button>`).join('')}
           </div></div>
         <div class="r-viewport"><div class="r-track" id="r-track"></div></div>
       </div>
@@ -55,9 +56,9 @@ export async function render({ el }) {
       <div class="r-bar">
         <div class="progress" aria-hidden="true"><i id="r-prog"></i></div>
         <div class="ctrl-btns">
-          <div class="ctrl-grp"><button data-r="prev" aria-label="이전 배너">${I.prev}</button><button data-r="next" aria-label="다음 배너">${I.next}</button></div>
+          <div class="ctrl-grp"><button data-r="prev" aria-label="이전 선생님">${I.prev}</button><button data-r="next" aria-label="다음 선생님">${I.next}</button></div>
           <button class="ctrl-one" data-r="pause" aria-label="자동 넘김 멈춤">${I.pause}</button>
-          <a class="ctrl-one" href="#/timetable" aria-label="전체 과정 보기">${I.grid}</a>
+          <a class="ctrl-one" href="#/teachers" aria-label="선생님 전체 보기">${I.grid}</a>
         </div>
       </div>
       <div class="dots" id="n-dots"></div>
@@ -117,17 +118,44 @@ export async function render({ el }) {
   </section>
   </div>`;
 
-  // ---- 모집안내 캐러셀 ----
+  // ---- 첫 화면 영상(스크롤 월드) ----
+  const unmountWorld = mountWorld($('#sw-root', el), { teachers: vt, leaders: visible(leaders), classes: visible(classes) });
+  window.addEventListener('hashchange', unmountWorld, { once: true });
+
+  // ---- 강사소개 바로가기 캐러셀 (모집안내 카드 디자인 그대로) ----
   const st = { filter: 'all', i: 0, playing: !window.matchMedia('(prefers-reduced-motion: reduce)').matches, timer: null };
   const track = $('#r-track', el);
-  const cards = () => RECRUIT.filter((c) => st.filter === 'all' || c.for === st.filter);
+  const people = [...vt, ...visible(leaders).map((l) => ({ ...l, subject: '입시 전략', lead: true }))];
+  const cards = () => {
+    const f = T_FILTERS.find(([k]) => k === st.filter);
+    if (!f || !f[2]) return people;
+    return f[0] === 'lead' ? people.filter((p) => p.lead) : people.filter((p) => !p.lead && f[2].includes(p.subject));
+  };
   const perView = () => (window.innerWidth <= 640 ? 1 : window.innerWidth <= 1280 ? 2 : 3);
+  const schoolLine = (p) => {
+    const s = (p.schools || []).map((x) => x.replace(/(고)[123]$/, '$1')).filter((x, i, a) => a.indexOf(x) === i);
+    return s.length ? (s.length > 3 ? `${s.slice(0, 3).join(' · ')} 외 ${s.length - 3}` : s.join(' · ')) : '';
+  };
   function drawCards() {
-    track.innerHTML = cards().map((c) => `<a class="r-card${c.alt ? ' alt' : ''}" href="${c.href}">
-      <span class="tag">${esc(c.tag)}</span><p class="copy">${esc(c.copy)}</p>
-      <p class="t1">${esc(c.t1)}</p><p class="t2${c.violet ? ' violet' : ''}">${esc(c.t2)}</p><p class="when">${esc(c.when)}</p></a>`).join('');
+    track.innerHTML = cards().map((p, k) => {
+      const tag = p.lead ? (p.title || '소장') : [p.subject, gradeTags(p).join('·')].filter(Boolean).join(' · ');
+      const copy = p.lead ? (p.role || '') : ((p.highlights || [])[0] || (p.bio || [])[0] || '');
+      const when = p.lead ? '설명회·입시 상담' : (schoolLine(p) || '연합반');
+      const photo = p.photo ? `<span class="r-ph"><img src="${esc(photoOf(p))}" alt="" loading="lazy" onerror="this.onerror=null;this.src=this.src.replace(/\\.png$/,'.jpg')"></span>` : '';
+      return `<a class="r-card t-short${k % 2 ? ' alt' : ''}" data-goto="${esc(p.id)}" href="${p.lead ? '#/teachers' : `#/teachers/${esc(p.id)}`}" aria-label="${esc(p.name)} ${p.lead ? esc(p.title || '') : '선생님'} 소개로 이동">
+        <span class="tag">${esc(tag)}</span><p class="copy">${esc(copy)}</p>
+        <p class="t1">${esc(p.lead ? '입시 전략' : p.subject)}</p><p class="t2">${esc(p.name)}${p.lead ? ` ${esc(p.title || '')}` : ''}</p><p class="when">${esc(when)}</p>${photo}</a>`;
+    }).join('');
     st.i = 0; move();
   }
+  // 바로가기: 위 영상 속 그 선생님 소개 카드로 이동(없으면 선생님 페이지로)
+  track.addEventListener('click', (e) => {
+    const a = e.target.closest('[data-goto]'); if (!a) return;
+    const card = document.getElementById(`sw-${a.dataset.goto}`); if (!card) return;
+    e.preventDefault();
+    const r = card.getBoundingClientRect();
+    window.scrollTo({ top: r.top + window.scrollY + r.height / 2 - window.innerHeight / 2, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+  });
   function move() {
     const n = cards().length, pv = perView(), max = Math.max(0, n - pv);
     if (st.i > max) st.i = 0; if (st.i < 0) st.i = max;
