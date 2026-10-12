@@ -12,6 +12,6 @@ export const firebaseConfig = {
   useStorage: false,
 };
 
-// 관리자 이메일. 이 주소로 가입하고 이메일 인증을 마치면 관리자 화면이 열립니다.
+// 관리자 Google 계정. 이 계정으로 Google 로그인하면 관리자 화면이 열립니다.
 // firestore.rules / storage.rules 의 ADMIN_EMAILS 목록과 같게 유지하세요.
 export const adminEmails = ['wjsdnwns1323@uinone.net'];

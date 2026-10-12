@@ -132,7 +132,17 @@ function localAdapter() {
       localStorage.setItem('taesan:_session', JSON.stringify(u.uid));
       currentUser = u; notify(); return u;
     },
-    async signInWithGoogle() { throw new Error('체험 모드에서는 Google 로그인을 쓸 수 없습니다. Firebase를 연결하면 사용할 수 있습니다.'); },
+    async signInWithGoogle(email) {
+      if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new Error('체험용 이메일을 입력해 주세요.');
+      const users = read('users');
+      let u = users.find((x) => x.email === email); const isNew = !u;
+      if (!u) {
+        u = { id: uid(), email, name: email.split('@')[0], role: email.startsWith('admin@') || adminEmails.includes(email) ? 'admin' : 'member', verified: true, provider: 'google', createdAt: now() };
+        u.uid = u.id; users.push(u); write('users', users);
+      }
+      localStorage.setItem('taesan:_session', JSON.stringify(u.uid));
+      currentUser = u; notify(); return { user: u, isNew };
+    },
     async signOut() { localStorage.removeItem('taesan:_session'); currentUser = null; notify(); },
     async resetPassword() { throw new Error('체험 모드에서는 비밀번호 재설정 메일을 보낼 수 없습니다.'); },
     async updateProfile(patch) {

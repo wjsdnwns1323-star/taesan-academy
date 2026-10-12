@@ -2,16 +2,29 @@ import { backend, getUser, seed } from '../backend.js';
 import { esc, $, $$, formData, toast, statusTag, fmtDate, phoneOk, modal, confirmBox } from '../ui.js';
 import { pageHead } from './common.js';
 
-function bindGoogle(el, go, next) {
-  const b = el.querySelector('[data-google]');
-  if (!b) return;
+const G_ICON = `<svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.5l6.7-6.7C35.6 2.4 30.2 0 24 0 14.6 0 6.6 5.4 2.7 13.3l7.8 6C12.4 13.6 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.1 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.4c-.5 2.9-2.2 5.3-4.6 7l7.2 5.6c4.2-3.9 7.1-9.6 7.1-17.1z"/><path fill="#FBBC05" d="M10.5 28.7A14.5 14.5 0 0 1 9.5 24c0-1.6.3-3.2.8-4.7l-7.8-6A24 24 0 0 0 0 24c0 3.9.9 7.5 2.6 10.7l7.9-6z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.2-5.6c-2 1.4-4.7 2.3-8.7 2.3-6.3 0-11.6-4.1-13.5-9.8l-7.9 6C6.6 42.6 14.6 48 24 48z"/></svg>`;
+
+function authPage(el, go, query, title, desc) {
+  const local = backend.mode === 'local';
+  el.innerHTML = `${pageHead(title, desc, [[title]])}
+  <div class="wrap page"><div class="narrow card" style="text-align:center;padding:40px 36px">
+    <img src="images/brand/logo-dark.png" alt="태산학원" style="height:72px;margin:0 auto 18px">
+    <p style="color:var(--sub);margin-bottom:24px">태산학원은 Google 계정으로 로그인합니다.<br>처음이면 로그인과 동시에 가입됩니다.</p>
+    ${local ? '<div class="callout" style="text-align:left">체험 모드입니다. 아래 이메일로 Google 로그인을 흉내 냅니다. <b>admin@</b>으로 시작하면 관리자 화면을 볼 수 있습니다.</div><label class="field" style="text-align:left"><span>체험용 이메일</span><input class="input" id="demo-email" type="email" placeholder="you@gmail.com"></label>' : ''}
+    <label class="check" style="text-align:left;margin-bottom:18px"><input type="checkbox" id="agree"> <span><a class="link" href="#/privacy">개인정보 수집·이용</a>에 동의합니다. (필수)</span></label>
+    <button type="button" class="btn gray block" data-google style="gap:10px;height:52px;font-size:16px">${G_ICON} Google로 계속하기</button>
+    <p class="form-error" aria-live="polite" style="margin-top:12px"></p>
+  </div></div>`;
+  const b = el.querySelector('[data-google]'), err = el.querySelector('.form-error');
   b.onclick = async () => {
-    b.disabled = true;
+    if (!el.querySelector('#agree').checked) { err.textContent = '개인정보 수집·이용에 동의해 주세요.'; return; }
+    err.textContent = ''; b.disabled = true;
     try {
-      const { user, isNew } = await backend.auth.signInWithGoogle();
-      toast(`${user.name || 'Google 계정'}으로 로그인했습니다.`);
-      go(isNew || !user.phone ? '#/mypage?setup=1' : next);
-    } catch (ex) { toast(ex.message); b.disabled = false; }
+      const demo = el.querySelector('#demo-email');
+      const { user, isNew } = await backend.auth.signInWithGoogle(demo ? demo.value.trim() : undefined);
+      toast(`${user.name || user.email} 님, 환영합니다.`);
+      go(isNew || !user.phone ? '#/mypage?setup=1' : nextOf(query));
+    } catch (ex) { err.textContent = ex.message; b.disabled = false; }
   };
 }
 
@@ -19,88 +32,12 @@ const nextOf = (query) => (query.next && query.next.startsWith('/') ? `#${query.
 
 export async function login({ el, query, go }) {
   if (getUser()) return go(nextOf(query));
-  el.innerHTML = `${pageHead('로그인', '', [['로그인']])}
-  <div class="wrap page"><div class="narrow card">
-    ${backend.mode === 'local' ? '<div class="callout">체험 모드입니다. 가입 정보는 이 브라우저에만 저장됩니다. <b>admin@</b>으로 시작하는 이메일로 가입하면 관리자 화면을 써 볼 수 있습니다.</div>' : ''}
-    <button type="button" class="btn gray block" data-google style="gap:10px;margin-bottom:18px"><svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.5l6.7-6.7C35.6 2.4 30.2 0 24 0 14.6 0 6.6 5.4 2.7 13.3l7.8 6C12.4 13.6 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.1 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.4c-.5 2.9-2.2 5.3-4.6 7l7.2 5.6c4.2-3.9 7.1-9.6 7.1-17.1z"/><path fill="#FBBC05" d="M10.5 28.7A14.5 14.5 0 0 1 9.5 24c0-1.6.3-3.2.8-4.7l-7.8-6A24 24 0 0 0 0 24c0 3.9.9 7.5 2.6 10.7l7.9-6z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.2-5.6c-2 1.4-4.7 2.3-8.7 2.3-6.3 0-11.6-4.1-13.5-9.8l-7.9 6C6.6 42.6 14.6 48 24 48z"/></svg> Google로 계속하기</button>
-    <p style="display:flex;align-items:center;gap:12px;color:var(--muted);font-size:13px;margin-bottom:18px"><span style="flex:1;height:1px;background:var(--line)"></span>또는 이메일로<span style="flex:1;height:1px;background:var(--line)"></span></p>
-    <form id="lf" novalidate>
-      <label class="field"><span>이메일</span><input class="input" type="email" name="email" autocomplete="email" required></label>
-      <label class="field"><span>비밀번호</span><input class="input" type="password" name="password" autocomplete="current-password" required></label>
-      <p class="form-error" aria-live="polite"></p>
-      <button class="btn block">로그인</button>
-    </form>
-    <p style="margin-top:16px;display:flex;justify-content:space-between;font-size:14px"><button class="link" id="reset">비밀번호 찾기</button><a class="link" href="#/join">회원가입</a></p>
-  </div></div>`;
-  bindGoogle(el, go, nextOf(query));
-  const f = $('#lf', el);
-  f.onsubmit = async (e) => {
-    e.preventDefault(); const d = formData(f); const err = f.querySelector('.form-error');
-    if (!d.email || !d.password) return (err.textContent = '이메일과 비밀번호를 입력해 주세요.');
-    const b = f.querySelector('button'); b.disabled = true;
-    try { await backend.auth.signIn(d.email.trim(), d.password); toast('로그인했습니다.'); go(nextOf(query)); }
-    catch (ex) { err.textContent = ex.message; b.disabled = false; }
-  };
-  $('#reset', el).onclick = () => modal({
-    title: '비밀번호 찾기', sub: '가입한 이메일로 재설정 링크를 보내드립니다.',
-    content: `<form novalidate><label class="field"><span>이메일</span><input class="input" type="email" name="email" required value="${esc(f.email.value)}"></label><p class="form-error"></p><button class="btn block">재설정 메일 보내기</button></form>`,
-    onMount(box, close) {
-      const rf = box.querySelector('form');
-      rf.onsubmit = async (e) => {
-        e.preventDefault();
-        try { await backend.auth.resetPassword(rf.email.value.trim()); close(); toast('재설정 메일을 보냈습니다.'); }
-        catch (ex) { rf.querySelector('.form-error').textContent = ex.message; }
-      };
-    },
-  });
+  authPage(el, go, query, '로그인', '');
 }
 
-export async function join({ el, go }) {
+export async function join({ el, query, go }) {
   if (getUser()) return go('#/mypage');
-  el.innerHTML = `${pageHead('회원가입', '가입하면 수강 신청·설명회 예약·상담 답변을 한곳에서 볼 수 있습니다.', [['회원가입']])}
-  <div class="wrap page"><div class="narrow card">
-    <button type="button" class="btn gray block" data-google style="gap:10px;margin-bottom:18px"><svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.5l6.7-6.7C35.6 2.4 30.2 0 24 0 14.6 0 6.6 5.4 2.7 13.3l7.8 6C12.4 13.6 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.1 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.4c-.5 2.9-2.2 5.3-4.6 7l7.2 5.6c4.2-3.9 7.1-9.6 7.1-17.1z"/><path fill="#FBBC05" d="M10.5 28.7A14.5 14.5 0 0 1 9.5 24c0-1.6.3-3.2.8-4.7l-7.8-6A24 24 0 0 0 0 24c0 3.9.9 7.5 2.6 10.7l7.9-6z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.2-5.6c-2 1.4-4.7 2.3-8.7 2.3-6.3 0-11.6-4.1-13.5-9.8l-7.9 6C6.6 42.6 14.6 48 24 48z"/></svg> Google로 계속하기</button>
-    <p style="display:flex;align-items:center;gap:12px;color:var(--muted);font-size:13px;margin-bottom:18px"><span style="flex:1;height:1px;background:var(--line)"></span>또는 이메일로<span style="flex:1;height:1px;background:var(--line)"></span></p>
-    <form id="jf" novalidate>
-      <label class="field"><span>이메일</span><input class="input" type="email" name="email" autocomplete="email" required></label>
-      <div class="row2">
-        <label class="field"><span>비밀번호</span><input class="input" type="password" name="password" autocomplete="new-password" minlength="6" required><small>6자 이상</small></label>
-        <label class="field"><span>비밀번호 확인</span><input class="input" type="password" name="password2" autocomplete="new-password" required></label>
-      </div>
-      <div class="row2">
-        <label class="field"><span>이름</span><input class="input" name="name" required></label>
-        <label class="field"><span>회원 구분</span><select class="select" name="type"><option>학부모</option><option>학생</option></select></label>
-      </div>
-      <label class="field"><span>연락처</span><input class="input" name="phone" inputmode="tel" placeholder="010-0000-0000" required></label>
-      <div class="row2">
-        <label class="field"><span>학생 학교</span><select class="select" name="school"><option value="">선택</option>${seed.schools.filter((s) => s.id !== '연합반').map((s) => `<option>${s.id}</option>`).join('')}<option>중학교</option><option>기타</option></select></label>
-        <label class="field"><span>학년</span><select class="select" name="grade"><option value="">선택</option><option>중3</option><option>고1</option><option>고2</option><option>고3</option></select></label>
-      </div>
-      <label class="field"><span>학생 이름 <small>(학부모 가입 시)</small></span><input class="input" name="studentName"></label>
-      <div class="consent">수집 항목: 이메일, 이름, 연락처, 학생 학교·학년·이름<br>이용 목적: 회원 관리, 수강·상담 안내<br>보관 기간: 회원 탈퇴 시까지</div>
-      <label class="check"><input type="checkbox" name="agree"> 개인정보 수집·이용에 동의합니다. (필수)</label>
-      <label class="check" style="margin-top:6px"><input type="checkbox" name="marketing"> 개강·설명회 소식을 문자로 받겠습니다. (선택)</label>
-      <p class="form-error" aria-live="polite"></p>
-      <button class="btn block">가입하기</button>
-    </form>
-  </div></div>`;
-  bindGoogle(el, go, '#/mypage');
-  const f = $('#jf', el);
-  f.onsubmit = async (e) => {
-    e.preventDefault(); const d = formData(f); const err = f.querySelector('.form-error');
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(d.email)) return (err.textContent = '이메일 형식을 확인해 주세요.');
-    if ((d.password || '').length < 6) return (err.textContent = '비밀번호는 6자 이상으로 입력해 주세요.');
-    if (d.password !== d.password2) return (err.textContent = '비밀번호 확인이 일치하지 않습니다.');
-    if (!d.name.trim()) return (err.textContent = '이름을 입력해 주세요.');
-    if (!phoneOk(d.phone)) return (err.textContent = '연락처를 010-0000-0000 형식으로 입력해 주세요.');
-    if (!f.agree.checked) return (err.textContent = '개인정보 수집·이용에 동의해 주세요.');
-    const b = f.querySelector('button'); b.disabled = true;
-    try {
-      await backend.auth.signUp({ email: d.email.trim(), password: d.password, name: d.name.trim(), type: d.type, phone: d.phone.trim(), school: d.school, grade: d.grade, studentName: d.studentName || '', marketing: !!f.marketing.checked });
-      toast(backend.mode === 'firebase' ? '가입했습니다. 이메일 인증 메일을 확인해 주세요.' : '가입했습니다.');
-      go('#/mypage');
-    } catch (ex) { err.textContent = ex.message; b.disabled = false; }
-  };
+  authPage(el, go, query, '회원가입', '가입하면 수강 신청·설명회 예약·상담 답변을 한곳에서 볼 수 있습니다.');
 }
 
 export async function mypage({ el, go, query = {} }) {
@@ -111,7 +48,6 @@ export async function mypage({ el, go, query = {} }) {
   const desc = (a, b) => (b.createdAt || '').localeCompare(a.createdAt || '');
   el.innerHTML = `${pageHead('내 신청 내역', `${esc(u.name || u.email)}님${u.school ? ` · ${esc(u.school)} ${esc(u.grade || '')}` : ''}`, [['내 신청 내역']])}
   <div class="wrap page"><div class="mid">
-    ${backend.mode === 'firebase' && !u.verified ? '<div class="callout">이메일 인증이 아직 안 됐습니다. 받은편지함의 인증 메일을 확인해 주세요. <button class="link" id="resend">인증 메일 다시 받기</button></div>' : ''}
     <div class="tabs" role="tablist">
       ${[['apps', `수강 신청 ${apps.length}`], ['rsv', `설명회·진단고사 ${rsv.length}`], ['cons', `온라인 상담 ${cons.length}`], ['vis', `방문 상담 ${vis.length}`], ['me', '내 정보']].map(([k, t], i) => `<button role="tab" data-t="${k}" aria-selected="${i === 0}">${t}</button>`).join('')}
     </div>
@@ -124,7 +60,8 @@ export async function mypage({ el, go, query = {} }) {
     cons: () => (cons.length ? `<div class="status-list">${cons.sort(desc).map((c) => `<div class="item"><div><h4>${esc(c.title)}</h4><p>${esc(c.topic)} · ${esc(fmtDate(c.createdAt))}</p><p style="white-space:pre-line;color:var(--text);margin-top:6px">${esc(c.body)}</p>${c.answer ? `<div class="answer"><b>학원 답변</b><br>${esc(c.answer)}</div>` : ''}</div><div>${statusTag(c.answer ? '답변완료' : c.status)}</div></div>`).join('')}</div>` : empty('남긴 상담이 없습니다.', '#/consult', '상담 남기기')),
     vis: () => (vis.length ? `<div class="status-list">${vis.sort(desc).map((v) => `<div class="item"><div><h4>${esc(fmtDate(v.date))} ${esc(v.time)} · ${esc(v.branch)}</h4><p>${esc(v.memo || '')}</p></div><div>${statusTag(v.status)}</div></div>`).join('')}</div>` : empty('예약한 방문 상담이 없습니다.', '#/visit', '방문 상담 예약')),
     me: () => `<form id="pf" class="card" novalidate>
-      <label class="field"><span>이메일</span><input class="input" value="${esc(u.email)}" disabled></label>
+      <div class="row2"><label class="field"><span>Google 계정</span><input class="input" value="${esc(u.email)}" disabled></label>
+      <label class="field"><span>회원 구분</span><select class="select" name="type">${['학부모', '학생'].map((t) => `<option ${u.type === t ? 'selected' : ''}>${t}</option>`).join('')}</select></label></div>
       <div class="row2"><label class="field"><span>이름</span><input class="input" name="name" value="${esc(u.name || '')}"></label>
       <label class="field"><span>연락처</span><input class="input" name="phone" value="${esc(u.phone || '')}"></label></div>
       <div class="row2"><label class="field"><span>학생 학교</span><input class="input" name="school" value="${esc(u.school || '')}"></label>
@@ -144,9 +81,9 @@ export async function mypage({ el, go, query = {} }) {
     const pf = $('#pf', el);
     if (pf) pf.onsubmit = async (e) => {
       e.preventDefault(); const d = formData(pf);
-      if (d.phone && !phoneOk(d.phone)) return (pf.querySelector('.form-error').textContent = '연락처 형식을 확인해 주세요.');
-      await backend.auth.updateProfile({ name: d.name, phone: d.phone, school: d.school, grade: d.grade, studentName: d.studentName, marketing: !!pf.marketing.checked });
-      toast('정보를 저장했습니다.');
+      if (!phoneOk(d.phone || '')) return (pf.querySelector('.form-error').textContent = '연락처 형식을 확인해 주세요.');
+      await backend.auth.updateProfile({ type: d.type, name: d.name, phone: d.phone, school: d.school, grade: d.grade, studentName: d.studentName, marketing: !!pf.marketing.checked });
+      toast('정보를 저장했습니다.'); if (query.setup) go('#/mypage');
     };
   };
   $$('[data-t]', el).forEach((b) => (b.onclick = () => show(b.dataset.t)));

@@ -88,7 +88,7 @@ export async function render({ el, params, go }) {
   if (!u) return go('#/login?next=/admin');
   if (!isAdmin()) {
     el.innerHTML = `<div class="wrap page"><div class="narrow card"><h2 style="font-size:20px;font-weight:900">관리자만 볼 수 있습니다.</h2>
-      <p style="margin-top:8px;color:var(--muted)">${backend.mode === 'firebase' && !u.verified ? '관리자 이메일이라면 이메일 인증을 먼저 마쳐 주세요. 인증 후 다시 로그인하면 열립니다.' : '관리자 권한이 필요하면 원장님께 요청하세요.'}</p>
+      <p style="margin-top:8px;color:var(--muted)">관리자 권한이 필요하면 원장님께 요청하세요. 관리자 Google 계정으로 로그인했는지 확인해 주세요.</p>
       <p style="margin-top:14px"><a class="btn" href="#/">홈으로</a></p></div></div>`;
     return;
   }

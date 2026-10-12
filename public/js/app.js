@@ -120,7 +120,7 @@ function topbar() {
     <div class="util-right">
       <div class="util-links">
         ${u ? `${isAdmin() ? '<a href="#/admin">관리자</a>' : ''}<a href="#/mypage">${esc(u.name || '내 정보')}님</a><a href="#" data-logout>로그아웃</a>`
-            : '<a href="#/login">로그인</a><a href="#/join">회원가입</a>'}
+            : '<a href="#/login">Google 로그인</a>'}
       </div>
       <form class="searchbox" role="search" data-search><span class="pill">검색</span>
         <label class="sr" for="g-q">사이트 검색</label><input id="g-q" name="q" placeholder="강사명, 과목명, 학교명을 입력하세요." autocomplete="off">
