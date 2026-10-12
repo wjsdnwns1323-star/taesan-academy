@@ -9,7 +9,7 @@ import hashlib
 import json
 import subprocess
 import sys
-import urllib.request
+import tempfile
 from pathlib import Path
 
 SITE = sys.argv[1] if len(sys.argv) > 1 else 'taesan-academy'
@@ -25,16 +25,18 @@ CONFIG = {
 
 
 def call(method, url, body=None, raw=None, ctype='application/json'):
+    """curl로 API를 부릅니다(Cloud Shell에서 urllib가 멈추는 경우가 있어 curl 사용)."""
     data = raw if raw is not None else (json.dumps(body).encode() if body is not None else None)
-    req = urllib.request.Request(url, data=data, method=method, headers={
-        'Authorization': f'Bearer {TOKEN}', 'Content-Type': ctype, 'x-goog-user-project': PROJECT,
-    })
-    try:
-        with urllib.request.urlopen(req) as r:
-            txt = r.read().decode() or '{}'
-            return json.loads(txt)
-    except urllib.error.HTTPError as e:
-        sys.exit(f'{method} {url}\n{e.code} {e.read().decode()}')
+    cmd = ['curl', '-sS', '-m', '120', '-X', method, url, '-H', f'Authorization: Bearer {TOKEN}',
+           '-H', f'Content-Type: {ctype}', '-H', f'x-goog-user-project: {PROJECT}', '-w', '\n%{http_code}']
+    with tempfile.NamedTemporaryFile() as f:
+        if data is not None:
+            f.write(data); f.flush(); cmd += ['--data-binary', f'@{f.name}']
+        out = subprocess.run(cmd, capture_output=True).stdout.decode()
+    txt, _, code = out.rpartition('\n')
+    if not code.startswith('2'):
+        sys.exit(f'{method} {url}\n{code} {txt}')
+    return json.loads(txt or '{}')
 
 
 files, blobs = {}, {}
@@ -49,7 +51,7 @@ print(f'파일 {len(files)}개 준비')
 ver = call('POST', f'{API}/sites/{SITE}/versions', {'config': CONFIG})['name']
 res = call('POST', f'{API}/{ver}:populateFiles', {'files': files})
 need, upload = res.get('uploadRequiredHashes', []), res.get('uploadUrl')
-for i, h in enumerate(need, 1):
+for h in need:
     call('POST', f'{upload}/{h}', raw=blobs[h], ctype='application/octet-stream')
 print(f'업로드 {len(need)}개 완료')
 call('PATCH', f'{API}/{ver}?update_mask=status', {'status': 'FINALIZED'})
