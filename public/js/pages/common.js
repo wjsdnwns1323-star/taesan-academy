@@ -1,5 +1,6 @@
 import { backend, getUser } from '../backend.js';
 import { esc, modal, toast, formData, CONSENT, phoneOk, statusTag } from '../ui.js';
+import { POSTERS, TEACHER_POSTERS, posterCodes, posterUrl } from '../data/posters.js';
 
 // 같은 화면에서 여러 번 읽지 않도록 잠깐 보관
 const cache = {};
@@ -21,12 +22,17 @@ export function pageHead(title, desc = '', crumbs = []) {
 }
 
 const initials = (name = '') => name.slice(-2);
+// 강사 사진: 누끼(투명 배경)·얼굴 높이 맞춘 PNG를 씁니다. 예전 데이터의 .jpg 경로도 같은 PNG로 바꿉니다.
+export function photoOf(t) {
+  if (!t || !t.photo) return '';
+  return /^images\/people\/[\w-]+\.jpe?g$/.test(t.photo) ? t.photo.replace(/\.jpe?g$/, '.png') : t.photo;
+}
 export function monogram(t) {
-  if (t.photo) return `<img src="${esc(t.photo)}" alt="${esc(t.name)} 선생님" loading="lazy">`;
+  if (t.photo) return `<img src="${esc(photoOf(t))}" alt="${esc(t.name)} 선생님" loading="lazy">`;
   return `<span class="mono" aria-hidden="true">${esc(initials(t.name))}</span>`;
 }
 export function avatar(t) {
-  if (t && t.photo) return `<span class="avatar"><img src="${esc(t.photo)}" alt="" loading="lazy"></span>`;
+  if (t && t.photo) return `<span class="avatar"><img src="${esc(photoOf(t))}" alt="" loading="lazy"></span>`;
   return `<span class="avatar" aria-hidden="true">${esc(initials(t?.name || '?'))}</span>`;
 }
 
@@ -95,6 +101,31 @@ export function applyClass(c) {
           err.textContent = `접수하지 못했습니다. ${ex.message}`; btn.disabled = false;
         }
       };
+    },
+  });
+}
+
+// 강의 내용 보기: 밴드에 올라온 해당 수업 이미지 카드를 팝업으로 보여 줍니다.
+export function showClassCards(c, teacher) {
+  const own = posterCodes(c.src);
+  const more = (TEACHER_POSTERS[teacher?.id || c.teacherId] || []).filter((p) => !own.includes(p) && POSTERS[p]);
+  const fig = (code) => `<figure class="pc-card"><a href="${posterUrl(code)}" target="_blank" rel="noopener" title="크게 보기">
+      <img src="${posterUrl(code)}" alt="${esc(POSTERS[code])}" loading="lazy"></a>
+      <figcaption>${esc(POSTERS[code])}</figcaption></figure>`;
+  const when = [c.start && `${c.start} 개강`, c.time].filter(Boolean).join(' · ');
+  modal({
+    title: classLabel(c) || '강의 내용',
+    sub: `${esc(c.teacherName || '')}${c.teacherName ? ' 선생님' : ''}${when ? ` · ${esc(when)}` : ''} ${c.status ? statusTag(c.status) : ''}`,
+    content: `<div class="pc-wrap">
+      ${own.length ? `<h3 class="pc-h">이 수업 안내</h3><div class="pc-list">${own.map(fig).join('')}</div>` : ''}
+      ${more.length ? `<h3 class="pc-h">${esc(c.teacherName || '')} 선생님 수업 소개</h3><div class="pc-list">${more.map(fig).join('')}</div>` : ''}
+      ${!own.length && !more.length ? '<p class="empty">아직 올라온 수업 안내 이미지가 없습니다.</p>' : ''}
+      <div class="toolbar pc-foot"><button class="btn block" data-apply-now>${c.status === '마감' ? '대기 신청하기' : '수강 신청하기'}</button></div>
+    </div>`,
+    onMount(box, close) {
+      box.closest('.modal').classList.add('modal-cards');
+      box.querySelectorAll('.pc-card img').forEach((img) => (img.onerror = () => img.closest('.pc-card').remove()));
+      box.querySelector('[data-apply-now]').onclick = () => { close(); applyClass(c); };
     },
   });
 }

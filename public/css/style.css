@@ -540,3 +540,22 @@ ul { margin: 0; padding: 0; }
 .t-card .ph:has(img) { width: 46%; height: 76%; justify-content: flex-end; }
 .logo .tag-line { display: none; }
 @media (max-width: 640px) { .logo .logo-img { height: 54px; } .t-card .ph:has(img) { width: 44%; height: 50%; right: 10px; } .t-card .tags { max-width: 100%; } .t-card h3 { position: relative; z-index: 1; } }
+
+/* 강사 누끼 사진(600x800 투명 PNG, 얼굴 높이·위치 통일) */
+.t-card .ph img { border-radius: 0; object-position: bottom center; }
+.t-card .ph:has(img) { height: 82%; }
+.p-photo:has(img) { background: linear-gradient(180deg, #f4f6fb 0%, var(--lav) 100%); align-items: flex-end; padding: 0; }
+.p-photo img { border-radius: 0; height: 100%; max-height: none; }
+.avatar img { position: absolute; width: 178%; height: auto; max-width: none; left: -39%; top: -24%; object-fit: initial; }
+
+/* 강의 내용 보기 팝업: 밴드 이미지 카드 */
+.modal-cards .box { width: min(760px, 100%); }
+.pc-h { font-size: 17px; font-weight: 800; margin: 18px 0 10px; }
+.pc-h:first-child { margin-top: 4px; }
+.pc-list { display: grid; gap: 16px; }
+.pc-card { margin: 0; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; background: var(--bg-gray); }
+.pc-card a { display: block; }
+.pc-card img { display: block; width: 100%; height: auto; }
+.pc-card figcaption { padding: 10px 14px; font-size: 14px; color: var(--sub); background: #fff; border-top: 1px solid var(--line); }
+.pc-foot { position: sticky; bottom: -32px; background: #fff; padding: 14px 0 0; margin-top: 18px; }
+@media (max-width: 640px) { .pc-foot { bottom: -24px; } }

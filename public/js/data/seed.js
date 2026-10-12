@@ -71,7 +71,7 @@ export const teachers = [
     prehigh: ['1% 완성 모의고사+핵심개념반(16주 완성)'],
     roles: ['대성&대신 설명회 연사(9/22, 10/20)'],
     highlights: ['대신고1 2학기 중간 최고점 95.2점(가채점)', '대신고2 100점 8명(가채점)', '공주사대부고1 국어 1등급 최다 예상(가채점)'],
-    method: [], materials: [], photo: 'images/people/kim-taehyun.jpg', order: 1,
+    method: [], materials: [], photo: 'images/people/kim-taehyun.png', order: 1,
   },
   {
     id: 'kim-dohyun', name: '김도현', subject: '국어', aka: ['김도현 국어연구소'],
@@ -81,7 +81,7 @@ export const teachers = [
     prehigh: ['올인원 국어 SEASON 1~4'],
     method: ['자체 교재 수업', '매주 과제장 제공', '매주 피드백 문자 발송', '수업 외 시간 상시 질의응답', '1:1 개별 클리닉 진행', '매주 어휘 TEST 진행', '꼼꼼한 개념 학습부터 문제 적용까지'],
     highlights: ['관저고2 전원 90점 이상, 50% 이상 1등급'],
-    roles: [], materials: ['자체 제작 교재'], photo: 'images/people/kim-dohyun.jpg', order: 2,
+    roles: [], materials: ['자체 제작 교재'], photo: 'images/people/kim-dohyun.png', order: 2,
   },
   {
     id: 'lee-geonjun', name: '이건준', subject: '영어', aka: ['이건준영어', 'LEEGEONJUN ENGLISH'],
@@ -93,7 +93,7 @@ export const teachers = [
     roles: ['대성&대신 설명회 연사', '예비고1 대전외고 설명회 연사', '대성고 추석 무료특강'],
     highlights: ['9월 모의고사 1등급 95명', '대성고1·2 2학기 중간 20·23문항 적중', '2026년 대성고생 300명 이상 수강'],
     method: ['원문을 더 단단하게', '변형을 더 다양하게', '고난도 적용까지 끝까지'],
-    photo: 'images/people/lee-geonjun.jpg', order: 3,
+    photo: 'images/people/lee-geonjun.png', order: 3,
   },
   {
     id: 'lee-yewon', name: '이예원', subject: '영어', aka: ['예원영어'],
@@ -102,7 +102,7 @@ export const teachers = [
     prehigh: ['고급 구문학개론(8회)'],
     method: ['구조를 읽는 힘 — 복잡한 문장 분석에서 어법 판단까지', '의미를 연결하는 힘 — 직역을 넘어 인과·대조·논리 파악', '숨은 의미를 풀어내는 힘 — 함축·비유에서 실제 의미 설명'],
     highlights: ['둔원고 영어 100점, 재원생 65% 이상 90점 이상(가채점)'],
-    roles: [], materials: [], photo: 'images/people/lee-yewon.jpg', order: 4,
+    roles: [], materials: [], photo: 'images/people/lee-yewon.png', order: 4,
   },
   {
     id: 'kim-mina', name: '김민아', subject: '수학', aka: ['민아T', 'MinAh Math'],
@@ -111,14 +111,14 @@ export const teachers = [
     materials: ['FINAL 교재', 'FINAL 예상문제'],
     highlights: ['2026 1학기 중간 대전외고 고1 전교1등 13명 · 고2 1등급 19명', '2학기 중간 98점, 24문항 중 24문항 적중(가채점)'],
     roles: ['예비고1 대전외고 설명회 연사(10/20)'],
-    prehigh: [], method: [], photo: 'images/people/kim-mina.jpg', order: 5,
+    prehigh: [], method: [], photo: 'images/people/kim-mina.png', order: 5,
   },
   {
     id: 'park-hanbit', name: '박한빛', subject: '수학', aka: ['박한빛수학'],
     bio: ['전) M2O 고등관 공동 원장'],
     schools: ['공주사대부고1'],
     highlights: ['공주사대부고 2학기 중간 98.5 최고점 · 1등급 과반수'],
-    prehigh: [], method: [], roles: [], materials: [], photo: 'images/people/park-hanbit.jpg', order: 6,
+    prehigh: [], method: [], roles: [], materials: [], photo: 'images/people/park-hanbit.png', order: 6,
   },
   {
     id: 'yang-jiwoon', name: '양지운', subject: '수학', grades: ['고1', '고2', '고3'], aka: ['양지운T'],
@@ -126,7 +126,7 @@ export const teachers = [
     schools: ['연합 공통수학2 집중반', '확통 집중반', '기하 집중반'],
     materials: ['WORKBOOK 공통수학Ⅱ(양개념)', 'ACCELERATOR(SERIES 3. 기출연습)', 'HIGH-END 공통수학2 FINAL 자료'],
     method: ['WEEK 1~3 개념복습 양개념', 'WEEK 4~6 실전개념 기출', 'WEEK 7 동형 모의고사'],
-    prehigh: [], highlights: [], roles: [], photo: 'images/people/yang-jiwoon.jpg', order: 7,
+    prehigh: [], highlights: [], roles: [], photo: 'images/people/yang-jiwoon.png', order: 7,
   },
   {
     id: 'song-kanghoon', name: '송강훈', subject: '수학',
@@ -144,20 +144,20 @@ export const teachers = [
     id: 'jeong-jikhan', name: '정직한', subject: '통합사회·한국사', aka: ['정직한 사회'],
     bio: [], schools: ['대성고1', '대신고1', '대전외고1', '연합반 특강'],
     materials: ['한국사 중간고사 내신대비자료(연합반 무료 제공)'],
-    prehigh: ['통합사회(12월)'], method: [], highlights: [], roles: [], photo: 'images/people/jeong-jikhan.jpg', order: 10,
+    prehigh: ['통합사회(12월)'], method: [], highlights: [], roles: [], photo: 'images/people/jeong-jikhan.png', order: 10,
   },
   {
     id: 'choi-sunghoon', name: '최성훈', subject: '물리', aka: ['최성훈T', '최성훈물리'],
     bio: [], schools: ['대성고2', '대신고2', '공주사대부고2', '연합A·B'],
     prehigh: ['물리학 비기너 → 물리학 문제풀이(10주) → 물리학 마스터'],
-    method: [], highlights: [], roles: [], materials: [], photo: 'images/people/choi-sunghoon.jpg', order: 11,
+    method: [], highlights: [], roles: [], materials: [], photo: 'images/people/choi-sunghoon.png', order: 11,
   },
 ];
 
 export const leaders = [
-  { id: 'jeong-jeongrae', name: '정정래', title: '소장', role: '입시전략(대입·고교선택) 설명회 강연', photo: 'images/people/jeong-jeongrae.jpg', bio: [] },
+  { id: 'jeong-jeongrae', name: '정정래', title: '소장', role: '입시전략(대입·고교선택) 설명회 강연', photo: 'images/people/jeong-jeongrae.png', bio: [] },
   {
-    id: 'kim-hyun', name: '김현', title: '소장', role: '자소서·면접, 대전외고·대성대신 입시 설명회', photo: 'images/people/kim-hyun.jpg',
+    id: 'kim-hyun', name: '김현', title: '소장', role: '자소서·면접, 대전외고·대성대신 입시 설명회', photo: 'images/people/kim-hyun.png',
     bio: ['서울대학교 외교학과 학사·석사·박사과정 수료', '서울대학교 법학전문대학원 졸업', '누적 2,000명 이상의 SKY 합격생 배출 실적', '매년 100명 이상의 특목고·자사고 지원자 자기소개서 및 면접 지도', '現 대치 두각·카이로스 논술구술·이강 일산 강사', '前 로고스 논술구술·시대인재 특목·KNS어학원 등 출강'],
   },
 ];
