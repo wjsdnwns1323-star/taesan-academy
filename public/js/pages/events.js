@@ -4,23 +4,33 @@ import { load, visible, pageHead, clearCache } from './common.js';
 import { BAND_POSTS } from '../data/band.js';
 import { POSTERS, posterCodes, posterUrl } from '../data/posters.js';
 
+const baseOf = (e) => (seed.events || []).find((x) => x.id === e.id) || {};
+function thumbOf(e) {
+  const ids = e.bandPosts || baseOf(e).bandPosts || [];
+  for (const id of ids) { const p = BAND_POSTS.find((x) => x.id === id); if (p && p.imgs.length) return p.imgs[0]; }
+  const c = posterCodes(e.src || baseOf(e).src)[0];
+  return c ? posterUrl(c) : '';
+}
 const isOpen = (e) => e.status !== '종료' && e.status !== '마감' && !isPast(e.date);
 
 export async function list({ el }) {
   const events = visible(await load('events'));
   const open = events.filter(isOpen).sort((a, b) => (a.date || '9').localeCompare(b.date || '9'));
   const past = events.filter((e) => !isOpen(e)).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-  const card = (e) => { const d = dayParts(e.date); return `<a class="ev-card" href="#/events/${esc(e.id)}">
-    <div class="ev-date">${d ? `<b class="num">${d.d}</b><span>${d.m}월 ${d.w}</span>` : '<b>상시</b><span>신청</span>'}</div>
-    <div><p><span class="tag">${esc(e.type)}</span> ${statusTag(isOpen(e) ? e.status : '종료')}</p><h4 style="margin-top:6px">${esc(e.title)}</h4>
-    <p>${esc(e.time)} · ${esc(e.place)} · 대상 ${esc(e.target)}</p>${e.benefit ? `<p>참석 혜택: ${esc(e.benefit)}</p>` : ''}</div></a>`; };
+  const card = (e) => { const d = dayParts(e.date); const th = thumbOf(e); return `<a class="ev-card" href="#/events/${esc(e.id)}">
+    <div class="ev-thumb">${th ? `<img src="${esc(th)}" alt="" loading="lazy">` : ''}
+      <div class="ev-date">${d ? `<b class="num">${d.m}.${d.d}</b><span>${d.w}</span>` : '<b>상시</b><span>신청</span>'}</div></div>
+    <div class="ev-body"><p class="ev-tags"><span class="tag">${esc(e.type)}</span> ${statusTag(isOpen(e) ? e.status : '종료')}</p>
+    <h4>${esc(e.title)}</h4>
+    <p class="ev-meta">${esc(e.time)} · ${esc(e.place)}</p><p class="ev-meta">대상 ${esc(e.target)}</p>
+    ${e.benefit ? `<p class="ev-gift">🎁 ${esc(e.benefit)}</p>` : ''}</div></a>`; };
   el.innerHTML = `${pageHead('설명회·특강', '고교 선택, 학교별 입시 전략, 진단고사 일정을 안내합니다.', [['학원안내', '#/about'], ['설명회·특강']])}
-  <div class="wrap page"><div class="mid">
-    <h2 style="font-size:20px;font-weight:900;color:var(--ink);margin-bottom:6px">예약 받는 중</h2>
-    ${open.map(card).join('') || '<p class="empty">지금 예약 받는 설명회가 없습니다.</p>'}
-    <h2 style="font-size:20px;font-weight:900;color:var(--ink);margin:40px 0 6px">지난 설명회·특강</h2>
-    ${past.map(card).join('')}
-  </div></div>`;
+  <div class="wrap page">
+    <h2 class="ev-h">예약 받는 중</h2>
+    <div class="ev-grid">${open.map(card).join('') || '<p class="empty">지금 예약 받는 설명회가 없습니다.</p>'}</div>
+    <h2 class="ev-h" style="margin-top:48px">지난 설명회·특강</h2>
+    <div class="ev-grid">${past.map(card).join('')}</div>
+  </div>`;
 }
 
 export async function detail({ el, params }) {
@@ -33,17 +43,19 @@ export async function detail({ el, params }) {
   const base = (seed.events || []).find((x) => x.id === e.id) || {};
   const posts = (e.bandPosts || base.bandPosts || []).map((id) => BAND_POSTS.find((p) => p.id === id)).filter(Boolean).slice(0, 1);
   const shown = new Set();
+  const hero = thumbOf(e);
   const fig = (src, cap) => `<figure class="pc-card"><a href="${esc(src)}" target="_blank" rel="noopener" title="크게 보기"><img src="${esc(src)}" alt="${esc(cap)}" loading="lazy"></a></figure>`;
-  const posterHtml = posterCodes(e.src || base.src).filter((c) => !shown.has(c) && shown.add(c)).map((c) => fig(posterUrl(c), POSTERS[c])).join('');
+  const posterHtml = posterCodes(e.src || base.src).filter((c) => posterUrl(c) !== hero && !shown.has(c) && shown.add(c)).map((c) => fig(posterUrl(c), POSTERS[c])).join('');
   const bandHtml = posts.map((p) => `<section class="plan-sec ev-band">
       <h4>설명회 안내 <small>${esc(p.date)} · 밴드 게시글</small></h4>
       ${p.text ? `<div class="plan-text">${esc(p.text)}</div>` : ''}
-      ${p.imgs.length ? `<div class="pc-list">${p.imgs.map((f) => fig(f, p.title)).join('')}</div>` : ''}
+      ${p.imgs.filter((f) => f !== hero).length ? `<div class="pc-list">${p.imgs.filter((f) => f !== hero).map((f) => fig(f, p.title)).join('')}</div>` : ''}
       <p class="plan-src"><a class="link" href="https://band.us/band/61446116/post/${p.id}" target="_blank" rel="noopener">밴드 원문 보기 ›</a></p>
     </section>`).join('') + (posterHtml ? `<section class="plan-sec ev-band"><h4>포스터</h4><div class="pc-list" style="margin-top:12px">${posterHtml}</div></section>` : '');
   el.innerHTML = `${pageHead(e.title, '', [['설명회·특강', '#/events'], [e.type]])}
   <div class="wrap page"><div class="profile ev">
     <div>
+      ${thumbOf(e) ? `<a class="ev-hero" href="${esc(thumbOf(e))}" target="_blank" rel="noopener"><img src="${esc(thumbOf(e))}" alt="${esc(e.title)}"></a>` : ''}
       <dl class="kv">
         <dt>일시</dt><dd>${e.date ? esc(e.date.replace(/-/g, '.')) + ' ' : ''}${esc(e.time)}${e.dateNote ? ` <small style="color:var(--muted)">(${esc(e.dateNote)})</small>` : ''}</dd>
         <dt>장소</dt><dd>${esc(e.place)}</dd>

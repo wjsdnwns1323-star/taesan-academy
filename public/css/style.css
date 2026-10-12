@@ -590,3 +590,23 @@ ul { margin: 0; padding: 0; }
   .plan-info th { width: 60px; }
 }
 .ev-band .plan-text { max-height: none; }
+
+/* 설명회·특강 목록 */
+.ev-h { font-size: 22px; font-weight: 900; color: var(--text); margin-bottom: 16px; }
+.ev-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+.ev-card { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: var(--radius-md); overflow: hidden; background: #fff; transition: box-shadow .2s, transform .2s; }
+.ev-card:hover { box-shadow: 0 10px 28px rgba(17,26,29,.12); transform: translateY(-2px); }
+.ev-thumb { position: relative; aspect-ratio: 1 / 1; background: var(--lav); overflow: hidden; }
+.ev-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.ev-date { position: absolute; left: 14px; top: 14px; background: rgba(17,26,29,.88); color: #fff; border-radius: 10px; padding: 6px 12px; text-align: center; line-height: 1.2; }
+.ev-date b { display: block; font-size: 20px; font-weight: 800; }
+.ev-date span { font-size: 12px; opacity: .85; }
+.ev-body { padding: 18px 20px 22px; display: grid; gap: 6px; }
+.ev-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+.ev-body h4 { font-size: 18px; font-weight: 800; line-height: 1.4; }
+.ev-meta { color: var(--sub); font-size: 14px; }
+.ev-gift { font-size: 14px; color: var(--blue-2); font-weight: 600; }
+.ev-hero { display: block; border-radius: var(--radius-md); overflow: hidden; border: 1px solid var(--line); margin-bottom: 24px; }
+.ev-hero img { width: 100%; height: auto; }
+@media (max-width: 960px) { .ev-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 640px) { .ev-grid { grid-template-columns: 1fr; } }
