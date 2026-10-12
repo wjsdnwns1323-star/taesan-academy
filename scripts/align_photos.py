@@ -30,8 +30,8 @@ def detect_face(img):
     bg = Image.new('RGB', img.size, (255, 255, 255))
     bg.paste(img, mask=img.split()[3])
     gray = cv2.cvtColor(np.array(bg), cv2.COLOR_RGB2GRAY)
-    min_side = max(40, img.width // 10)
-    faces = CASCADE.detectMultiScale(gray, scaleFactor=1.08, minNeighbors=6, minSize=(min_side, min_side))
+    min_side = max(40, img.width // 5)  # 상반신 사진: 얼굴이 가로의 20% 이상
+    faces = CASCADE.detectMultiScale(gray, scaleFactor=1.05, minNeighbors=5, minSize=(min_side, min_side))
     if len(faces) == 0:
         return None
     # 위쪽 절반에 있는 가장 큰 얼굴
