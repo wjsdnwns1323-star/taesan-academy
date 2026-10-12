@@ -559,3 +559,33 @@ ul { margin: 0; padding: 0; }
 .pc-card figcaption { padding: 10px 14px; font-size: 14px; color: var(--sub); background: #fff; border-top: 1px solid var(--line); }
 .pc-foot { position: sticky; bottom: -32px; background: #fff; padding: 14px 0 0; margin-top: 18px; }
 @media (max-width: 640px) { .pc-foot { bottom: -24px; } }
+
+/* 강의계획 보기 (메가스터디 강의계획서 스타일) */
+.modal-plan .box { width: min(860px, 100%); padding: 28px; }
+.plan-hero { position: relative; overflow: hidden; border-radius: 14px; padding: 22px 26px 26px; min-height: 210px; color: #fff;
+  background: linear-gradient(120deg, #14254d 0%, #1f3b8a 62%, #3c5cf5 100%); }
+.plan-hero::after { content: ''; position: absolute; right: -60px; top: -60px; width: 320px; height: 320px; border-radius: 50%; background: rgba(255,255,255,.08); }
+.plan-chips { display: flex; flex-wrap: wrap; gap: 6px; position: relative; z-index: 1; }
+.plan-chips span { border: 1px solid rgba(255,255,255,.7); border-radius: 6px; padding: 3px 12px; font-size: 14px; font-weight: 600; }
+.plan-chips span:first-child { background: #fff; color: #14254d; border-color: #fff; }
+.plan-sub { color: #ffe26a; font-weight: 800; font-size: 16px; margin-top: 16px; max-width: 64%; position: relative; z-index: 1; }
+.plan-title { font-size: 28px; font-weight: 900; letter-spacing: -0.03em; line-height: 1.25; margin-top: 4px; max-width: 64%; position: relative; z-index: 1; }
+.plan-desc { margin-top: 8px; opacity: .85; position: relative; z-index: 1; }
+.plan-photo { position: absolute; right: 18px; bottom: 0; height: 100%; max-height: 240px; width: auto; z-index: 1; }
+.plan-name { position: absolute; right: 0; bottom: 14px; z-index: 2; background: #ffe26a; color: #14254d; font-weight: 800; padding: 4px 18px 4px 14px; border-radius: 6px 0 0 6px; }
+.plan-info { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 15px; }
+.plan-info th { background: #14254d; color: #fff; font-weight: 600; width: 90px; padding: 12px 8px; }
+.plan-info td { background: var(--bg-gray); padding: 12px 14px; text-align: center; }
+.plan-sec { margin-top: 18px; }
+.plan-sec h4 { background: #14254d; color: #fff; font-size: 19px; font-weight: 800; padding: 10px 16px; border-radius: 8px 8px 0 0; display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.plan-sec h4 small { font-size: 13px; font-weight: 500; opacity: .8; }
+.plan-text { white-space: pre-line; border: 1px solid var(--line); border-top: 0; padding: 16px 18px; font-size: 15.5px; line-height: 1.75; max-height: 360px; overflow: auto; margin-bottom: 12px; }
+.plan-src { text-align: right; margin-top: 8px; font-size: 14px; }
+@media (max-width: 640px) {
+  .modal-plan .box { padding: 20px 14px; }
+  .plan-hero { padding: 18px; min-height: 230px; }
+  .plan-title { font-size: 21px; max-width: 100%; }
+  .plan-sub { max-width: 100%; font-size: 14px; }
+  .plan-photo { opacity: .35; }
+  .plan-info th { width: 60px; }
+}

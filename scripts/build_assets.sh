@@ -24,3 +24,11 @@ for p in sorted(Path('.assets_raw/posters').glob('*.jpg')):
 print('수업 이미지 카드', len(list(Path('public/images/posters').glob('*.jpg'))), '장')
 PY
 rm -f public/images/people/*.jpg
+
+# 밴드 강좌 소개 원본 이미지(고화질) — scripts/band_images.tsv
+mkdir -p public/images/band
+while IFS=$'\t' read -r pid n path out; do
+  [ -z "$pid" ] && continue
+  [ -s "public/$out" ] || curl -fsSL "https://coresos-phinf.pstatic.net/$path" -o "public/$out" || echo "실패: $pid-$n"
+done < scripts/band_images.tsv
+echo "밴드 이미지 $(ls public/images/band | wc -l)장"

@@ -241,7 +241,7 @@ function bindShell() {
   SITE = await getSite();
   let ready = false;
   onUser(() => { if (ready) render(); });
-  window.addEventListener('hashchange', render);
+  window.addEventListener('hashchange', () => { document.querySelectorAll('.modal').forEach((m) => m.remove()); render(); });
   await render();
   ready = true;
 })();

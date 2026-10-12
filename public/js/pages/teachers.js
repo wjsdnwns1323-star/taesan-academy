@@ -1,6 +1,6 @@
 import { seed } from '../backend.js';
 import { esc, $$, statusTag } from '../ui.js';
-import { load, visible, byOrder, pageHead, teacherCard, monogram, showClassCards } from './common.js';
+import { load, visible, byOrder, pageHead, teacherCard, monogram, showClassPlan } from './common.js';
 
 export async function list({ el, query }) {
   const teachers = visible(await load('teachers')).sort(byOrder);
@@ -53,14 +53,14 @@ export async function detail({ el, params }) {
       ${now.length ? `<div class="block"><h3>지금 열린 반</h3><div class="tt-wrap"><table class="tt"><tbody>${now.map((c) => `<tr>
         <td class="t-school">${esc(c.school || c.grade)}</td><td>${esc(c.school ? c.grade : '')}</td><td class="t-title">${esc(c.title || '학교 내신반')} ${statusTag(c.status)}</td>
         <td class="num">${esc(c.start)}</td><td class="t-time num">${esc(c.time || '추후 안내')}</td>
-        <td class="t-act"><button class="btn sm" data-view="${esc(c.id)}">강의 내용 보기</button></td></tr>`).join('')}</tbody></table></div></div>` : ''}
+        <td class="t-act"><button class="btn sm" data-view="${esc(c.id)}">강의계획 보기</button></td></tr>`).join('')}</tbody></table></div></div>` : ''}
       ${t.method && t.method.length ? `<div class="block"><h3>수업 방식</h3><ol class="steps">${t.method.map((m) => `<li>${esc(m)}</li>`).join('')}</ol></div>` : ''}
       ${listBlock('교재', t.materials)}
       ${listBlock('예비고1 과정', t.prehigh)}
       ${listBlock('설명회·특강', t.roles)}
     </div>
   </div></div>`;
-  $$('[data-view]', el).forEach((b) => (b.onclick = () => showClassCards(mine.find((c) => c.id === b.dataset.view), t)));
+  $$('[data-view]', el).forEach((b) => (b.onclick = () => showClassPlan(mine.find((c) => c.id === b.dataset.view), t)));
 }
 
 export async function curriculum({ el }) {

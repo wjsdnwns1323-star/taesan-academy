@@ -1,6 +1,6 @@
 import { seed } from '../backend.js';
 import { esc, $, $$ } from '../ui.js';
-import { load, visible, pageHead, applyClass, avatar } from './common.js';
+import { load, visible, pageHead, applyClass, avatar, showClassPlan } from './common.js';
 
 const HERO = {
   final: { copy: '학교별 시험 범위 그대로\n학교마다 따로 여는 내신반', title: '2학기 기말대비 내신반', target: '고1·고2 (연합반 포함)', open: '10월 순차 개강', status: '현재 접수 중' },
@@ -92,10 +92,12 @@ export async function render({ el, query, site }) {
           <p class="when num">${esc(c.start)}${/개강|~|종료|월$/.test(c.start) ? '' : ' 개강'}${c.time ? ` <span>[${esc(dayOf(c.time))}] ${esc(hoursOf(c.time))}</span>` : ' <span>시간 추후 안내</span>'}</p>
         </div>
         <div class="act">
+          <button class="btn ghost" data-plan="${esc(c.id)}">강의계획 보기</button>
           <button class="btn ${closed(c) ? 'gray' : 'line'}" data-apply="${esc(c.id)}">${closed(c) ? '대기 신청' : '수강 신청'}</button>
         </div>
       </article>`; }).join('')}`;
     $$('[data-apply]', el).forEach((b) => (b.onclick = () => applyClass(all.find((c) => c.id === b.dataset.apply))));
+    $$('[data-plan]', el).forEach((b) => (b.onclick = () => { const c = all.find((x) => x.id === b.dataset.plan); showClassPlan(c, tById[c.teacherId]); }));
   }
 
   $$('[data-term]', el).forEach((b) => (b.onclick = () => { location.hash = `#/timetable?term=${b.dataset.term}`; }));

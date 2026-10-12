@@ -1,6 +1,7 @@
 import { backend, getUser } from '../backend.js';
 import { esc, modal, toast, formData, CONSENT, phoneOk, statusTag } from '../ui.js';
 import { POSTERS, TEACHER_POSTERS, posterCodes, posterUrl } from '../data/posters.js';
+import { BAND_POSTS } from '../data/band.js';
 
 // 같은 화면에서 여러 번 읽지 않도록 잠깐 보관
 const cache = {};
@@ -105,27 +106,57 @@ export function applyClass(c) {
   });
 }
 
-// 강의 내용 보기: 밴드에 올라온 해당 수업 이미지 카드를 팝업으로 보여 줍니다.
-export function showClassCards(c, teacher) {
-  const own = posterCodes(c.src);
-  const more = (TEACHER_POSTERS[teacher?.id || c.teacherId] || []).filter((p) => !own.includes(p) && POSTERS[p]);
-  const fig = (code) => `<figure class="pc-card"><a href="${posterUrl(code)}" target="_blank" rel="noopener" title="크게 보기">
-      <img src="${posterUrl(code)}" alt="${esc(POSTERS[code])}" loading="lazy"></a>
-      <figcaption>${esc(POSTERS[code])}</figcaption></figure>`;
-  const when = [c.start && `${c.start} 개강`, c.time].filter(Boolean).join(' · ');
+// 강의계획 보기: 밴드에 선생님이 올린 강좌 소개·교재 소개를 강의계획서처럼 보여 줍니다.
+const termLabel = { final: '2학기 기말대비', mid: '2학기 중간대비', pre: '예비고1' };
+function planPosts(c) {
+  const name = c.teacherName || '';
+  const scored = BAND_POSTS.filter((p) => p.teachers.includes(name)).map((p) => {
+    let sc = 0;
+    if (c.school && p.text.includes(c.school.replace('공주사대부고', '공주사대부'))) sc += 4;
+    if (c.school && (p.schools || []).includes(c.school)) sc += 2;
+    if (c.grade && (p.grades || []).includes(c.grade)) sc += 2;
+    if (c.term === 'final' && /기말/.test(p.text)) sc += 2;
+    if (c.term === 'pre' && /예비/.test(p.text)) sc += 3;
+    if (/교재|커리큘럼|진도|계획|수업/.test(p.text)) sc += 1;
+    if (p.teachers.length === 1) sc += 3;
+    return { p, sc };
+  }).sort((a, b) => b.sc - a.sc || b.p.id - a.p.id);
+  return scored.slice(0, 3).map((x) => x.p);
+}
+export function showClassPlan(c, teacher) {
+  const posts = planPosts(c);
+  const main = posts[0];
+  const codes = posterCodes(c.src).concat((TEACHER_POSTERS[teacher?.id || c.teacherId] || [])).filter((v, i, a) => a.indexOf(v) === i && POSTERS[v]).slice(0, 6);
+  const photo = teacher && teacher.photo ? photoOf(teacher) : '';
+  const head = (main && main.title) || (teacher && teacher.highlights && teacher.highlights[0]) || '';
+  const img = (f, cap) => `<figure class="pc-card"><a href="${esc(f)}" target="_blank" rel="noopener" title="원본 크게 보기"><img src="${esc(f)}" alt="${esc(cap)}" loading="lazy"></a></figure>`;
   modal({
-    title: classLabel(c) || '강의 내용',
-    sub: `${esc(c.teacherName || '')}${c.teacherName ? ' 선생님' : ''}${when ? ` · ${esc(when)}` : ''} ${c.status ? statusTag(c.status) : ''}`,
-    content: `<div class="pc-wrap">
-      ${own.length ? `<h3 class="pc-h">이 수업 안내</h3><div class="pc-list">${own.map(fig).join('')}</div>` : ''}
-      ${more.length ? `<h3 class="pc-h">${esc(c.teacherName || '')} 선생님 수업 소개</h3><div class="pc-list">${more.map(fig).join('')}</div>` : ''}
-      ${!own.length && !more.length ? '<p class="empty">아직 올라온 수업 안내 이미지가 없습니다.</p>' : ''}
+    title: '강의계획',
+    content: `<div class="plan">
+      <div class="plan-hero">
+        <div class="plan-chips"><span>${esc(termLabel[c.term] || '내신')}</span><span>${esc(c.subject)}</span><span>${esc([c.school, c.grade].filter(Boolean).join(' '))}</span></div>
+        ${head ? `<p class="plan-sub">${esc(head)}</p>` : ''}
+        <h3 class="plan-title">${esc(classLabel(c))}</h3>
+        <p class="plan-desc">${esc(c.teacherName || '')}${c.teacherName ? ' 선생님' : ''} ${c.status ? statusTag(c.status) : ''}</p>
+        ${photo ? `<img class="plan-photo" src="${esc(photo)}" alt="" onerror="this.onerror=null;this.src=this.src.replace(/\\.png$/,'.jpg')">` : ''}
+        ${c.teacherName ? `<span class="plan-name">${esc(c.subject)} ${esc(c.teacherName)}T</span>` : ''}
+      </div>
+      <table class="plan-info"><tr><th>개강</th><td>${esc(c.start || '추후 안내')}</td><th>일정</th><td>${esc(c.time || '추후 안내')}</td></tr></table>
+      ${posts.length ? posts.map((p, i) => `<section class="plan-sec">
+        <h4>${i === 0 ? '강좌 소개' : '함께 보면 좋은 안내'} <small>${esc(p.date)} · 밴드 게시글</small></h4>
+        ${p.text ? `<div class="plan-text">${esc(p.text)}</div>` : ''}
+        ${p.imgs.length ? `<div class="pc-list">${p.imgs.map((f) => img(f, p.title)).join('')}</div>` : ''}
+        <p class="plan-src"><a class="link" href="https://band.us/band/61446116/post/${p.id}" target="_blank" rel="noopener">밴드 원문 보기 ›</a></p>
+      </section>`).join('') : ''}
+      ${!posts.length && codes.length ? `<section class="plan-sec"><h4>수업 안내</h4><div class="pc-list">${codes.map((k) => img(posterUrl(k), POSTERS[k])).join('')}</div></section>` : ''}
+      ${!posts.length && !codes.length ? '<p class="empty">밴드에 올라온 강좌 소개가 아직 없습니다. 학원(042-321-5788)으로 문의해 주세요.</p>' : ''}
       <div class="toolbar pc-foot"><button class="btn block" data-apply-now>${c.status === '마감' ? '대기 신청하기' : '수강 신청하기'}</button></div>
     </div>`,
     onMount(box, close) {
-      box.closest('.modal').classList.add('modal-cards');
-      box.querySelectorAll('.pc-card img').forEach((img) => (img.onerror = () => img.closest('.pc-card').remove()));
+      box.closest('.modal').classList.add('modal-plan');
+      box.querySelectorAll('.pc-card img').forEach((im) => (im.onerror = () => im.closest('.pc-card').remove()));
       box.querySelector('[data-apply-now]').onclick = () => { close(); applyClass(c); };
     },
   });
 }
+export const showClassCards = showClassPlan;
