@@ -1,6 +1,7 @@
 import { seed } from '../backend.js';
 import { esc, $, $$, isPast, WEEK } from '../ui.js';
 import { load, visible, byOrder, teacherCard } from './common.js';
+import { mountWorld } from './world.js';
 
 // 모집안내 카드 (관리자에서 바꾸려면 공지·강좌를 수정하세요. 카드 문구는 여기서 관리)
 const RECRUIT = [
@@ -28,7 +29,7 @@ const fmtDay = (iso) => {
 const shortDay = (iso) => { const d = new Date(`${iso}T00:00:00`); return `${d.getMonth() + 1}. ${d.getDate()}(${WEEK[d.getDay()]})`; };
 
 export async function render({ el }) {
-  const [teachers, results, events, notices] = await Promise.all([load('teachers'), load('results'), load('events'), load('notices')]);
+  const [teachers, results, events, notices, leaders, classes] = await Promise.all([load('teachers'), load('results'), load('events'), load('notices'), load('leaders'), load('classes')]);
   const upcoming = visible(events).filter((e) => e.status !== '종료' && !isPast(e.date)).sort((a, b) => (a.date || '9').localeCompare(b.date || '9'));
   const dated = upcoming.filter((e) => e.date);
   const recent = [...visible(notices)].sort((a, b) => (Number(!!b.pinned) - Number(!!a.pinned)) || b.date.localeCompare(a.date)).slice(0, 5);
@@ -36,7 +37,7 @@ export async function render({ el }) {
   const highlights = visible(results).filter((r) => r.featured).slice(0, 2);
   const vt = visible(teachers).sort(byOrder);
 
-  el.innerHTML = `<div class="home wrap">
+  el.innerHTML = `<div id="sw-root"></div><div class="home wrap">
   <section class="h-sec" aria-labelledby="rc-t">
     <div class="recruit">
       <div>
@@ -116,6 +117,10 @@ export async function render({ el }) {
     </div>
   </section>
   </div>`;
+
+  // ---- 스크롤 월드(첫 화면 영상) ----
+  const unmountWorld = mountWorld($('#sw-root', el), { teachers: visible(teachers), leaders: visible(leaders), classes: visible(classes) });
+  window.addEventListener('hashchange', unmountWorld, { once: true });
 
   // ---- 모집안내 캐러셀 ----
   const st = { filter: 'all', i: 0, playing: !window.matchMedia('(prefers-reduced-motion: reduce)').matches, timer: null };

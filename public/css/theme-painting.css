@@ -1,0 +1,160 @@
+/* 태산학원 — 유화 복도 테마
+   첫 화면 영상(라벤더빛 복도, 청록 붓글씨 로고, 금빛 가루)에서 색과 글꼴을 가져와 style.css 위에 덮어씁니다.
+   이 파일을 빼면 원래 디자인으로 돌아갑니다. */
+:root {
+  --blue: #1d5865;      /* 붓글씨 로고의 청록 */
+  --blue-2: #164652;
+  --blue-soft: #e3eef0;
+  --violet: #1c2b38;
+  --violet-2: #8c6421;
+  --lav: #eceff6;       /* 복도 벽 라벤더 */
+  --lav-2: #f1eff6;
+  --mist: #d6deea;
+  --text: #17222c;
+  --sub: #4d5866;
+  --muted: #7d8794;
+  --line: #dde2ea;
+  --line-2: #ebeef3;
+  --bg-gray: #f2f4f8;
+  --marker: #f0dfae;
+  --gold: #a2772b;      /* 금빛 가루 */
+  --gold-2: #dcb86c;
+  --display: 'Song Myung', 'Nanum Myeongjo', 'AppleMyungjo', serif;
+}
+:focus-visible { outline-color: rgba(29, 88, 101, .45); }
+.input:focus, .select:focus, .textarea:focus { outline-color: rgba(29, 88, 101, .15); }
+
+/* ---------- 상단: 검색줄은 올라가고 메뉴줄만 붙어 있음 ---------- */
+.topwrap { position: sticky; top: -48px; z-index: 50; background: #fff; transition: background .35s, box-shadow .35s, transform .35s; }
+.header { position: relative; top: auto; background: transparent; }
+.header > .wrap { height: 84px; }
+.logo .logo-img { height: 58px; }
+.logo .on-dark { display: none; }
+.gnb > li > a { font-size: 18px; font-weight: 600; }
+@media (max-width: 1000px) { .header > .wrap { height: 68px; } }
+@media (max-width: 640px) { .topwrap { top: -44px; } .logo .logo-img { height: 46px; } }
+
+/* 홈: 영상 위에 투명한 상단, 영상을 지나면 흰 바탕 */
+body.sw-home .topwrap { position: fixed; left: 0; right: 0; top: 0; background: linear-gradient(to bottom, rgba(14, 22, 30, .5), rgba(14, 22, 30, 0)); }
+body.sw-home:not(.sw-solid) .header { border-bottom-color: transparent; }
+body.sw-home:not(.sw-solid) .gnb > li > a,
+body.sw-home:not(.sw-solid) .util-links,
+body.sw-home:not(.sw-solid) .util-left,
+body.sw-home:not(.sw-solid) .logo .tag-line,
+body.sw-home:not(.sw-solid) .menu-btn { color: #fff; }
+body.sw-home:not(.sw-solid) .gnb > li:hover > a { color: var(--gold-2); }
+body.sw-home:not(.sw-solid) .logo .on-light { display: none; }
+body.sw-home:not(.sw-solid) .logo .on-dark { display: block; }
+body.sw-home:not(.sw-solid) .searchbox { background: rgba(255, 255, 255, .14); border-color: rgba(255, 255, 255, .6); }
+body.sw-home:not(.sw-solid) .searchbox input, body.sw-home:not(.sw-solid) .searchbox button { color: #fff; }
+body.sw-home:not(.sw-solid) .searchbox input::placeholder { color: rgba(255, 255, 255, .8); }
+body.sw-home.sw-solid .topwrap { background: #fff; box-shadow: 0 10px 28px -20px rgba(20, 30, 40, .4); transform: translateY(-48px); }
+@media (max-width: 640px) { body.sw-home.sw-solid .topwrap { transform: translateY(-44px); } }
+
+/* ---------- 스크롤 월드 ---------- */
+.sw { position: relative; background: #1a2129; }
+.sw-stage { position: sticky; top: 0; height: 100vh; height: 100svh; overflow: hidden; }
+.sw-stage img, .sw-stage video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.sw-stage video { opacity: 0; transition: opacity .6s; }
+.sw-stage.ready video { opacity: 1; }
+.sw-stage::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(120% 90% at 50% 42%, transparent 55%, rgba(10, 16, 22, .38)); }
+.sw-load { position: absolute; right: 16px; bottom: calc(env(safe-area-inset-bottom, 0px) + 16px); z-index: 2; font-size: 12.5px; color: #f4f1e8; background: rgba(15, 22, 30, .55); padding: 4px 10px; border-radius: 999px; font-variant-numeric: tabular-nums; }
+.sw-stage.ready .sw-load { display: none; }
+
+.sw-steps { position: relative; margin-top: -100vh; margin-top: -100svh; z-index: 2; }
+.sw-step { display: flex; align-items: center; padding: 0 clamp(16px, 4vw, 64px); }
+.sw-hero { min-height: 100vh; min-height: 100svh; align-items: flex-end; padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 9svh); }
+.sw-dissolve { min-height: 120svh; }
+.sw-reveal { min-height: 150svh; }
+.sw-settle { min-height: 70svh; }
+.sw-t { min-height: 135svh; justify-content: flex-end; }
+
+.sw-panel, .sw-card { background: rgba(250, 251, 253, .95); border-radius: 16px; padding: clamp(20px, 2.4vw, 30px); box-shadow: 0 24px 60px -30px rgba(10, 20, 30, .6); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); min-width: 0; }
+.sw-intro { max-width: 560px; }
+.sw-intro h1 { font-family: var(--display); font-weight: 400; font-size: clamp(44px, 6vw, 72px); line-height: 1.1; letter-spacing: 0; }
+.sw-intro p { margin-top: 12px; color: var(--sub); font-size: 17px; max-width: 40ch; }
+.sw-intro .sw-act { margin-top: 20px; }
+.sw-cue { font-size: 14px; color: var(--blue) !important; font-weight: 700; }
+.sw-whisper { font-family: var(--display); font-size: clamp(24px, 3vw, 36px); color: #fffaf0; text-shadow: 0 2px 18px rgba(0, 0, 0, .5); max-width: 16em; }
+.sw-roster { max-width: 470px; }
+.sw-roster h2 { font-family: var(--display); font-weight: 400; font-size: clamp(30px, 3.6vw, 42px); letter-spacing: 0; }
+.sw-roster > p { color: var(--sub); margin: 6px 0 16px; }
+.sw-roster dl { display: grid; grid-template-columns: max-content 1fr; gap: 9px 16px; margin: 0; align-items: baseline; }
+.sw-roster dt { color: var(--gold); font-weight: 700; font-size: 14px; }
+.sw-roster dd { margin: 0; display: flex; flex-wrap: wrap; gap: 4px 14px; }
+.sw-roster button { border: 0; background: none; padding: 0; font-weight: 600; font-size: 16px; color: var(--text); border-bottom: 1px solid var(--line); }
+.sw-roster button:hover { color: var(--blue); border-color: var(--blue); }
+
+.sw-card { width: min(480px, 38vw); display: grid; gap: 14px; }
+.sw-card header { display: grid; grid-template-columns: 104px 1fr; gap: 16px; align-items: end; }
+.sw-ph { width: 104px; height: 128px; border-radius: 12px; background: linear-gradient(180deg, var(--lav), var(--mist)); overflow: hidden; display: flex; align-items: flex-end; justify-content: center; }
+.sw-ph img { width: 100%; height: 100%; object-fit: cover; object-position: top; }
+.sw-subj { font-size: 14px; font-weight: 700; color: var(--gold); }
+.sw-card h3 { font-family: var(--display); font-weight: 400; font-size: clamp(32px, 3.2vw, 42px); line-height: 1.15; letter-spacing: 0; }
+.sw-card h3 small { font-family: var(--font); font-size: 15px; color: var(--sub); margin-left: 6px; }
+.sw-hl { margin-top: 4px; color: var(--blue); font-weight: 700; font-size: 15px; line-height: 1.45; }
+.sw-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.sw-chips span { font-size: 13px; padding: 2px 10px; border-radius: 999px; border: 1px solid var(--line); background: #fff; color: var(--sub); }
+.sw-block h4 { font-size: 13px; color: var(--muted); font-weight: 700; margin-bottom: 4px; }
+.sw-block ul { padding-left: 18px; font-size: 14.5px; line-height: 1.55; }
+.sw-block li + li { margin-top: 2px; }
+.sw-win li::marker { color: var(--gold); }
+.sw-tt { border-top: 1px solid var(--line); padding-top: 10px; }
+.sw-tt summary { cursor: pointer; font-weight: 700; color: var(--blue); font-size: 15px; }
+.sw-tt table { width: 100%; border-collapse: collapse; font-size: 13.5px; margin-top: 8px; }
+.sw-tt td { padding: 6px; border-bottom: 1px solid var(--line-2); vertical-align: top; }
+.sw-g { font-weight: 700; white-space: nowrap; }
+.sw-nw { white-space: nowrap; }
+.sw-more { font-size: 13px; color: var(--muted); margin-top: 6px; }
+.sw-act { display: flex; flex-wrap: wrap; gap: 8px; }
+
+@media (max-width: 760px) {
+  .sw-t { justify-content: center; align-items: flex-start; padding-top: 86svh; min-height: 165svh; }
+  .sw-card { width: 100%; }
+  .sw-card header { grid-template-columns: 80px 1fr; }
+  .sw-ph { width: 80px; height: 98px; }
+  .sw-reveal { min-height: 190svh; align-items: flex-end; padding-bottom: 8svh; }  /* 세로 영상은 단체 장면이 먼저 다 보이고 명단이 뒤따라 올라옴 */
+  .sw-intro .btn { flex: 1 1 auto; }
+  .sw-dissolve { justify-content: center; }
+  .sw-whisper { text-align: center; }
+}
+@media (prefers-reduced-motion: reduce) { .sw-stage video { transition: none; } }
+
+/* ---------- 홈 아래쪽 ---------- */
+.home { padding-top: 76px; }
+.h-head h2, .page-head h1, .profile h2, .news h3 { font-family: var(--display); font-weight: 400; letter-spacing: 0; }
+.h-head h2 { font-size: 30px; }
+.page-head h1 { font-size: 42px; }
+.r-card { background: linear-gradient(160deg, #eef1f7, #e3e8f1); }
+.r-card.alt { background: linear-gradient(160deg, #f3f0f6, #e8e4ee); }
+.r-card .t2.violet { color: var(--gold); }
+.r-card:hover { box-shadow: inset 0 0 0 2px rgba(29, 88, 101, .35); }
+.news { border-color: var(--blue); background: linear-gradient(180deg, #fff, var(--lav)); }
+
+.result-band { background: linear-gradient(100deg, #142029 0%, #1c3440 55%, #16232c 100%); }
+.result-band::after { display: none; }
+.result-band::before { content: ''; position: absolute; inset: 0; pointer-events: none; opacity: .55;
+  background-image: radial-gradient(circle, rgba(220, 184, 108, .9) 0 1px, transparent 1.6px), radial-gradient(circle, rgba(220, 184, 108, .5) 0 1px, transparent 1.6px);
+  background-size: 46px 38px, 71px 59px; background-position: 0 0, 23px 17px; mask-image: linear-gradient(90deg, transparent 15%, #000 50%, transparent 95%); -webkit-mask-image: linear-gradient(90deg, transparent 15%, #000 50%, transparent 95%); }
+.result-band .rb-title { color: #c4d2d7; }
+.result-band .rb-title small { color: #95aab2; }
+.rb-item span { color: #c4d2d7; }
+.rb-item b { color: var(--gold-2); }
+
+.t-card { background: linear-gradient(180deg, #fff 35%, var(--lav) 100%); transition: border-color .2s, transform .2s; }
+.t-card:hover { transform: translateY(-2px); }
+.t-card .subj { color: var(--gold); font-size: 17px; font-weight: 700; }
+.t-card h3 { font-family: var(--display); font-weight: 400; font-size: 34px; letter-spacing: 0; }
+.p-photo, .p-photo:has(img) { background: linear-gradient(180deg, var(--lav), var(--mist)); padding: 0; align-items: flex-end; border-color: transparent; }
+.profile h2 { font-size: 46px; }
+.story { background: linear-gradient(135deg, #2a5560, #1b3640); }
+.story.v { background: linear-gradient(135deg, #6f5220, #a2772b); }
+.contents a.big { border-color: #bcd3d8; }
+
+/* 영상 위에서는 오른쪽 빠른 상담 버튼을 숨겨 카드와 겹치지 않게 */
+.quick { transition: opacity .3s; }
+body.sw-home:not(.sw-solid) .quick { opacity: 0; pointer-events: none; }
+/* 고정 상단 메뉴 아래로 카드가 들어가지 않도록 */
+.sw-step { scroll-margin-top: 96px; }
+.sw-reveal, .sw-t { padding-top: 110px; }
+@media (max-width: 760px) { .sw-t { padding-top: 86svh; } }

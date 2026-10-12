@@ -133,7 +133,8 @@ function header(active) {
   return `<header class="header"><div class="wrap">
     <a class="logo" href="#/" aria-label="태산학원 홈">
       <span class="tag-line">대전 둔산<br>학교별 내신</span>
-      <img class="logo-img" src="images/brand/logo-dark.png" alt="태산학원 TAESANEDU">
+      <img class="logo-img on-light" src="images/brand/logo-dark.png" alt="태산학원 TAESANEDU">
+      <img class="logo-img on-dark" src="images/brand/logo-white.png" alt="" aria-hidden="true">
     </a>
     <nav aria-label="주 메뉴" style="flex:1;height:100%;display:flex"><ul class="gnb">
       ${MENU.map((m) => `<li><a href="${m.href}" ${active === m.key ? 'aria-current="page"' : ''}>${m.label}</a>
@@ -197,7 +198,7 @@ async function render() {
   const route = parseHash();
   const app = document.getElementById('app');
   const isAdminPage = route.page === 'admin';
-  app.innerHTML = `${topbar()}${header(route.menu)}${drawer()}<main id="main" tabindex="-1"></main>${isAdminPage ? '' : footer() + quick()}`;
+  app.innerHTML = `<div class="topwrap">${topbar()}${header(route.menu)}</div>${drawer()}<main id="main" tabindex="-1"></main>${isAdminPage ? '' : footer() + quick()}`;
   bindShell();
   const main = $('#main');
   if (!route.page) {
