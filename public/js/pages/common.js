@@ -110,7 +110,7 @@ export function applyClass(c) {
 const termLabel = { final: '2학기 기말대비', mid: '2학기 중간대비', pre: '예비고1' };
 function planPosts(c) {
   const name = c.teacherName || '';
-  const scored = BAND_POSTS.filter((p) => p.teachers.includes(name)).map((p) => {
+  const scored = BAND_POSTS.filter((p) => p.kind !== 'event' && p.teachers.includes(name)).map((p) => {
     let sc = 0;
     if (c.school && p.text.includes(c.school.replace('공주사대부고', '공주사대부'))) sc += 4;
     if (c.school && (p.schools || []).includes(c.school)) sc += 2;
@@ -121,7 +121,7 @@ function planPosts(c) {
     if (p.teachers.length === 1) sc += 3;
     return { p, sc };
   }).sort((a, b) => b.sc - a.sc || b.p.id - a.p.id);
-  return scored.slice(0, 3).map((x) => x.p);
+  return scored.slice(0, 1).map((x) => x.p);
 }
 export function showClassPlan(c, teacher) {
   const posts = planPosts(c);
@@ -142,8 +142,8 @@ export function showClassPlan(c, teacher) {
         ${c.teacherName ? `<span class="plan-name">${esc(c.subject)} ${esc(c.teacherName)}T</span>` : ''}
       </div>
       <table class="plan-info"><tr><th>개강</th><td>${esc(c.start || '추후 안내')}</td><th>일정</th><td>${esc(c.time || '추후 안내')}</td></tr></table>
-      ${posts.length ? posts.map((p, i) => `<section class="plan-sec">
-        <h4>${i === 0 ? '강좌 소개' : '함께 보면 좋은 안내'} <small>${esc(p.date)} · 밴드 게시글</small></h4>
+      ${posts.length ? posts.map((p) => `<section class="plan-sec">
+        <h4>강좌 소개 <small>${esc(p.date)} · 밴드 게시글</small></h4>
         ${p.text ? `<div class="plan-text">${esc(p.text)}</div>` : ''}
         ${p.imgs.length ? `<div class="pc-list">${p.imgs.map((f) => img(f, p.title)).join('')}</div>` : ''}
         <p class="plan-src"><a class="link" href="https://band.us/band/61446116/post/${p.id}" target="_blank" rel="noopener">밴드 원문 보기 ›</a></p>

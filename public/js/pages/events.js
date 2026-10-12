@@ -1,6 +1,8 @@
-import { backend, getUser } from '../backend.js';
+import { backend, getUser, seed } from '../backend.js';
 import { esc, $, statusTag, dayParts, isPast, formData, toast, CONSENT, phoneOk } from '../ui.js';
 import { load, visible, pageHead, clearCache } from './common.js';
+import { BAND_POSTS } from '../data/band.js';
+import { POSTERS, posterCodes, posterUrl } from '../data/posters.js';
 
 const isOpen = (e) => e.status !== '종료' && e.status !== '마감' && !isPast(e.date);
 
@@ -27,6 +29,18 @@ export async function detail({ el, params }) {
   const u = getUser();
   const open = isOpen(e);
   const diag = e.type === '진단고사';
+  // 밴드에 올라온 설명회 안내(글·고화질 이미지)와 포스터. Firestore에 없으면 기본 데이터에서 가져옵니다.
+  const base = (seed.events || []).find((x) => x.id === e.id) || {};
+  const posts = (e.bandPosts || base.bandPosts || []).map((id) => BAND_POSTS.find((p) => p.id === id)).filter(Boolean).slice(0, 1);
+  const shown = new Set();
+  const fig = (src, cap) => `<figure class="pc-card"><a href="${esc(src)}" target="_blank" rel="noopener" title="크게 보기"><img src="${esc(src)}" alt="${esc(cap)}" loading="lazy"></a></figure>`;
+  const posterHtml = posterCodes(e.src || base.src).filter((c) => !shown.has(c) && shown.add(c)).map((c) => fig(posterUrl(c), POSTERS[c])).join('');
+  const bandHtml = posts.map((p) => `<section class="plan-sec ev-band">
+      <h4>설명회 안내 <small>${esc(p.date)} · 밴드 게시글</small></h4>
+      ${p.text ? `<div class="plan-text">${esc(p.text)}</div>` : ''}
+      ${p.imgs.length ? `<div class="pc-list">${p.imgs.map((f) => fig(f, p.title)).join('')}</div>` : ''}
+      <p class="plan-src"><a class="link" href="https://band.us/band/61446116/post/${p.id}" target="_blank" rel="noopener">밴드 원문 보기 ›</a></p>
+    </section>`).join('') + (posterHtml ? `<section class="plan-sec ev-band"><h4>포스터</h4><div class="pc-list" style="margin-top:12px">${posterHtml}</div></section>` : '');
   el.innerHTML = `${pageHead(e.title, '', [['설명회·특강', '#/events'], [e.type]])}
   <div class="wrap page"><div class="profile ev">
     <div>
@@ -40,6 +54,7 @@ export async function detail({ el, params }) {
       </dl>
       ${(e.program || []).length ? `<div class="block"><h3>${diag ? '진행 순서' : '프로그램'}</h3><ol class="steps">${e.program.map((p) => `<li>${esc(p)}</li>`).join('')}</ol></div>` : ''}
       ${e.body ? `<div class="block"><h3>안내</h3><p style="white-space:pre-line">${esc(e.body)}</p></div>` : ''}
+      ${bandHtml}
     </div>
     <div class="card ev-form">
       ${open ? `<h2 style="font-size:20px;font-weight:900;color:var(--ink);margin-bottom:14px">${diag ? '진단고사 신청' : '예약하기'}</h2>
