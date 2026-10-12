@@ -132,6 +132,7 @@ function localAdapter() {
       localStorage.setItem('taesan:_session', JSON.stringify(u.uid));
       currentUser = u; notify(); return u;
     },
+    async signInWithGoogle() { throw new Error('체험 모드에서는 Google 로그인을 쓸 수 없습니다. Firebase를 연결하면 사용할 수 있습니다.'); },
     async signOut() { localStorage.removeItem('taesan:_session'); currentUser = null; notify(); },
     async resetPassword() { throw new Error('체험 모드에서는 비밀번호 재설정 메일을 보낼 수 없습니다.'); },
     async updateProfile(patch) {
@@ -254,6 +255,26 @@ async function firebaseAdapter() {
         const cred = await A.signInWithEmailAndPassword(fa, email, password);
         currentUser = await loadProfile(cred.user); notify(); return currentUser;
       } catch (e) { throw wrap(e); }
+    },
+    async signInWithGoogle() {
+      try {
+        const provider = new A.GoogleAuthProvider();
+        provider.setCustomParameters({ prompt: 'select_account' });
+        const cred = await A.signInWithPopup(fa, provider);
+        const ref = F.doc(fs, 'users', cred.user.uid);
+        const snap = await F.getDoc(ref);
+        if (!snap.exists()) {
+          await F.setDoc(ref, { name: cred.user.displayName || '', email: cred.user.email, role: 'member', provider: 'google', createdAt: now() });
+        }
+        currentUser = await loadProfile(cred.user); notify();
+        return { user: currentUser, isNew: !snap.exists() };
+      } catch (e) {
+        if (e.code === 'auth/popup-closed-by-user' || e.code === 'auth/cancelled-popup-request') throw new Error('Google 로그인 창이 닫혔습니다.');
+        if (e.code === 'auth/popup-blocked') throw new Error('팝업이 차단되었습니다. 브라우저에서 이 사이트의 팝업을 허용해 주세요.');
+        if (e.code === 'auth/account-exists-with-different-credential') throw new Error('같은 이메일로 이미 가입한 계정이 있습니다. 이메일·비밀번호로 로그인해 주세요.');
+        if (e.code === 'auth/unauthorized-domain') throw new Error('이 주소에서는 Google 로그인이 아직 허용되지 않았습니다. 관리자에게 알려주세요.');
+        throw wrap(e);
+      }
     },
     async signOut() { await A.signOut(fa); },
     async resetPassword(email) {

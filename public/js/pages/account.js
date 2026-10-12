@@ -2,6 +2,19 @@ import { backend, getUser, seed } from '../backend.js';
 import { esc, $, $$, formData, toast, statusTag, fmtDate, phoneOk, modal, confirmBox } from '../ui.js';
 import { pageHead } from './common.js';
 
+function bindGoogle(el, go, next) {
+  const b = el.querySelector('[data-google]');
+  if (!b) return;
+  b.onclick = async () => {
+    b.disabled = true;
+    try {
+      const { user, isNew } = await backend.auth.signInWithGoogle();
+      toast(`${user.name || 'Google 계정'}으로 로그인했습니다.`);
+      go(isNew || !user.phone ? '#/mypage?setup=1' : next);
+    } catch (ex) { toast(ex.message); b.disabled = false; }
+  };
+}
+
 const nextOf = (query) => (query.next && query.next.startsWith('/') ? `#${query.next}` : '#/mypage');
 
 export async function login({ el, query, go }) {
@@ -9,6 +22,8 @@ export async function login({ el, query, go }) {
   el.innerHTML = `${pageHead('로그인', '', [['로그인']])}
   <div class="wrap page"><div class="narrow card">
     ${backend.mode === 'local' ? '<div class="callout">체험 모드입니다. 가입 정보는 이 브라우저에만 저장됩니다. <b>admin@</b>으로 시작하는 이메일로 가입하면 관리자 화면을 써 볼 수 있습니다.</div>' : ''}
+    <button type="button" class="btn gray block" data-google style="gap:10px;margin-bottom:18px"><svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.5l6.7-6.7C35.6 2.4 30.2 0 24 0 14.6 0 6.6 5.4 2.7 13.3l7.8 6C12.4 13.6 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.1 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.4c-.5 2.9-2.2 5.3-4.6 7l7.2 5.6c4.2-3.9 7.1-9.6 7.1-17.1z"/><path fill="#FBBC05" d="M10.5 28.7A14.5 14.5 0 0 1 9.5 24c0-1.6.3-3.2.8-4.7l-7.8-6A24 24 0 0 0 0 24c0 3.9.9 7.5 2.6 10.7l7.9-6z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.2-5.6c-2 1.4-4.7 2.3-8.7 2.3-6.3 0-11.6-4.1-13.5-9.8l-7.9 6C6.6 42.6 14.6 48 24 48z"/></svg> Google로 계속하기</button>
+    <p style="display:flex;align-items:center;gap:12px;color:var(--muted);font-size:13px;margin-bottom:18px"><span style="flex:1;height:1px;background:var(--line)"></span>또는 이메일로<span style="flex:1;height:1px;background:var(--line)"></span></p>
     <form id="lf" novalidate>
       <label class="field"><span>이메일</span><input class="input" type="email" name="email" autocomplete="email" required></label>
       <label class="field"><span>비밀번호</span><input class="input" type="password" name="password" autocomplete="current-password" required></label>
@@ -17,6 +32,7 @@ export async function login({ el, query, go }) {
     </form>
     <p style="margin-top:16px;display:flex;justify-content:space-between;font-size:14px"><button class="link" id="reset">비밀번호 찾기</button><a class="link" href="#/join">회원가입</a></p>
   </div></div>`;
+  bindGoogle(el, go, nextOf(query));
   const f = $('#lf', el);
   f.onsubmit = async (e) => {
     e.preventDefault(); const d = formData(f); const err = f.querySelector('.form-error');
@@ -43,6 +59,8 @@ export async function join({ el, go }) {
   if (getUser()) return go('#/mypage');
   el.innerHTML = `${pageHead('회원가입', '가입하면 수강 신청·설명회 예약·상담 답변을 한곳에서 볼 수 있습니다.', [['회원가입']])}
   <div class="wrap page"><div class="narrow card">
+    <button type="button" class="btn gray block" data-google style="gap:10px;margin-bottom:18px"><svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.5l6.7-6.7C35.6 2.4 30.2 0 24 0 14.6 0 6.6 5.4 2.7 13.3l7.8 6C12.4 13.6 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.1 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.4c-.5 2.9-2.2 5.3-4.6 7l7.2 5.6c4.2-3.9 7.1-9.6 7.1-17.1z"/><path fill="#FBBC05" d="M10.5 28.7A14.5 14.5 0 0 1 9.5 24c0-1.6.3-3.2.8-4.7l-7.8-6A24 24 0 0 0 0 24c0 3.9.9 7.5 2.6 10.7l7.9-6z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.2-5.6c-2 1.4-4.7 2.3-8.7 2.3-6.3 0-11.6-4.1-13.5-9.8l-7.9 6C6.6 42.6 14.6 48 24 48z"/></svg> Google로 계속하기</button>
+    <p style="display:flex;align-items:center;gap:12px;color:var(--muted);font-size:13px;margin-bottom:18px"><span style="flex:1;height:1px;background:var(--line)"></span>또는 이메일로<span style="flex:1;height:1px;background:var(--line)"></span></p>
     <form id="jf" novalidate>
       <label class="field"><span>이메일</span><input class="input" type="email" name="email" autocomplete="email" required></label>
       <div class="row2">
@@ -66,6 +84,7 @@ export async function join({ el, go }) {
       <button class="btn block">가입하기</button>
     </form>
   </div></div>`;
+  bindGoogle(el, go, '#/mypage');
   const f = $('#jf', el);
   f.onsubmit = async (e) => {
     e.preventDefault(); const d = formData(f); const err = f.querySelector('.form-error');
@@ -84,7 +103,7 @@ export async function join({ el, go }) {
   };
 }
 
-export async function mypage({ el, go }) {
+export async function mypage({ el, go, query = {} }) {
   const u = getUser();
   if (!u) return go('#/login?next=/mypage');
   const mine = (col) => backend.db.list(col, { where: [['uid', '==', u.uid]] }).catch(() => []);
@@ -132,5 +151,8 @@ export async function mypage({ el, go }) {
   };
   $$('[data-t]', el).forEach((b) => (b.onclick = () => show(b.dataset.t)));
   const rs = $('#resend', el); if (rs) rs.onclick = async () => { await backend.auth.resendVerification(); toast('인증 메일을 다시 보냈습니다.'); };
-  show('apps');
+  if (query.setup || !u.phone) {
+    show('me');
+    $('#pane', el).insertAdjacentHTML('afterbegin', '<div class="callout">수강 신청·상담 연락을 받으려면 연락처와 학생 학교·학년을 입력해 주세요.</div>');
+  } else show('apps');
 }
