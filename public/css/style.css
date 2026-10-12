@@ -691,3 +691,8 @@ button.u-link:hover, a.u-link:hover { color: #111; }
   .lnb-i:first-child { border-left: 0; }
   .gate .panel { padding: 24px 18px; }
 }
+
+/* 계정 링크를 검색창 위로 */
+.util { height: auto; padding: 8px 0 6px; }
+.util-right { flex-direction: column; align-items: flex-end; gap: 6px; }
+.util-links { min-height: 20px; }
