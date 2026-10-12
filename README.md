@@ -1,6 +1,8 @@
 # 태산학원 홈페이지
 
-대전 둔산 태산학원의 공식 홈페이지입니다. 학교별 내신반 시간표, 선생님, 시험 결과, 설명회 예약, 상담, 회원, 관리자 기능을 담고 있습니다.
+대전 둔산 태산학원의 공식 홈페이지입니다. **사이트: https://taesan-academy.web.app**
+
+ 학교별 내신반 시간표, 선생님, 시험 결과, 설명회 예약, 상담, 회원, 관리자 기능을 담고 있습니다.
 
 - 프레임워크·빌드 없이 동작하는 정적 사이트(HTML + ES 모듈)
 - 서버: Firebase (Authentication · Firestore · Storage · Hosting)
@@ -11,7 +13,7 @@
 | 메뉴 | 경로 | 기능 |
 | --- | --- | --- |
 | 홈 | `#/` | 학교·학년을 고르면 이번 기말대비 반이 바로 나오는 학교 찾기, 모집 과정, 2학기 중간 결과, 선생님, 공지·설명회 |
-| 시간표 | `#/timetable` | 기말대비 / 예비고1 / 지난 중간대비, 학교·학년·과목·선생님 필터, 학교별·과목별 묶어보기, 수강·대기 신청 |
+| 시간표 | `#/timetable` | 기말대비 / 예비고1 / 지난 중간대비, 학교·학년·과목·선생님 필터, **강의계획 보기**(밴드 강좌 소개·교재 이미지), 수강·대기 신청 |
 | 선생님 | `#/teachers`, `#/teachers/:id` | 과목별 목록, 선생님 홈(약력, 시험 결과, 지금 열린 반, 수업 방식, 교재) |
 | 커리큘럼 | `#/curriculum` | 선생님별 수업 순서·교재 |
 | 시험 결과 | `#/results` | 시험·과목 필터, 가채점 표시 |
@@ -20,7 +22,7 @@
 | 상담 | `#/consult`, `#/visit`, `#/faq` | 온라인 상담(답변은 내 신청 내역에서 확인), 방문 상담 예약, FAQ |
 | 학원 소개·오시는 길 | `#/about`, `#/location` | 인사말, 대상 학교, 캠퍼스, 지도 |
 | 검색 | `#/search` | 강좌·선생님·설명회·공지 통합 검색 |
-| 회원 | `#/login`, `#/join`, `#/mypage` | 가입(이메일 인증), 비밀번호 재설정, 내 신청·예약·상담·방문 내역, 예약 취소, 정보 수정 |
+| 회원 | `#/login`, `#/join`, `#/mypage` | **Google 로그인 전용**(처음 로그인하면 자동 가입), 내 신청·예약·상담·방문 내역, 예약 취소, 정보 수정 |
 | 관리자 | `#/admin` | 접수 관리(상태 변경, 답변·메모, CSV), 강좌·선생님·설명회·결과·공지·FAQ·학교 편집, 사진 업로드, 회원 권한, 사이트 설정, 기본 데이터 업로드·백업 |
 
 ## 체험 모드
@@ -38,7 +40,7 @@ python3 -m http.server 5173 --directory public
 ## Firebase 연결
 
 1. [Firebase 콘솔](https://console.firebase.google.com)에서 프로젝트를 만듭니다.
-2. **Authentication** → 로그인 방법 → 이메일/비밀번호 사용 설정
+2. **Authentication** → 로그인 방법 → Google 사용 설정
 3. **Firestore Database** 만들기(프로덕션 모드, 지역 `asia-northeast3` 서울 권장)
 4. **Storage** 시작하기
 5. 프로젝트 설정 → 내 앱 → 웹 앱 추가 → 나온 `firebaseConfig` 값을 `public/js/config.js`에 붙여넣기
@@ -51,19 +53,24 @@ firebase login
 firebase deploy --only hosting,firestore,storage
 ```
 
-8. 사이트에서 관리자 이메일(`config.js`의 `adminEmails`)로 가입 → 받은 인증 메일의 링크 클릭 → 다시 로그인
+8. 사이트에서 관리자 Google 계정(`config.js`의 `adminEmails`)으로 로그인
 9. 관리자 → **데이터 관리** → "비어 있는 컬렉션 모두 올리기"를 누르면 밴드 자료 정리본이 Firestore에 저장되고, 이후부터 관리자 화면에서 수정할 수 있습니다.
 
 관리자 이메일을 바꾸려면 `public/js/config.js`, `firestore.rules`, `storage.rules` 세 곳을 같이 바꿉니다. 그 밖의 관리자는 관리자 → 회원에서 지정합니다.
 
-### GitHub에서 자동 배포
+### 배포 (Cloud Shell, 지금 쓰는 방법)
 
-`.github/workflows/firebase-deploy.yml`이 `main`에 올릴 때마다 Hosting과 보안 규칙을 배포합니다.
+[Cloud Shell](https://shell.cloud.google.com/?project=taesan-academy)에서:
 
-- 저장소 Settings → Secrets and variables → Actions
-  - Secret `FIREBASE_SERVICE_ACCOUNT`: Firebase 프로젝트 설정 → 서비스 계정 → 새 비공개 키 생성으로 받은 JSON 전체
-  - Variable `FIREBASE_PROJECT_ID`: 프로젝트 ID
-- 변수가 없으면 배포 단계는 건너뜁니다.
+```bash
+git clone https://github.com/wjsdnwns1323-star/taesan-academy.git && cd taesan-academy
+bash scripts/build_assets.sh      # 드라이브 누끼 사진·밴드 이미지 받기 + 강사 얼굴 높이 맞추기
+python3 scripts/deploy_hosting.py # https://taesan-academy.web.app 에 배포
+```
+
+- 사진·이미지 파일은 저장소에 넣지 않고 배포할 때 받습니다(`scripts/assets.tsv`, `scripts/band_images.tsv`).
+- 강사 사진: 드라이브 `누끼_투명배경` 폴더의 PNG → `scripts/align_photos.py`가 600×800 캔버스에 얼굴 높이 200px·위치를 맞춥니다.
+- 밴드 강좌 소개: `scripts/band_posts.py`를 고친 뒤 `python3 scripts/band_posts.py`로 `public/js/data/band.js`와 이미지 목록을 다시 만듭니다.
 
 ## 데이터 구조(Firestore)
 
