@@ -1,0 +1,83 @@
+import { backend, getUser } from '../backend.js';
+import { esc, modal, toast, formData, CONSENT, phoneOk, statusTag } from '../ui.js';
+
+// 같은 화면에서 여러 번 읽지 않도록 잠깐 보관
+const cache = {};
+export async function load(col, opts) {
+  const k = col + JSON.stringify(opts || {});
+  if (!cache[k] || Date.now() - cache[k].t > 30000) cache[k] = { t: Date.now(), p: backend.db.list(col, opts) };
+  return cache[k].p;
+}
+export const clearCache = () => Object.keys(cache).forEach((k) => delete cache[k]);
+
+export const visible = (rows) => rows.filter((r) => !r.hidden);
+export const byOrder = (a, b) => (a.order ?? 999) - (b.order ?? 999);
+
+export function pageHead(title, desc = '', crumbs = []) {
+  return `<div class="page-head"><div class="wrap">
+    <p class="crumb"><a href="#/">홈</a>${crumbs.map(([t, h]) => ` / ${h ? `<a href="${h}">${esc(t)}</a>` : esc(t)}`).join('')}</p>
+    <h1>${esc(title)}</h1>${desc ? `<p>${desc}</p>` : ''}
+  </div></div>`;
+}
+
+export function monogram(t) {
+  if (t.photo) return `<img src="${esc(t.photo)}" alt="${esc(t.name)} 선생님" loading="lazy">`;
+  return `<div class="monogram" aria-hidden="true"><b>${esc((t.name || '').slice(-2))}</b><small>${esc(t.subject || '')}</small></div>`;
+}
+
+export function teacherCard(t) {
+  const line = (t.highlights && t.highlights[0]) || (t.schools || []).slice(0, 3).join(' · ');
+  return `<a class="t-card" href="#/teachers/${esc(t.id)}">
+    <div class="t-photo">${monogram(t)}</div>
+    <div class="t-body"><span class="subj">${esc(t.subject)}</span><h3>${esc(t.name)}</h3><p>${esc(line)}</p></div>
+  </a>`;
+}
+
+export const classLabel = (c) => [c.school || '', c.grade, c.subject, c.title].filter(Boolean).join(' ');
+
+// 수강 신청: 로그인하지 않아도 신청서를 남길 수 있고, 로그인하면 내 신청 내역에서 볼 수 있습니다.
+export function applyClass(c) {
+  const u = getUser();
+  const closed = c.status === '마감' || c.term === 'mid';
+  modal({
+    title: closed ? '대기 신청' : '수강 신청',
+    sub: `${esc(classLabel(c))}<br>${esc(c.teacherName || '')} 선생님 · 개강 ${esc(c.start)} · ${esc(c.time || '시간 추후 안내')} ${statusTag(c.status)}`,
+    content: `<form novalidate>
+      ${closed ? '<div class="callout">마감되었거나 지난 학기 반입니다. 대기 신청을 남기면 자리가 나거나 다음 반이 열릴 때 연락드립니다.</div>' : ''}
+      <div class="row2">
+        <label class="field"><span>학생 이름</span><input class="input" name="studentName" required value="${esc(u?.studentName || u?.name || '')}"></label>
+        <label class="field"><span>연락처</span><input class="input" name="phone" required inputmode="tel" placeholder="010-0000-0000" value="${esc(u?.phone || '')}"></label>
+      </div>
+      <div class="row2">
+        <label class="field"><span>학교</span><input class="input" name="school" value="${esc(c.school && c.school !== '연합반' ? c.school : u?.school || '')}"></label>
+        <label class="field"><span>학년</span><input class="input" name="grade" value="${esc(c.grade || u?.grade || '')}"></label>
+      </div>
+      <label class="field"><span>남길 말 <small>(선택)</small></span><textarea class="textarea" name="memo" style="min-height:80px" placeholder="예: 현재 성적, 희망 시간"></textarea></label>
+      ${CONSENT}
+      <p class="form-error" aria-live="polite"></p>
+      <button class="btn block">${closed ? '대기 신청하기' : '수강 신청하기'}</button>
+    </form>`,
+    onMount(box, close) {
+      const f = box.querySelector('form');
+      f.onsubmit = async (e) => {
+        e.preventDefault();
+        const d = formData(f); const err = f.querySelector('.form-error');
+        if (!d.studentName.trim()) return (err.textContent = '학생 이름을 입력해 주세요.');
+        if (!phoneOk(d.phone)) return (err.textContent = '연락처를 010-0000-0000 형식으로 입력해 주세요.');
+        if (!f.agree.checked) return (err.textContent = '개인정보 수집·이용에 동의해 주세요.');
+        const btn = f.querySelector('button.btn'); btn.disabled = true;
+        try {
+          await backend.db.add('applications', {
+            kind: closed ? 'waitlist' : 'enroll', classId: c.id, classLabel: classLabel(c), teacherName: c.teacherName || '',
+            term: c.term, studentName: d.studentName.trim(), phone: d.phone.trim(), school: d.school, grade: d.grade,
+            memo: d.memo, uid: getUser()?.uid || '', status: '접수',
+          });
+          close(); clearCache();
+          toast(closed ? '대기 신청을 접수했습니다.' : '수강 신청을 접수했습니다. 학원에서 연락드릴게요.');
+        } catch (ex) {
+          err.textContent = `접수하지 못했습니다. ${ex.message}`; btn.disabled = false;
+        }
+      };
+    },
+  });
+}

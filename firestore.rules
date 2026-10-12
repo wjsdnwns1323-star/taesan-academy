@@ -1,0 +1,73 @@
+rules_version = '2';
+// 태산학원 Firestore 보안 규칙
+// ADMIN_EMAILS는 public/js/config.js의 adminEmails와 같게 유지하세요.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function adminEmail() {
+      return signedIn() && request.auth.token.email_verified == true
+        && request.auth.token.email in ['wjsdnwns1323@uinone.net'];
+    }
+    function adminRole() {
+      return signedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+    function isAdmin() { return adminEmail() || adminRole(); }
+    function str(v, max) { return v is string && v.size() <= max; }
+    function ownerOk() {
+      return request.resource.data.uid == '' || (signedIn() && request.resource.data.uid == request.auth.uid);
+    }
+    function phoneOk() { return request.resource.data.phone is string && request.resource.data.phone.matches('^0[0-9]{1,2}-?[0-9]{3,4}-?[0-9]{4}$'); }
+    function mine() { return signedIn() && resource.data.uid == request.auth.uid; }
+
+    // 공개 콘텐츠
+    match /{col}/{id} {
+      allow read: if col in ['teachers', 'leaders', 'classes', 'results', 'events', 'notices', 'faqs', 'schools', 'settings'];
+      allow write: if isAdmin() && col in ['teachers', 'leaders', 'classes', 'results', 'events', 'notices', 'faqs', 'schools', 'settings'];
+    }
+
+    // 회원
+    match /users/{uid} {
+      allow read: if (signedIn() && request.auth.uid == uid) || isAdmin();
+      allow create: if signedIn() && request.auth.uid == uid && request.resource.data.role == 'member';
+      allow update: if (signedIn() && request.auth.uid == uid
+                         && request.resource.data.role == resource.data.role) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // 수강 신청
+    match /applications/{id} {
+      allow create: if ownerOk() && phoneOk() && request.resource.data.status == '접수'
+        && str(request.resource.data.studentName, 40) && str(request.resource.data.classId, 40)
+        && str(request.resource.data.memo, 1000) && !('adminNote' in request.resource.data);
+      allow read: if isAdmin() || mine();
+      allow update, delete: if isAdmin();
+    }
+
+    // 설명회·진단고사 예약 (본인은 취소만 가능)
+    match /reservations/{id} {
+      allow create: if ownerOk() && phoneOk() && request.resource.data.status == '접수'
+        && str(request.resource.data.name, 40) && str(request.resource.data.eventId, 60);
+      allow read: if isAdmin() || mine();
+      allow update: if isAdmin() || (mine() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
+                                      && request.resource.data.status == '취소');
+      allow delete: if isAdmin();
+    }
+
+    // 온라인 상담
+    match /consults/{id} {
+      allow create: if ownerOk() && phoneOk() && request.resource.data.status == '접수'
+        && request.resource.data.answer == '' && str(request.resource.data.title, 80) && str(request.resource.data.body, 2000);
+      allow read: if isAdmin() || mine();
+      allow update, delete: if isAdmin();
+    }
+
+    // 방문 상담
+    match /visits/{id} {
+      allow create: if ownerOk() && phoneOk() && request.resource.data.status == '접수'
+        && str(request.resource.data.name, 40) && str(request.resource.data.memo, 1000);
+      allow read: if isAdmin() || mine();
+      allow update, delete: if isAdmin();
+    }
+  }
+}
