@@ -285,7 +285,7 @@ function fieldHTML(f, v) {
   const ph = f.ph ? ` placeholder="${esc(f.ph)}"` : '';
   switch (f.t) {
     case 'bool':
-      return `<label class="sw-row"><span class="sw"><input type="checkbox" name="${f.k}" ${v ? 'checked' : ''}><i></i></span><span>${lab}${hint}</span></label>`;
+      return `<label class="tgl-row"><span class="tgl"><input type="checkbox" name="${f.k}" ${v ? 'checked' : ''}><i></i></span><span>${lab}${hint}</span></label>`;
     case 'select':
       return `<label class="field"><span>${lab}</span><select class="select" name="${f.k}">${optList(f.opts).map(([val, t]) => `<option value="${esc(val)}" ${String(v ?? '') === String(val) ? 'selected' : ''}>${esc(t || '(없음)')}</option>`).join('')}</select>${hint}</label>`;
     case 'textarea':
@@ -439,13 +439,13 @@ async function content(main, col, query) {
     $('#tb', main).innerHTML = list.map((r, i) => `<tr class="${r.hidden ? 'off' : ''}" data-row="${esc(r.id)}">
       ${cfg.bulk ? `<td class="ck"><input type="checkbox" data-ck="${esc(r.id)}" ${st.sel.has(r.id) ? 'checked' : ''} aria-label="선택"></td>` : ''}
       ${shownCols().map(([k]) => `<td class="c-${k}">${cell(r, k)}</td>`).join('')}
-      ${hasHidden ? `<td><label class="sw sm" title="사이트에 보이기"><input type="checkbox" data-vis="${esc(r.id)}" ${r.hidden ? '' : 'checked'}><i></i></label></td>` : ''}
+      ${hasHidden ? `<td><label class="tgl sm" title="사이트에 보이기"><input type="checkbox" data-vis="${esc(r.id)}" ${r.hidden ? '' : 'checked'}><i></i></label></td>` : ''}
       ${cfg.sortable ? `<td class="ord"><button data-up="${esc(r.id)}" ${i === 0 ? 'disabled' : ''} aria-label="위로">▲</button><button data-dn="${esc(r.id)}" ${i === list.length - 1 ? 'disabled' : ''} aria-label="아래로">▼</button></td>` : ''}
       <td class="act"><button class="btn sm ghost" data-edit="${esc(r.id)}">수정</button><button class="btn sm ghost" data-copy="${esc(r.id)}" title="복제">복제</button><button class="btn sm ghost danger-t" data-del="${esc(r.id)}">삭제</button></td></tr>`).join('')
       || `<tr><td colspan="20" class="empty">항목이 없습니다. 오른쪽 위 "새 ${esc(cfg.one)}"로 추가하세요.</td></tr>`;
     hydrateMedia($('#tb', main));
     $$('[data-edit]', main).forEach((b) => (b.onclick = () => edit(rows.find((r) => r.id === b.dataset.edit))));
-    $$('[data-row] td:not(.ck):not(.act):not(.ord)', main).forEach((td) => { if (!td.querySelector('.sw')) td.onclick = () => edit(rows.find((r) => r.id === td.parentNode.dataset.row)); });
+    $$('[data-row] td:not(.ck):not(.act):not(.ord)', main).forEach((td) => { if (!td.querySelector('.tgl')) td.onclick = () => edit(rows.find((r) => r.id === td.parentNode.dataset.row)); });
     $$('[data-copy]', main).forEach((b) => (b.onclick = () => { const { id, createdAt, updatedAt, ...rest } = rows.find((r) => r.id === b.dataset.copy); edit(null, { ...rest, hidden: true, ...(rest.title ? { title: `${rest.title} (복사본)` } : {}) }); }));
     $$('[data-del]', main).forEach((b) => (b.onclick = async () => {
       const r = rows.find((x) => x.id === b.dataset.del);
