@@ -488,3 +488,28 @@ h1, h2, h3 { letter-spacing: -0.035em; }
 .cover-prev img { height: 70px; }
 .cover-prev b { display: block; font-size: 30px; font-weight: 900; }
 .cover-prev span { font-size: 14px; opacity: .9; }
+
+/* ---- 모바일 다듬기 ---- */
+@media (max-width: 1023px) {
+  .row2:has(#send-code) { grid-template-columns: 1fr; }
+  #send-code { white-space: nowrap; }
+  .cbox textarea { min-width: 0; }
+  .cbox .send { flex: none; padding: 0 14px; }
+  .cbox > div { min-width: 0; }
+  .cover-prev { flex-direction: column; gap: 6px; height: auto; padding: 18px 12px; text-align: center; }
+  .cover-prev img { height: 46px; }
+  .cover-prev b { font-size: 22px; }
+  .cover-prev span { font-size: 12px; }
+  .admin-item b { word-break: break-all; }
+  .table td, .table th { padding: 8px 4px; }
+  .site-foot { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+  .post { overflow-wrap: anywhere; }
+  .rec-page { width: calc(100vw - 40px); }
+  .fab { bottom: calc(88px + env(safe-area-inset-bottom)); right: 16px; width: 58px; height: 58px; }
+  .to-top { bottom: calc(156px + env(safe-area-inset-bottom)); right: 18px; width: 50px; height: 50px; }
+}
+@media (max-width: 360px) {
+  .row2 { grid-template-columns: 1fr; }
+  .top-row h1 { font-size: 24px; }
+  .tabs a { padding: 12px 9px 14px; font-size: 17px; }
+}
