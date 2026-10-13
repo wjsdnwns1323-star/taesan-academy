@@ -5,32 +5,41 @@ import { esc, $, $$, ago, toast, backBar, itemHtml, safeImg } from './ui.js';
 export async function renderAdmin(ctx) {
   const { view, q } = ctx;
   if (!be.isAdmin()) { view.innerHTML = `${backBar('관리자')}<div class="empty">관리자만 볼 수 있어요.</div>`; return; }
-  const tab = q.get('tab') || 'pending';
-  const tabs = [['pending', '자료 승인'], ['reports', '신고'], ['users', '회원'], ['banners', '배너·안내']];
+  const tab = q.get('tab') || 'users';
+  const tabs = [['users', '회원 관리'], ['posts', '글 관리']];
   view.innerHTML = `${backBar('관리자', '<a class="btn small" href="#/write?board=notice" style="display:grid;place-items:center">공지 쓰기</a>')}
     <nav class="tabs">${tabs.map(([id, n]) => `<a href="#/admin?tab=${id}" class="${id === tab ? 'on' : ''}">${n}</a>`).join('')}</nav>
     <div id="ab"><div class="loading">불러오는 중…</div></div>`;
   const box = $('#ab');
 
-  if (tab === 'pending') {
-    const list = await be.listPending();
+  if (tab === 'posts') {
+    const [pending, reports, recent] = await Promise.all([be.listPending(), be.listReports(), be.listPosts({ limit: 100 })]);
     if (!ctx.alive()) return;
-    box.innerHTML = `<div class="card"><p>자료실에 올라온 자료는 여기서 승인해야 공개돼요. 글을 열어 파일을 확인한 뒤 <b>승인</b> 또는 <b>규칙 위반으로 삭제</b>를 누르세요.</p></div>
-      <div class="post-list">${list.map(itemHtml).join('') || '<div class="empty">승인 기다리는 자료가 없어요</div>'}</div>`;
-  }
-
-  if (tab === 'reports') {
-    const list = await be.listReports();
-    if (!ctx.alive()) return;
-    box.innerHTML = `<div class="admin-box">${list.map((r) => `<div class="admin-item" data-r="${esc(r.id)}">
+    const row = (p) => `<div class="admin-item" data-p="${esc(p.id)}"><div><span class="tag t-${esc(p.board)}">${esc(p.board === 'notice' ? '공지' : p.board)}</span> <b>${esc(p.title)}</b></div>
+      <div style="color:var(--muted);font-size:13px">${esc(p.nickname)} · ${ago(p.createdAt)} · 조회 ${p.viewCount || 0} · 댓글 ${p.commentCount || 0}</div>
+      <div class="btns"><a class="btn small gray" href="#/post/${esc(p.id)}" style="display:grid;place-items:center">보기</a>
+      ${p.board === 'data' && !p.approved ? '<button class="btn small" data-ok>승인</button>' : ''}<button class="btn small dark" data-del>삭제</button></div></div>`;
+    box.innerHTML = `<div class="admin-box">
+      <h3 class="adm-h">승인 기다리는 자료 (${pending.length})</h3>${pending.map(row).join('') || '<div class="empty">올라온 글이 없어요</div>'}
+      <h3 class="adm-h">신고 (${reports.length})</h3>${reports.map((r) => `<div class="admin-item" data-r="${esc(r.id)}">
         <div><b>${esc(r.reason)}</b> <small style="color:var(--muted)">· ${ago(r.createdAt)}</small></div>
-        <div style="color:var(--sub);font-size:14px">${r.commentId ? '댓글' : '글'}: ${esc(r.target)}<br>글 제목: ${esc(r.postTitle)}</div>
-        <div class="btns"><a class="btn small gray" href="#/post/${esc(r.postId)}" style="display:grid;place-items:center">글 열기</a><button class="btn small dark" data-done>처리 완료</button></div>
-      </div>`).join('') || '<div class="empty">새 신고가 없어요</div>'}</div>`;
+        <div style="color:var(--sub);font-size:14px">${r.commentId ? '댓글' : '글'}: ${esc(r.target)} / 글 제목: ${esc(r.postTitle)}</div>
+        <div class="btns"><a class="btn small gray" href="#/post/${esc(r.postId)}" style="display:grid;place-items:center">글 열기</a><button class="btn small dark" data-done>처리 완료</button></div></div>`).join('') || '<div class="empty">새 신고가 없어요</div>'}
+      <h3 class="adm-h">최근 글 (${recent.length})</h3>${recent.map(row).join('') || '<div class="empty">올라온 글이 없어요</div>'}</div>`;
+    const all = [...pending, ...recent];
     box.addEventListener('click', async (e) => {
-      const it = e.target.closest('[data-r]');
-      if (!it || !e.target.closest('[data-done]')) return;
-      try { await be.closeReport(it.dataset.r); it.remove(); toast('처리했어요'); } catch (err) { toast(be.errorText(err)); }
+      try {
+        const r = e.target.closest('[data-r]');
+        if (r && e.target.closest('[data-done]')) { await be.closeReport(r.dataset.r); r.remove(); toast('처리했어요'); return; }
+        const it = e.target.closest('[data-p]');
+        if (!it) return;
+        const p = all.find((x) => x.id === it.dataset.p);
+        if (e.target.closest('[data-ok]')) { await be.approvePost(p, true); toast('승인했어요'); ctx.go(`#/admin?tab=posts&r=${Date.now()}`); }
+        if (e.target.closest('[data-del]')) {
+          if (!confirm(`'${p.title}' 글을 삭제할까요? 되돌릴 수 없어요.`)) return;
+          await be.deletePost(p); it.remove(); toast('삭제했어요');
+        }
+      } catch (err) { toast(be.errorText(err)); }
     });
   }
 
@@ -59,7 +68,7 @@ export async function renderAdmin(ctx) {
       try {
         if (b.dataset.a === 'priv') {
           const p = await be.getPrivate(u.id);
-          $('.priv', tr).innerHTML = p ? `실명 ${esc(p.realName)} · ${esc(p.phone)} · ${esc(p.age)}세${p.guardianConsent ? ' · 보호자 동의' : ''}` : '개인정보 없음';
+          $('.priv', tr).innerHTML = p ? `실명 ${esc(p.realName)} · ${esc(p.phone)} · ${esc(p.gender || '')} · ${esc(p.age)}세 · ${esc(p.memberType || '')}${p.childGrade ? `(자녀 ${esc(p.childGrade)})` : ''}${p.guardianConsent ? ' · 보호자 동의' : ''}` : '개인정보 없음';
         } else if (b.dataset.a === 'ban') {
           if (!confirm(`${u.nickname}님을 ${u.banned ? '정지 해제' : '이용 정지'}할까요?`)) return;
           await be.setUserFlags(u.id, { banned: !u.banned });
@@ -70,45 +79,6 @@ export async function renderAdmin(ctx) {
           toast('바꿨어요'); ctx.go(`#/admin?tab=users&r=${Date.now()}`);
         }
       } catch (err) { toast(be.errorText(err)); }
-    });
-  }
-
-  if (tab === 'banners') {
-    const list = await be.listBanners();
-    if (!ctx.alive()) return;
-    box.innerHTML = `<form class="form" id="bf">
-        <div class="card" style="margin:0"><p><b>배너</b>는 홈·게시판 위에 넘겨 보는 사진이고, <b>상단 안내</b>는 맨 위 띠에 돌아가며 나오는 한 줄 글이에요. 링크는 사이트 안 주소(#/…)나 https:// 주소만 쓸 수 있어요.</p></div>
-        <label class="field"><span>종류</span><select name="kind"><option value="image">배너(사진)</option><option value="text">상단 안내(글)</option></select></label>
-        <label class="field" id="b-img"><span>배너 사진 <small>(가로로 긴 사진 권장, 자동으로 줄여요)</small></span><input type="file" accept="image/*" name="file"></label>
-        <label class="field"><span>글 <small>(상단 안내 문구 / 배너 설명)</small></span><input class="input" name="text" maxlength="100"></label>
-        <label class="field"><span>누르면 갈 곳 <small>(선택)</small></span><input class="input" name="link" maxlength="300" placeholder="예: #/community/news 또는 https://…"></label>
-        <p class="err" id="berr"></p><button class="btn">추가</button></form>
-      <div class="admin-box">${list.map((b) => `<div class="admin-item" data-b="${esc(b.id)}">
-          ${b.kind === 'image' ? `<img src="${safeImg(b.image)}" alt="" style="max-height:120px;border-radius:10px;object-fit:cover">` : '<b>상단 안내</b>'}
-          <div>${esc(b.text)} <small style="color:var(--muted)">${esc(b.link)}</small></div>
-          <div class="btns"><button class="btn small gray" data-del>삭제</button></div></div>`).join('') || '<div class="empty">아직 없어요</div>'}</div>`;
-    const f = $('#bf');
-    f.kind.addEventListener('change', () => $('#b-img').classList.toggle('hidden', f.kind.value !== 'image'));
-    f.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const link = f.link.value.trim();
-      try {
-        if (link && !/^(#\/|https:\/\/)/.test(link)) throw new Error('링크는 #/ 또는 https:// 로 시작해야 해요.');
-        let image = '';
-        if (f.kind.value === 'image') {
-          const file = f.file.files[0];
-          if (!file) throw new Error('배너 사진을 골라 주세요.');
-          image = await be.blobToDataUrl(await be.shrinkImage(file, 1600, 0.8));
-          if (image.length > 900000) image = await be.blobToDataUrl(await be.shrinkImage(file, 1200, 0.7));
-        } else if (!f.text.value.trim()) throw new Error('상단 안내 문구를 적어 주세요.');
-        await be.addBanner({ kind: f.kind.value, image, text: f.text.value.trim(), link });
-        toast('추가했어요. 새로고침하면 보여요.'); ctx.go(`#/admin?tab=banners&r=${Date.now()}`);
-      } catch (err) { $('#berr').textContent = be.errorText(err); }
-    });
-    box.addEventListener('click', async (e) => {
-      const it = e.target.closest('[data-b]');
-      if (!it || !e.target.closest('[data-del]') || !confirm('삭제할까요?')) return;
-      try { await be.deleteBanner(it.dataset.b); it.remove(); toast('삭제했어요'); } catch (err) { toast(be.errorText(err)); }
     });
   }
 }

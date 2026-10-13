@@ -28,6 +28,7 @@ export async function renderWrite(ctx, editing) {
         <select name="board" ${editing ? 'disabled' : ''}>${boards.map((b) => `<option value="${b}" ${b === board ? 'selected' : ''}>${BOARDS[b].name}</option>`).join('')}</select></label>
       <div class="field"><span id="cat-label">말머리</span><div class="chips" id="cats" style="padding:0;flex-wrap:wrap"></div></div>
       <div id="data-rules"></div>
+      ${be.isAdmin() && !editing ? '<label class="check" id="pin-box"><input type="checkbox" name="pinned"> 이 게시판의 공지로 올리기(목록 맨 위에 고정)</label>' : ''}
       <label class="field"><span>제목</span><input class="input" name="title" maxlength="100" value="${esc(post?.title || '')}" placeholder="제목을 입력하세요"></label>
       <label class="field"><span>내용</span><textarea name="body" maxlength="10000" placeholder="내용을 입력하세요">${esc(post?.body || '')}</textarea>
         <small>다른 사람의 실명·학교·연락처·얼굴 사진을 올리지 마세요.</small></label>
@@ -129,7 +130,9 @@ export async function renderWrite(ctx, editing) {
         fileMetas.push({ id: meta.id, name: meta.name, size: meta.size, type: meta.type });
       }
       step('저장하는 중…');
-      const data = { title, body, category: cat, thumb: safeImg(thumb), images: imgMetas, files: fileMetas, source: board === 'data' ? source : '' };
+      const data0 = {};
+      if (!editing && form.pinned?.checked) data0.pinned = true;
+      const data = { ...data0, title, body, category: cat, thumb: safeImg(thumb), images: imgMetas, files: fileMetas, source: board === 'data' ? source : '' };
       let id = post?.id;
       if (editing) {
         await be.updatePost(id, { ...data, approved: board !== 'data' || (be.isAdmin() && !!post.approved) });

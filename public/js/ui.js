@@ -76,7 +76,7 @@ function metaHtml(p, { when = true } = {}) {
 export function itemHtml(p) {
   const badge = p.board === 'data' && !p.approved ? ' <span class="badge pending">승인 대기</span>' : '';
   const files = p.files?.length ? ` · 📎${p.files.length}` : '';
-  return `<a class="item b-${p.board}${p.board === 'notice' ? ' pinned' : ''}" href="#/post/${p.id}" data-date="${ago(p.createdAt)}">
+  return `<a class="item b-${p.pinned ? 'notice' : p.board}${p.board === 'notice' || p.pinned ? ' pinned' : ''}" href="#/post/${p.id}" data-date="${ago(p.createdAt)}">
     <div class="txt">${labelHtml(p)}<h3>${esc(p.title)}${badge}</h3><p>${preview(p.body)}${files}</p>${metaHtml(p)}</div>
     ${safeImg(p.thumb) ? `<div class="th"><img src="${safeImg(p.thumb)}" alt="" loading="lazy"></div>` : ''}</a>`;
 }
