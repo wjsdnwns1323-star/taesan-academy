@@ -121,7 +121,7 @@ service cloud.firestore {
         || (active() && changed().hasOnly(['commentCount'])
           && (request.resource.data.commentCount == post().commentCount + 1 || request.resource.data.commentCount == post().commentCount - 1))
         // 관리자: 승인
-        || (isAdmin() && changed().hasOnly(['approved']));
+        || (isAdmin() && changed().hasOnly(['approved', 'hidden']));
 
       allow delete: if (signedIn() && post().uid == request.auth.uid) || isAdmin();
 

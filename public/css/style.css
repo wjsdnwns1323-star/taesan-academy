@@ -599,3 +599,19 @@ html, body, button, input, select, textarea, .bt, .bt-head h1 { font-family: 'No
 /* 자료실 안내: 게시판과 어울리는 한 줄 안내 */
 .bt-note { margin: 0 0 12px; padding: 10px 12px; border-top: 1px solid #e5e5e5; border-bottom: 1px solid #e5e5e5; background: #fafafa; font-size: 13px; color: #555; line-height: 1.6; }
 .bt-note a { color: var(--accent); font-weight: 700; white-space: nowrap; }
+
+/* 관리자: 글 옆 숨김·삭제, 회원 정보 창 */
+.bt td.adm { white-space: nowrap; }
+.bt td.adm button { font-size: 12px; padding: 3px 7px; border: 1px solid #ddd; border-radius: 4px; margin: 0 2px; background: #fff; color: #555; }
+.bt td.adm button[data-del] { color: #e03131; border-color: #ffc9c9; }
+[data-uid]:not([data-uid=""]) { cursor: pointer; }
+.modal { position: fixed; inset: 0; z-index: 80; background: rgba(0,0,0,.4); display: grid; place-items: center; padding: 16px; }
+.modal-card { background: #fff; border-radius: 12px; padding: 18px 20px; width: 100%; max-width: 420px; max-height: 90vh; overflow: auto; }
+.modal-h { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; font-size: 17px; }
+.modal-card .table th { width: 90px; color: #888; }
+.u-links .u-adm { color: var(--accent); font-weight: 700; }
+@media (max-width: 1023px) {
+  .bt td.adm { order: 5; margin-left: auto; }
+  .u-links .u-adm { display: none; }
+}
+#m-tabs .u-adm { color: var(--accent); font-weight: 700; display: block; }

@@ -525,5 +525,17 @@ export async function saveCover(c) {
 export async function deleteBanner(id) { needAdmin(); await db.remove(`banners/${id}`); }
 
 /* ---------------- 관리자 ---------------- */
+// 글 숨기기: 목록·비회원 목록에서 빠지고 관리자만 볼 수 있음
+export async function setHidden(post, hide) {
+  needAdmin();
+  await db.update(`posts/${post.id}`, { approved: !hide, hidden: hide });
+  await db.update(`postIndex/${post.id}`, { approved: !hide }).catch(() => {});
+}
+export const listHidden = () => db.query('posts', { eq: { hidden: true }, limit: 100 });
+export async function getMember(uid) {
+  needAdmin();
+  const [u, p] = await Promise.all([db.get(`users/${uid}`), db.get(`users/${uid}/private/info`).catch(() => null)]);
+  return u ? { ...u, uid, priv: p } : null;
+}
 export async function listUsers(after) { needAdmin(); return db.query('users', { limit: 200, after }); }
 export async function setUserFlags(uid, patch) { needAdmin(); await db.update(`users/${uid}`, patch); }
