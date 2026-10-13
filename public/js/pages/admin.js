@@ -637,8 +637,7 @@ async function settings(main) {
   const sections = [
     ['연락처', [F('phone', '대표 전화', 'text', { req: true }), F('hours', '운영·상담 시간', 'text', { ph: '예: 평일 14:00~22:00 / 주말 09:00~18:00' }), F('kakaoUrl', '카카오톡 채널 주소', 'text', { ph: 'https://pf.kakao.com/...', hint: '오른쪽 아래 TALK 버튼에 연결됩니다.' }), F('blogUrl', '네이버 밴드 주소', 'text')]],
     ['학원 소개', [F('directorName', '원장 이름', 'text'), F('greeting', '인사말', 'textarea', { rows: 8, hint: '학원 소개 페이지에 나옵니다. 빈 줄로 문단을 나눕니다.' })]],
-    ['지점 주소·지도', [F('mainAddress', '본관 주소', 'text'), F('annexAddress', '2관 주소', 'text', { hint: '넣으면 오시는 길에 2관 지도 탭이 생깁니다.' }),
-      F('naverMapId', '네이버 지도 Client ID', 'text', { ph: '비우면 구글 지도로 보여줍니다', hint: '네이버 클라우드 플랫폼 > Maps > Application 등록(Dynamic Map, Geocoding 선택, 웹 서비스 URL에 https://taesan-academy.web.app 추가) 후 나오는 Client ID' })]],
+    ['지점 주소', [F('mainAddress', '본관 주소', 'text'), F('annexAddress', '2관 주소', 'text')]],
     ['홈·시간표 문구', [F('resultBandTitle', '홈 실적 띠 제목', 'text', { ph: '예: 2학기 중간고사 결과' }), F('resultBandNote', '실적 띠 작은 글씨', 'text', { ph: '예: 가채점 포함 (비우면 숨김)' }), F('timetableNotice', '시간표 안내 문구', 'textarea', { rows: 3 })]],
   ];
   const fields = sections.flatMap(([, f]) => f);

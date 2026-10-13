@@ -957,40 +957,6 @@ body.sw-on .quick { opacity: 0; pointer-events: none; }
 .adm-tbl td.act .btn { min-height: 30px; padding: 0 9px; font-size: 12.5px; }
 .adm-tbl td, .adm-tbl th { padding-left: 10px; padding-right: 10px; }
 
-/* ═════════ 상단 개편: 얇은 안내줄 + [로고 | 검색 | 메뉴] 한 줄 ═════════ */
-.util { height: 38px; padding: 0; background: #f7f6f2; border-bottom: 1px solid var(--line-2); }
-.util .wrap { height: 100%; }
-.util-right { flex-direction: row; align-items: center; gap: 0; }
-.util-left { font-size: 13px; gap: 12px; }
-.util-left .u-tag { font-weight: 700; color: var(--violet); letter-spacing: -0.02em; }
-.util-left .u-tel { display: inline-flex; align-items: center; gap: 6px; color: var(--sub); }
-.util-left .u-tel svg { width: 13px; height: 13px; color: var(--blue); }
-.util-left .u-tel b { color: var(--text); font-weight: 800; }
-.util-left .u-tel:hover b { color: var(--blue); }
-.header > .wrap { gap: 20px; }
-.header .searchbox { width: auto; flex: 0 1 300px; min-width: 190px; height: 44px; margin-left: 8px; padding: 0 6px 0 18px; border: 1.5px solid var(--line); background: #f7f6f2; transition: border-color .15s, background .15s; }
-.header .searchbox:hover { border-color: #b9c2c2; }
-.header .searchbox:focus-within { border-color: var(--blue); background: #fff; box-shadow: 0 0 0 3px rgba(27, 107, 123, .12); }
-.header .searchbox input { font-size: 15px; }
-.header .searchbox button { width: 34px; height: 34px; border-radius: 50%; background: var(--violet); color: #fff; }
-.header .searchbox button svg { width: 17px; height: 17px; }
-.header .searchbox button:hover { background: var(--blue); }
-@media (max-width: 1280px) {
-  .header .searchbox { flex-basis: 220px; min-width: 160px; }
-  .gnb > li > a { padding: 0 11px; }
-}
-@media (max-width: 1100px) { .header .searchbox { min-width: 140px; } .gnb > li > a { font-size: 17px; padding: 0 9px; } }
-@media (max-width: 1000px) { .util-left .u-tag, .util-left .bar { display: none; } }
-@media (max-width: 640px) { .util-left .u-tel { font-size: 12.5px; } .util-links > * { padding: 0 8px; } }
-
-/* 오시는 길 */
-.map-box .nmap { width: 100%; height: 100%; }
-.nmap-iw { background: var(--violet); color: #fff; padding: 9px 14px; border-radius: 8px; font-size: 13px; line-height: 1.45; box-shadow: 0 4px 14px rgba(0,0,0,.2); }
-.nmap-iw b { display: block; font-size: 14.5px; }
-.nmap-iw span { opacity: .8; }
-.map-links { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
-@media (max-width: 640px) { .map-box { aspect-ratio: 4 / 3; } }
-
 /* 홈 첫 화면 영상 배너(화면 절반 높이) — '스크롤월드 보러가기' 버튼으로 #/world 를 엽니다 */
 .sw-mini { position: relative; height: 50vh; height: 50svh; min-height: 340px; max-height: 560px; overflow: hidden; background: #1a2129; display: flex; align-items: flex-end; }
 .sw-mini-v { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }

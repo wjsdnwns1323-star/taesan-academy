@@ -41,61 +41,19 @@ export async function about({ el, site }) {
   </div></div></div>`;
 }
 
-// 네이버 지도: 관리자 > 사이트 정보 > "네이버 지도 Client ID"를 넣으면 네이버 지도로, 비어 있으면 구글 지도로 보여줍니다.
-function loadNaver(id) {
-  if (window.naver?.maps?.Service) return Promise.resolve(window.naver);
-  return new Promise((ok, no) => {
-    window.navermap_authFailure = () => no(new Error('naver auth'));
-    const sc = document.createElement('script');
-    sc.src = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${encodeURIComponent(id)}&submodules=geocoder`;
-    sc.onload = () => (window.naver?.maps ? ok(window.naver) : no(new Error('naver load')));
-    sc.onerror = () => no(new Error('naver load'));
-    document.head.appendChild(sc);
-  });
-}
-const googleFrame = (b) => `<iframe title="${esc(b.name)} 지도" loading="lazy" referrerpolicy="no-referrer-when-downgrade" src="https://maps.google.com/maps?q=${encodeURIComponent(b.address.replace(/\s*\d+층.*/, ''))}&z=17&output=embed"></iframe>`;
-
-async function drawMap(box, b, naverId) {
-  if (!naverId) { box.innerHTML = googleFrame(b); return; }
-  try {
-    const naver = await loadNaver(naverId);
-    const pos = (b.lat && b.lng) ? new naver.maps.LatLng(b.lat, b.lng) : await new Promise((ok, no) => naver.maps.Service.geocode({ query: b.address.replace(/\s*\d+층.*/, '') }, (st, res) => {
-      const a = res?.v2?.addresses?.[0];
-      return st === naver.maps.Service.Status.OK && a ? ok(new naver.maps.LatLng(+a.y, +a.x)) : no(new Error('geocode'));
-    }));
-    box.innerHTML = '<div class="nmap"></div>';
-    const map = new naver.maps.Map(box.firstChild, { center: pos, zoom: 17, zoomControl: true, zoomControlOptions: { position: naver.maps.Position.TOP_RIGHT } });
-    const mk = new naver.maps.Marker({ position: pos, map });
-    const iw = new naver.maps.InfoWindow({ content: `<div class="nmap-iw"><b>${esc(b.name)}</b><span>${esc(b.address)}</span></div>`, borderWidth: 0, backgroundColor: 'transparent', disableAnchor: true, pixelOffset: new naver.maps.Point(0, -6) });
-    iw.open(map, mk); naver.maps.Event.addListener(mk, 'click', () => (iw.getMap() ? iw.close() : iw.open(map, mk)));
-  } catch { box.innerHTML = googleFrame(b); }
-}
-
 export async function location({ el, site }) {
-  const branches = (site.branches || []).filter((b) => b.address);
-  const tel = esc(site.phone.replace(/-/g, ''));
-  const q = (b) => encodeURIComponent(b.address.replace(/\s*\d+층.*/, ''));
-  let cur = 0;
+  const main = site.branches[0];
+  const q = encodeURIComponent(main.address.replace(/\s*2층.*/, ''));
   el.innerHTML = `${pageHead('오시는 길', '', [['학원안내'], ['오시는 길']])}
   <div class="wrap page"><div class="layout-side">${side('location')}<div>
-    ${branches.length > 1 ? `<div class="tabs" role="tablist" style="margin-bottom:16px">${branches.map((b, i) => `<button role="tab" data-br="${i}" aria-selected="${i === 0}">${esc(b.name)}</button>`).join('')}</div>` : ''}
-    <div class="map-box" id="map-box"></div>
-    <div class="map-links" id="map-links"></div>
+    <div class="map-box"><iframe title="태산학원 본관 지도" loading="lazy" referrerpolicy="no-referrer-when-downgrade" src="https://maps.google.com/maps?q=${q}&z=17&output=embed"></iframe></div>
     <div class="info-band" style="margin-top:20px">
-      ${(site.branches || []).map((b) => `<div><h3>${esc(b.name)}</h3><p class="v" style="font-size:18px">${esc(b.address || '상담 시 안내')}</p>${b.uses ? `<p>${esc(b.uses)}</p>` : ''}</div>`).join('')}
-      <div><h3>전화</h3><a class="v num" href="tel:${tel}">${esc(site.phone)}</a><p>${esc(site.hours || '상담 가능 시간은 전화로 확인해 주세요.')}</p></div>
+      <div><h3>본관 주소</h3><p class="v" style="font-size:18px">${esc(main.address)}</p>
+        <p><a class="link" href="https://map.kakao.com/?q=${q}" target="_blank" rel="noopener">카카오맵</a> · <a class="link" href="https://map.naver.com/p/search/${q}" target="_blank" rel="noopener">네이버 지도</a></p></div>
+      <div><h3>2관</h3><p class="v" style="font-size:18px">${esc(site.branches[1]?.address || '상담 시 안내')}</p></div>
+      <div><h3>전화</h3><a class="v num" href="tel:${esc(site.phone.replace(/-/g, ''))}">${esc(site.phone)}</a><p>${esc(site.hours || '상담 가능 시간은 전화로 확인해 주세요.')}</p></div>
     </div>
   </div></div></div>`;
-  const show = () => {
-    const b = branches[cur]; if (!b) { el.querySelector('#map-box').innerHTML = '<div class="empty"><p>주소가 아직 등록되지 않았습니다.</p></div>'; return; }
-    drawMap(el.querySelector('#map-box'), b, site.naverMapId);
-    el.querySelector('#map-links').innerHTML = `<a class="btn sm ghost" href="https://map.naver.com/p/search/${q(b)}" target="_blank" rel="noopener">네이버 지도에서 길찾기</a>
-      <a class="btn sm ghost" href="https://map.kakao.com/?q=${q(b)}" target="_blank" rel="noopener">카카오맵</a>
-      <a class="btn sm ghost" href="https://www.google.com/maps/search/?api=1&query=${q(b)}" target="_blank" rel="noopener">구글 지도</a>
-      <a class="btn sm" href="tel:${tel}">전화 문의</a>`;
-  };
-  el.querySelectorAll('[data-br]').forEach((t) => (t.onclick = () => { cur = +t.dataset.br; el.querySelectorAll('[data-br]').forEach((x) => x.setAttribute('aria-selected', x === t)); show(); }));
-  show();
 }
 
 export async function privacy({ el, site }) {

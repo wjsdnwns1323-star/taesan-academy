@@ -115,11 +115,8 @@ const groupHTML = (cls) => (g) => {
 
 function topbar() {
   const u = getUser();
-  const phone = (SITE && SITE.phone) || '';
   return `<div class="util"><div class="wrap">
     <div class="util-left">
-      <span class="u-tag">대전 둔산 · 학교별 고등 내신</span>
-      ${phone ? `<span class="bar"></span><a class="u-tel" href="tel:${esc(phone.replace(/-/g, ''))}">${ICON.phone || ''}상담 <b class="num">${esc(phone)}</b></a>` : ''}
       ${backend.mode === 'local' ? '<span class="mode-badge" title="Firebase 연결 전입니다. 입력한 내용은 이 브라우저에만 저장됩니다.">체험 모드</span>' : ''}
     </div>
     <div class="util-right">
@@ -127,6 +124,9 @@ function topbar() {
         ${u ? `<span class="u-txt who">${esc(u.name || '회원')}님</span><a class="u-link" href="#/mypage">마이페이지</a>${isAdmin() ? '<a class="u-link" href="#/admin">관리자</a>' : ''}<button class="u-link" type="button" data-logout>로그아웃</button>`
             : '<a class="u-link" href="#/login">로그인</a><a class="u-link" href="#/join">회원가입</a>'}
       </div>
+      <form class="searchbox" role="search" data-search><span class="pill">검색</span>
+        <label class="sr" for="g-q">사이트 검색</label><input id="g-q" name="q" placeholder="강사명, 과목명, 학교명을 입력하세요." autocomplete="off">
+        <button aria-label="검색">${ICON.search}</button></form>
     </div>
   </div></div>`;
 }
@@ -137,9 +137,6 @@ function header(active) {
       <span class="tag-line">대전 둔산<br>학교별 내신</span>
       <img class="logo-img" src="images/brand/logo-dark.png" alt="태산학원 TAESANEDU">
     </a>
-    <form class="searchbox" role="search" data-search>
-      <label class="sr" for="g-q">사이트 검색</label><input id="g-q" name="q" placeholder="선생님·과목·학교 검색" autocomplete="off">
-      <button aria-label="검색">${ICON.search}</button></form>
     <nav aria-label="주 메뉴" style="flex:1;height:100%;display:flex"><ul class="gnb">
       ${MENU.map((m) => `<li><a href="${m.href}" ${active === m.key ? 'aria-current="page"' : ''}>${m.label}</a>
         <div class="drop">${m.groups.map(groupHTML()).join('')}</div></li>`).join('')}
