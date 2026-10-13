@@ -156,6 +156,25 @@ service cloud.firestore {
       }
     }
 
+    // 비회원도 보는 제목 목록(본문 없음). 글과 같은 내용인지 확인합니다
+    match /postIndex/{pid} {
+      function postAfter() { return getAfter(/databases/$(database)/documents/posts/$(pid)).data; }
+      function same() {
+        return request.resource.data.title == postAfter().title && request.resource.data.category == postAfter().category
+          && request.resource.data.approved == postAfter().approved;
+      }
+      allow read: if resource.data.approved == true || (signedIn() && (resource.data.uid == request.auth.uid || isAdmin()));
+      allow create: if active() && request.resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['board', 'category', 'title', 'uid', 'nickname', 'grade', 'createdAt', 'approved', 'pinned'])
+        && same() && postAfter().uid == request.auth.uid && request.resource.data.board == postAfter().board
+        && request.resource.data.nickname == postAfter().nickname && request.resource.data.grade == postAfter().grade
+        && request.resource.data.createdAt == postAfter().createdAt && request.resource.data.pinned == (('pinned' in postAfter()) && postAfter().pinned == true);
+      allow update: if (active() && resource.data.uid == request.auth.uid
+                         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title', 'category', 'approved']) && same())
+                    || (isAdmin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['approved']));
+      allow delete: if signedIn() && (resource.data.uid == request.auth.uid || isAdmin());
+    }
+
     // 첨부 파일(조각으로 나눠 저장)
     match /files/{fid} {
       allow read: if signedIn();

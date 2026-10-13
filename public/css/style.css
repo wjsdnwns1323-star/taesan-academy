@@ -479,3 +479,6 @@ h1, h2, h3 { letter-spacing: -0.035em; }
   .cover { max-width: 1278px; }
   .util { max-width: 1310px; }
 }
+
+.g-btns { display: flex; gap: 8px; margin-top: 12px; }
+.g-btns .btn { display: grid; place-items: center; }
