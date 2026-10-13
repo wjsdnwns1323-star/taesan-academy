@@ -999,3 +999,18 @@ body.sw-on .quick { opacity: 0; pointer-events: none; }
 .sw-stage.ready .sw-canvas { opacity: 1; }
 .sw-load { top: 50%; left: 50%; right: auto; bottom: auto; transform: translate(-50%, -50%); font-size: 14px; padding: 8px 16px; font-variant-numeric: tabular-nums; }
 .sw:not(.ready) .sw-steps { visibility: hidden; }
+/* 모집안내(맨 위 줄) — 카드 크기 조금 줄임 */
+.recruit .r-card { min-height: 300px; padding: 34px 30px 30px; }
+.recruit .r-card .tag { font-size: 14px; }
+.recruit .r-card .copy { margin-top: 22px; font-size: 16px; }
+.recruit .r-card .t1, .recruit .r-card .t2 { font-size: 26px; }
+.recruit .r-card .when { padding-top: 18px; font-size: 17px; }
+.recruit .news { min-height: 300px; padding: 34px 30px 30px; }
+.recruit .news h3 { margin-top: 20px; font-size: 26px; }
+.recruit .news p { font-size: 16px; }
+@media (max-width: 640px) {
+  .recruit .r-card { min-height: 250px; padding: 26px 22px 24px; }
+  .recruit .r-card .t1, .recruit .r-card .t2 { font-size: 23px; }
+  .recruit .news { min-height: 0; padding: 26px 22px; }
+  .recruit .news h3 { font-size: 22px; }
+}
