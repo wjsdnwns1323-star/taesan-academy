@@ -74,6 +74,20 @@ def sane(face, img):
     return face if img.height * 0.06 <= fh <= img.height * 0.7 and fw > 0 else None
 
 
+def fill_bottom(canvas):
+    """몸이 캔버스 아래 끝까지 오도록(아래가 비면) 머리 위치는 그대로 두고 살짝 키웁니다."""
+    bb = canvas.split()[3].point(lambda v: 255 if v > 40 else 0).getbbox()
+    if not bb or bb[3] >= H - 2:
+        return canvas
+    top, bottom = bb[1], bb[3]
+    k = (H - top) / (bottom - top)
+    big = canvas.resize((round(W * k), round(H * k)), Image.LANCZOS)
+    cx = (bb[0] + bb[2]) / 2
+    out = Image.new('RGBA', (W, H), (0, 0, 0, 0))
+    out.paste(big, (round(cx - cx * k), round(top - top * k)), big)
+    return out
+
+
 def align(src: Path, dst: Path):
     img = Image.open(src).convert('RGBA')
     # 큰 원본은 먼저 줄여서 처리(메모리·속도)
@@ -97,18 +111,7 @@ def align(src: Path, dst: Path):
     x0, y0 = round(W / 2 - cx), round(FACE_TOP - top)
     canvas = Image.new('RGBA', (W, H), (0, 0, 0, 0))
     canvas.paste(img, (x0, y0), img)
-    # 원본 아래쪽이 잘린 사진이면 늘려 붙이지 않고(줄무늬가 생김) 아래 끝을 부드럽게 흐리게 처리합니다
-    gap = H - (y0 + img.height)
-    if gap > 0:
-        fade = min(110, img.height // 5)
-        px = canvas.load()
-        bottom = y0 + img.height
-        for y in range(max(0, bottom - fade), min(H, bottom)):
-            k = (bottom - y) / fade
-            for x in range(W):
-                r, g, b, al = px[x, y]
-                if al:
-                    px[x, y] = (r, g, b, int(al * k))
+    canvas = fill_bottom(canvas)
     # 팔 등이 사진 좌우 끝에 닿아 잘려 보이면 끝을 부드럽게 흐리게
     px = canvas.load(); edge = 48
     for x in list(range(edge)) + list(range(W - edge, W)):
