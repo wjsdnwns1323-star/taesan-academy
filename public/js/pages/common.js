@@ -150,6 +150,7 @@ export async function showClassPlan(c, teacher) {
         ${c.teacherName ? `<span class="plan-name">${esc(c.subject)} ${esc(c.teacherName)}T</span>` : ''}
       </div>
       <table class="plan-info"><tr><th>개강</th><td>${esc(c.start || '추후 안내')}</td><th>일정</th><td>${esc(c.time || '추후 안내')}</td></tr></table>
+      ${(c.posters || []).length ? `<section class="plan-sec"><h4>수업 포스터</h4><div class="pc-list">${c.posters.map((f) => img(f, c.title || '수업 포스터')).join('')}</div></section>` : ''}
       ${posts.length ? posts.map((p) => `<section class="plan-sec">
         <h4>강좌 소개 <small>${esc(p.date)} · 밴드 게시글</small></h4>
         ${p.text ? `<div class="plan-text">${esc(p.text)}</div>` : ''}
