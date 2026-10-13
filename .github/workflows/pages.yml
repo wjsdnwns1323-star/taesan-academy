@@ -41,7 +41,7 @@ jobs:
             get "$out" || curl -fsSL -m 30 "https://coresos-phinf.pstatic.net/$path" -o "public/$out" || rm -f "public/$out"
             t="images/band/t/$(basename "${out%.*}").jpg"; get "$t" || true
           done < scripts/band_images.tsv
-          pip3 install -q pillow
+          pip3 install -q pillow numpy
           python3 - <<'PY'
           from pathlib import Path
           from PIL import Image
@@ -55,6 +55,7 @@ jobs:
               im = Image.open(p).convert('RGBA'); im.thumbnail((450, 600), Image.LANCZOS)
               im.save(p.with_suffix('.webp'), 'WEBP', quality=82, method=6)
           PY
+          python3 scripts/face_crops.py public/images/people   # 동그란 프로필용(얼굴 가운데·어깨 대칭)
           echo "강사 사진 $(ls public/images/people/*.png | wc -l)장, 수업 카드 $(ls public/images/posters | wc -l)장, 밴드 $(ls public/images/band | wc -l)개"
       - name: 파일마다 버전 붙이기(새로 올리면 브라우저가 옛 파일과 섞어 쓰지 않게)
         run: |

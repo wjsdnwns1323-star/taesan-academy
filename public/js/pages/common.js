@@ -43,7 +43,11 @@ export function monogram(t) {
   return `<span class="mono" aria-hidden="true">${esc(initials(t.name))}</span>`;
 }
 export function avatar(t) {
-  if (t && t.photo) return `<span class="avatar"><img src="${esc(photoOf(t))}" alt="" loading="lazy" decoding="async" onerror="photoFallback(this)"></span>`;
+  if (t && t.photo) {
+    const full = photoOf(t), face = full.replace(/\.webp(?=\?|$)/, '-face.webp');
+    const fb = face === full ? 'photoFallback(this)' : `this.onerror=function(){photoFallback(this)};this.classList.add('full');this.src='${esc(full)}'`;
+    return `<span class="avatar"><img src="${esc(face)}" alt="" loading="lazy" decoding="async" onerror="${fb}"></span>`;
+  }
   return `<span class="avatar" aria-hidden="true">${esc(initials(t?.name || '?'))}</span>`;
 }
 
