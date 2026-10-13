@@ -187,6 +187,12 @@ async function firebaseAdapter() {
 
   const db = {
     async list(c, opts = {}) {
+      // 한 번만 서버에 물어봄: 공개 콘텐츠는 통째로 받아서, 비어 있으면 기본 자료로
+      if (CONTENT[c] && !opts.where) {
+        const snap = await F.getDocs(F.collection(fs, c));
+        seededCache[c] = !snap.empty;
+        return snap.empty ? applyQuery(clone(CONTENT[c]), opts) : applyQuery(toRows(snap), opts);
+      }
       if (CONTENT[c] && !(await isSeeded(c))) return applyQuery(clone(CONTENT[c]), opts);
       const cons = (opts.where || []).map(([f, op, v]) => F.where(f, op, v));
       const snap = await F.getDocs(F.query(F.collection(fs, c), ...cons));

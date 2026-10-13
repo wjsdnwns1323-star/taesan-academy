@@ -60,6 +60,9 @@ jobs:
           v = sys.argv[1]
           idx = Path('public/index.html'); h = idx.read_text()
           h = h.replace('href="css/style.css"', f'href="css/style.css?v={v}"').replace('src="js/app.js"', f'src="js/app.js?v={v}"')
+          # 모든 화면 코드를 처음에 한꺼번에 받기(하나 받고 다음 것 받는 대기 없애기). 관리자 화면 코드는 제외
+          pre = ''.join(f'  <link rel="modulepreload" href="{p.as_posix()[7:]}?v={v}" />\n' for p in sorted(Path('public/js').rglob('*.js')) if p.name != 'admin.js')
+          h = h.replace('</head>', pre + '</head>')
           idx.write_text(h)
           pat = re.compile(r"""((?:from\s*|import\(\s*)['"])(\.{1,2}/[^'"?]+\.js)(['"])""")
           for p in Path('public/js').rglob('*.js'):
