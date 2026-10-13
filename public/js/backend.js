@@ -162,6 +162,8 @@ export async function init() {
     db.auth.onChange(async (uid) => {
       if (signingUp) return;
       me = uid ? await db.get(`users/${uid}`).catch(() => null) : null;
+      // 예전 홈페이지(Google 로그인) 계정이나 가입이 덜 된 계정은 로그아웃시킵니다
+      if (uid && (!me || !me.username || !me.nickname)) { me = null; await db.auth.signOut().catch(() => {}); }
       if (me) me.uid = uid;
       listeners.forEach((fn) => fn(me));
       if (first) { first = false; resolve(me); }
