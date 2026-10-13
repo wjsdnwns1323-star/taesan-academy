@@ -34,6 +34,7 @@ export async function render({ el, go }) {
     <div class="wrap sw-mini-in">
       <h1 id="swm-t"><img class="sw-mini-logo" src="images/brand/logo-dark.png" alt="태산학원 TAESANEDU"></h1>
       <p class="sw-mini-copy">큰 산처럼 흔들림 없이, 학생들의 곁을 지킵니다</p>
+      <a class="sw-mini-cta" href="#/world">강사진 보러가기<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></a>
     </div>
   </section><div class="home wrap">
   <section class="h-sec" aria-labelledby="rc-t">

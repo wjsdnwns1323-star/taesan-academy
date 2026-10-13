@@ -106,9 +106,12 @@ export function mountWorld(el, { teachers, leaders, classes }) {
   });
 
   el.innerHTML = `<section class="sw" aria-label="태산학원 선생님 소개">
-    <div class="sw-stage" aria-hidden="true"><img class="sw-poster" alt=""><canvas class="sw-canvas"></canvas><span class="sw-load">불러오는 중</span></div>
+    <div class="sw-stage" aria-hidden="true"><img class="sw-poster" alt=""><canvas class="sw-canvas"></canvas><span class="sw-load">불러오는 중</span>
+      <div class="sw-guide"><span class="sw-mouse"><i></i></span><span class="sw-swipe"><i></i></span><b class="sw-guide-t"></b></div>
+    </div>
+    <nav class="sw-rail" aria-label="선생님 바로가기">${tour.map(([id]) => `<button type="button" data-goto="${esc(id)}" aria-label="${esc(people[id].name)}"><span>${esc(people[id].name)}</span></button>`).join('')}</nav>
     <div class="sw-steps">
-      <div class="sw-step sw-hero" data-seg="hero"><span class="sw-hint" aria-hidden="true"></span></div>
+      <div class="sw-step sw-hero" data-seg="hero"></div>
       <div class="sw-step sw-dissolve" data-seg="dissolve" aria-hidden="true"></div>
       <div class="sw-step sw-reveal" data-seg="reveal" aria-hidden="true"></div>
       <div class="sw-step sw-settle" data-seg="settle" aria-hidden="true"></div>
@@ -119,6 +122,8 @@ export function mountWorld(el, { teachers, leaders, classes }) {
   const root = el.querySelector('.sw');
   const stage = root.querySelector('.sw-stage'), canvas = stage.querySelector('canvas'), ctx = canvas.getContext('2d'), poster = stage.querySelector('.sw-poster'), loadEl = stage.querySelector('.sw-load');
   const steps = root.querySelector('.sw-steps');
+  const tourSteps = [...steps.querySelectorAll('.sw-t')], railBtns = [...root.querySelectorAll('.sw-rail button')]; let railOn = -2;
+  root.querySelector('.sw-guide-t').textContent = matchMedia('(hover: none)').matches ? '위로 밀어 선생님을 만나 보세요' : '스크롤하면 선생님 소개가 이어집니다';
   const wide = window.matchMedia('(min-width: 761px)');
   steps.querySelectorAll('.sw-tt').forEach((d) => { if (wide.matches && d.querySelectorAll('tr').length <= 4) d.open = true; });
 
@@ -166,7 +171,12 @@ export function mountWorld(el, { teachers, leaders, classes }) {
       cur += reduce ? tgt - cur : (tgt - cur) * 0.4;
       draw(Math.max(0, Math.min(S.n - 1, Math.round(cur * FPS))));
     }
-    root.classList.toggle('sw-moved', window.scrollY > 40);
+    root.classList.toggle('sw-moved', window.scrollY > 60);
+    if (ready && map.length) {
+      const mid = window.innerHeight / 2; let k = -1;
+      tourSteps.forEach((el, i) => { if (el.getBoundingClientRect().top <= mid) k = i; });
+      if (k !== railOn) { railOn = k; railBtns.forEach((b, i) => { b.classList.toggle('on', i === k); b.classList.toggle('past', i < k); }); }
+    }
     document.body.classList.toggle('sw-on', root.getBoundingClientRect().bottom > window.innerHeight * 0.6);
     raf = requestAnimationFrame(tick);
   }
