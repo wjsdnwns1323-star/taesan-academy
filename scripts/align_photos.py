@@ -109,6 +109,14 @@ def align(src: Path, dst: Path):
                 r, g, b, al = px[x, y]
                 if al:
                     px[x, y] = (r, g, b, int(al * k))
+    # 팔 등이 사진 좌우 끝에 닿아 잘려 보이면 끝을 부드럽게 흐리게
+    px = canvas.load(); edge = 48
+    for x in list(range(edge)) + list(range(W - edge, W)):
+        k = (x if x < edge else W - 1 - x) / edge
+        for y in range(H):
+            r, g, b, al = px[x, y]
+            if al:
+                px[x, y] = (r, g, b, int(al * k))
     canvas.save(dst, optimize=True)
     return '얼굴 인식' if found else '윤곽 추정'
 
