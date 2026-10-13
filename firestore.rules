@@ -33,7 +33,7 @@ service cloud.firestore {
         && nonEmpty(request.resource.data.nickname, 20) && request.resource.data.grade in grades()
         && recent(request.resource.data.createdAt)
         && getAfter(/databases/$(database)/documents/nicknames/$(request.resource.data.nickname)).data.uid == uid;
-      allow update: if (signedIn() && request.auth.uid == uid
+      allow update: if (false && signedIn() && request.auth.uid == uid
                          && changed().hasOnly(['nickname', 'grade'])
                          && nonEmpty(request.resource.data.nickname, 20) && request.resource.data.grade in grades()
                          && getAfter(/databases/$(database)/documents/nicknames/$(request.resource.data.nickname)).data.uid == uid)
@@ -53,7 +53,8 @@ service cloud.firestore {
           && request.resource.data.age is int && request.resource.data.age >= 8 && request.resource.data.age <= 99
           && (request.resource.data.age >= 14 || request.resource.data.guardianConsent == true)
           && recent(request.resource.data.agreedAt);
-        allow update: if signedIn() && request.auth.uid == uid
+        // 본인 정보 수정 불가(관리자 문의)
+        allow update: if false
           && changed().hasOnly(['realName', 'phone', 'age'])
           && nonEmpty(request.resource.data.realName, 20)
           && request.resource.data.phone.matches('^01[0-9]-?[0-9]{3,4}-?[0-9]{4}$')

@@ -120,20 +120,11 @@ export async function renderMe(ctx) {
   view.innerHTML = `${backBar('내 정보')}
     <div class="card"><div class="profile"><span class="avatar">${esc(me.nickname[0])}</span><div><b>${esc(me.nickname)}</b><br>
       <small style="color:var(--sub)">@${esc(me.username)} · ${esc(me.grade)}${me.role === 'admin' ? ' · 관리자' : ''}${me.banned ? ' · <b style="color:var(--danger)">이용 정지</b>' : ''}</small></div></div></div>
-    <form class="form" id="pf">
-      <div class="row2">
-        <label class="field"><span>닉네임</span><input class="input" name="nickname" maxlength="20" value="${esc(me.nickname)}"></label>
-        <label class="field"><span>학년</span><select name="grade">${GRADES.map((g) => `<option ${g === me.grade ? 'selected' : ''}>${g}</option>`).join('')}</select></label>
-      </div>
-      <div class="row2">
-        <label class="field"><span>실명 <small>(관리자만 봄)</small></span><input class="input" name="realName" maxlength="20" value="${esc(priv?.realName || '')}"></label>
-        <label class="field"><span>나이</span><input class="input" type="number" name="age" value="${esc(priv?.age ?? '')}"></label>
-      </div>
-      <p style="margin:0;color:var(--sub);font-size:14px">${esc(priv?.memberType || '')}${priv?.childGrade ? ` · 자녀 ${esc(priv.childGrade)}` : ''}${priv?.gender ? ` · ${esc(priv.gender)}` : ''}</p>
-      <label class="field"><span>전화번호 <small>(관리자만 봄)</small></span><input class="input" name="phone" inputmode="tel" value="${esc(priv?.phone || '')}"></label>
-      <p class="err" id="perr"></p>
-      <button class="btn dark">정보 저장</button>
-    </form>
+    <div class="form"><table class="table">
+      ${[['아이디', `@${me.username}`], ['닉네임', me.nickname], ['구분', priv?.memberType || me.grade], ['학년', priv?.childGrade ? `자녀 ${priv.childGrade}` : me.grade],
+        ['실명', priv?.realName], ['휴대폰', priv?.phone], ['성별', priv?.gender], ['나이', priv?.age ? `${priv.age}세` : '']]
+        .filter((r) => r[1]).map(([k, v]) => `<tr><th style="width:90px">${k}</th><td>${esc(v)}</td></tr>`).join('')}
+    </table><p style="margin:0;color:var(--muted);font-size:13px">회원 정보는 직접 바꿀 수 없어요. 바꿔야 하면 학원(관리자)에 문의해 주세요.</p></div>
     <div class="sec-title" style="padding-top:10px"><h2>내가 쓴 글</h2></div>
     <div class="post-list">${posts.map((p) => (p.board === 'qna' ? qcardHtml(p) : itemHtml(p))).join('') || '<div class="empty">올라온 글이 없어요</div>'}</div>
     <form class="form" id="pwf"><h3 style="margin:10px 0 0">비밀번호 바꾸기</h3>
@@ -142,17 +133,6 @@ export async function renderMe(ctx) {
       <p class="err" id="pwerr"></p><button class="btn gray">비밀번호 바꾸기</button></form>
     <div class="menu-list"><button id="withdraw" style="color:var(--muted);font-size:15px">회원 탈퇴</button></div>`;
 
-  $('#pf').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const f = e.target;
-    const v = { nickname: f.nickname.value.trim(), grade: f.grade.value, realName: f.realName.value.trim(), phone: f.phone.value.replace(/\s/g, ''), age: parseInt(f.age.value, 10) };
-    const problem = v.nickname.length < 2 || /[/\s]/.test(v.nickname) ? '닉네임은 띄어쓰기·/ 없이 2~20자로 정해 주세요.'
-      : !v.realName ? '실명을 입력해 주세요.'
-      : !/^01[0-9]-?[0-9]{3,4}-?[0-9]{4}$/.test(v.phone) ? '휴대전화 번호를 확인해 주세요.'
-      : !(v.age >= 8 && v.age <= 99) ? '나이를 확인해 주세요.' : '';
-    if (problem) { $('#perr').textContent = problem; return; }
-    try { await be.updateProfile(v); toast('저장했어요'); $('#perr').textContent = ''; } catch (err) { $('#perr').textContent = be.errorText(err); }
-  });
   $('#pwf').addEventListener('submit', async (e) => {
     e.preventDefault();
     const f = e.target;
