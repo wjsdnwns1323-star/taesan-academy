@@ -52,18 +52,32 @@ export function renderJoin(ctx) {
         <label class="field"><span id="grade-label">학년</span><select name="grade"><option value="">선택</option>${STUDENT_GRADES.map((g) => `<option>${g}</option>`).join('')}</select></label>
       </div>
       <div class="row2">
-        <label class="field"><span>전화번호</span><input class="input" name="phone" inputmode="tel" autocomplete="tel" placeholder="010-0000-0000"></label>
+        <label class="field"><span>휴대폰 번호</span><div style="display:flex;gap:6px"><input class="input" name="phone" inputmode="tel" autocomplete="tel" placeholder="010-0000-0000"><button type="button" class="btn small dark" id="send-code" style="flex:none">인증번호 받기</button></div></label>
         <label class="field"><span>나이</span><input class="input" name="age" type="number" inputmode="numeric" min="8" max="99" placeholder="만 나이"></label>
       </div>
+      <label class="field hidden" id="code-box"><span>인증번호</span><input class="input" name="code" inputmode="numeric" maxlength="6" placeholder="문자로 받은 6자리"><small id="code-msg"></small></label>
+      <div id="recaptcha-box"></div>
       <div class="field">
         <label class="check"><input type="checkbox" name="agreeRules"> <span>[필수] <a href="#/rules" target="_blank" style="text-decoration:underline">커뮤니티 이용규칙</a>에 동의합니다.</span></label>
         <label class="check"><input type="checkbox" name="agreePrivacy"> <span>[필수] <a href="#/privacy" target="_blank" style="text-decoration:underline">개인정보 수집·이용</a>(실명, 전화번호, 성별, 나이, 학생·학부모 구분과 학년 / 회원 관리·학원 연락 목적 / 탈퇴 시까지 보관)에 동의합니다.</span></label>
         <label class="check hidden" id="guardian"><input type="checkbox" name="guardianConsent"> <span>[필수] 만 14세 미만이라 <b>보호자(부모님)의 동의</b>를 받았습니다.</span></label>
       </div>
       <p class="err" id="err"></p>
-      <button class="btn">가입하기</button>
+      <button class="btn" id="join-btn">가입하기</button>
     </form>`;
   const f = $('#jf');
+  $('#send-code').addEventListener('click', async (e) => {
+    const phone = f.phone.value.replace(/\s/g, '');
+    if (!/^01[0-9]-?[0-9]{3,4}-?[0-9]{4}$/.test(phone)) { $('#err').textContent = '휴대폰 번호를 확인해 주세요. (예: 010-1234-5678)'; return; }
+    const b = e.currentTarget; b.disabled = true; b.textContent = '보내는 중…';
+    try {
+      await be.sendPhoneCode(phone, 'recaptcha-box');
+      $('#code-box').classList.remove('hidden');
+      $('#code-msg').textContent = be.DEMO ? '체험 모드: 인증번호는 123456' : '문자로 받은 인증번호 6자리를 넣어 주세요.';
+      $('#err').textContent = ''; b.textContent = '다시 받기'; f.phone.readOnly = true;
+      setTimeout(() => { b.disabled = false; }, 30000);
+    } catch (err) { $('#err').textContent = be.errorText(err); b.disabled = false; b.textContent = '인증번호 받기'; }
+  });
   f.memberType.addEventListener('change', () => { $('#grade-label').textContent = f.memberType.value === '학부모' ? '자녀 학년' : '학년'; });
   f.age.addEventListener('input', () => $('#guardian').classList.toggle('hidden', !(+f.age.value > 0 && +f.age.value < 14)));
   f.addEventListener('submit', async (e) => {
@@ -73,13 +87,14 @@ export function renderJoin(ctx) {
       username: f.username.value.trim().toLowerCase(), password: f.password.value,
       realName: f.realName.value.trim(), gender: f.gender.value, memberType: f.memberType.value,
       grade: f.memberType.value === '학부모' ? '학부모' : f.grade.value, childGrade: f.memberType.value === '학부모' ? f.grade.value : '', phone: f.phone.value.replace(/\s/g, ''), age: parseInt(f.age.value, 10),
-      guardianConsent: f.guardianConsent.checked,
+      guardianConsent: f.guardianConsent.checked, code: f.code.value.trim(),
     };
     const problem = !be.USERNAME_RE.test(v.username) ? '아이디는 영문 소문자·숫자·_ 4~20자입니다.'
       : v.password.length < 8 ? '비밀번호는 8자 이상이어야 해요.'
       : v.password !== f.password2.value ? '비밀번호 확인이 맞지 않아요.'
       : !v.realName ? '실명을 입력해 주세요.'
       : !/^01[0-9]-?[0-9]{3,4}-?[0-9]{4}$/.test(v.phone) ? '휴대전화 번호를 확인해 주세요. (예: 010-1234-5678)'
+      : !/^[0-9]{6}$/.test(v.code) ? '휴대폰 인증번호 6자리를 넣어 주세요.'
       : !v.gender ? '성별을 골라 주세요.'
       : !(v.age >= 8 && v.age <= 99) ? '나이를 숫자로 입력해 주세요.'
       : !v.memberType ? '학생인지 학부모인지 골라 주세요.'
@@ -88,7 +103,7 @@ export function renderJoin(ctx) {
       : v.age < 14 && !v.guardianConsent ? '만 14세 미만은 보호자 동의가 필요해요.'
       : '';
     if (problem) { err.textContent = problem; return; }
-    const btn = $('button', f);
+    const btn = $("#join-btn");
     btn.disabled = true; err.textContent = '';
     try {
       await be.signUp(v);

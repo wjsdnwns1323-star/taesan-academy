@@ -9,6 +9,16 @@ import time
 from urllib.parse import quote
 from fb import PROJECT, LOGIN_DOMAIN, FS, call, fs_fields
 
+# 이미 가입한 아이디를 관리자로 바꿀 때: python3 scripts/create_admin.py 아이디
+if len(sys.argv) > 1:
+    username = sys.argv[1].strip().lower()
+    email = f'{username}@{LOGIN_DOMAIN}'
+    u = call('POST', f'https://identitytoolkit.googleapis.com/v1/projects/{PROJECT}/accounts:lookup', {'email': [email]}).get('users')
+    if not u:
+        sys.exit('그 아이디로 가입한 계정이 없습니다.')
+    call('PATCH', f'{FS}/users/{u[0]["localId"]}?updateMask.fieldPaths=role', fs_fields({'role': 'admin'}))
+    print(f'{username} 계정을 관리자로 바꿨습니다.')
+    sys.exit(0)
 username = input('관리자 아이디(영문 소문자·숫자·_ 4~20자): ').strip().lower()
 if not re.fullmatch(r'[a-z0-9_]{4,20}', username):
     sys.exit('아이디 형식이 맞지 않습니다.')
