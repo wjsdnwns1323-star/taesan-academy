@@ -1128,3 +1128,9 @@ body.sw-on .sw.ready .sw-rail { opacity: 1; pointer-events: auto; }
 .sw-mini-in .sw-mini-cta { position: absolute; left: 50%; transform: translateX(-50%); top: calc(50% + clamp(48px, 5.4vw, 70px) + 38px); margin: 0; }
 .sw-mini-in .sw-mini-cta:hover { transform: translateX(-50%); }
 @media (max-width: 640px) { .sw-mini-in .sw-mini-cta { top: calc(50% + clamp(48px, 5.4vw, 70px) + 26px); height: 38px; font-size: 13.5px; } }
+/* 배너 안내: 연하게, 아래 가운데 */
+.sw-mini-hint { position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%); display: inline-flex; align-items: center; gap: 2px; font-size: 13px; font-weight: 600; letter-spacing: -0.01em; color: var(--violet); opacity: .45; transition: opacity .2s; white-space: nowrap; }
+.sw-mini-hint svg { width: 14px; height: 14px; transition: transform .2s; }
+.sw-mini:hover .sw-mini-hint, .sw-mini:focus-visible .sw-mini-hint { opacity: .85; }
+.sw-mini:hover .sw-mini-hint svg { transform: translateX(3px); }
+@media (max-width: 640px) { .sw-mini-hint { bottom: 12px; font-size: 12px; } }
