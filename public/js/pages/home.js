@@ -3,6 +3,16 @@ import { esc, $, $$, isPast, WEEK } from '../ui.js';
 import { load, visible, byOrder, teacherCard, gradeTags, photoOf } from './common.js';
 import { mountWorld } from './world.js';
 
+// 모집안내 카드 (관리자에서 바꾸려면 공지·강좌를 수정하세요. 카드 문구는 여기서 관리)
+const RECRUIT = [
+  { for: 'grade', tag: '고1·고2', copy: '학교마다 시험 범위가 다르니까\n반도 학교별로', t1: '2학기', t2: '기말대비 내신반', when: '10월 순차 개강', href: '#/timetable?term=final' },
+  { for: 'pre', tag: '예비고1', copy: '수능까지 이어지는 국어 공부법,\n중3부터 시작', t1: '올인원 국어', t2: 'SEASON 3 문법', when: '10. 25(일) 개강', href: '#/timetable?term=pre&subject=국어', alt: true },
+  { for: 'pre', tag: '예비고1', copy: 'PRE 대성 · PRE 대신 · PRE 대전외고\n원하는 고등학교에 맞춘 실전반', t1: '영어', t2: '고등 내신 실전반', when: '11. 20(금)부터 순차 개강', href: '#/timetable?term=pre&subject=영어' },
+  { for: 'grade', tag: '고1 연합반', copy: '학교 무관,\n진도에 맞춰 신청', t1: '통합사회', t2: '경제단원 집중특강', when: '11. 15(일)·22(일)', href: '#/timetable?term=final&school=연합반', alt: true, violet: true },
+  { for: 'pre', tag: '예비고1', copy: '16주 완성\n모의고사 + 핵심개념', t1: '국어', t2: '1% 완성반', when: '11. 21(토) 개강', href: '#/timetable?term=pre&subject=국어' },
+  { for: 'grade', tag: '대성고·대신고', copy: '원하는 날짜·시간에 응시,\n개별 성적표 발송', t1: '대성대신', t2: '진단고사', when: '상시 신청', href: '#/events/e-diag', alt: true, violet: true },
+];
+
 // 강사소개 바로가기 카드 묶음: [필터 키, 버튼 이름, 해당 과목]
 const T_FILTERS = [
   ['all', '전체', null],
@@ -62,6 +72,22 @@ export async function render({ el }) {
         </div>
       </div>
       <div class="dots" id="n-dots"></div>
+    </div>
+  </section>
+
+  <section class="h-sec" aria-labelledby="rc2-t">
+    <div class="h-head"><h2 id="rc2-t">모집안내</h2>
+      <div class="seg" role="group" aria-label="대상 선택">
+        <button data-rf2="all" aria-pressed="true">전체</button><button data-rf2="grade" aria-pressed="false">고1·고2</button><button data-rf2="pre" aria-pressed="false">예비고1</button>
+      </div>
+      <a class="plus" href="#/timetable" aria-label="전체 과정 보기">+</a></div>
+    <div class="r-viewport"><div class="r-track recruit-full" id="rc2-track"></div></div>
+    <div class="r-bar rc2-bar">
+      <div class="progress" aria-hidden="true"><i id="rc2-prog"></i></div>
+      <div class="ctrl-btns">
+        <div class="ctrl-grp"><button data-r2="prev" aria-label="이전 모집안내">${I.prev}</button><button data-r2="next" aria-label="다음 모집안내">${I.next}</button></div>
+        <button class="ctrl-one" data-r2="pause" aria-label="자동 넘김 멈춤">${I.pause}</button>
+      </div>
     </div>
   </section>
 
@@ -180,6 +206,40 @@ export async function render({ el }) {
   window.addEventListener('resize', onResize);
   window.addEventListener('hashchange', () => { clearInterval(st.timer); window.removeEventListener('resize', onResize); }, { once: true });
   drawCards(); play();
+
+  // ---- 모집안내 캐러셀(강사소개·학원소식 아래) ----
+  const rc = { filter: 'all', i: 0, playing: !window.matchMedia('(prefers-reduced-motion: reduce)').matches, timer: null };
+  const rcTrack = $('#rc2-track', el);
+  const rcCards = () => RECRUIT.filter((c) => rc.filter === 'all' || c.for === rc.filter);
+  const rcPer = () => (window.innerWidth <= 640 ? 1 : window.innerWidth <= 1000 ? 2 : window.innerWidth <= 1280 ? 3 : 4);
+  function rcMove() {
+    const n = rcCards().length, pv = rcPer(), max = Math.max(0, n - pv);
+    if (rc.i > max) rc.i = 0; if (rc.i < 0) rc.i = max;
+    const card = rcTrack.firstElementChild;
+    const step = card ? card.getBoundingClientRect().width + 24 : 0;
+    rcTrack.style.transform = `translateX(${-rc.i * step}px)`;
+    $('#rc2-prog', el).style.width = `${n ? Math.min(100, ((rc.i + pv) / n) * 100) : 0}%`;
+  }
+  function rcDraw() {
+    rcTrack.innerHTML = rcCards().map((c) => `<a class="r-card${c.alt ? ' alt' : ''}" href="${c.href}">
+      <span class="tag">${esc(c.tag)}</span><p class="copy">${esc(c.copy)}</p>
+      <p class="t1">${esc(c.t1)}</p><p class="t2${c.violet ? ' violet' : ''}">${esc(c.t2)}</p><p class="when">${esc(c.when)}</p></a>`).join('');
+    rc.i = 0; rcMove();
+  }
+  const rcPlay = () => { clearInterval(rc.timer); if (rc.playing) rc.timer = setInterval(() => { rc.i += 1; rcMove(); }, 5500); };
+  $$('[data-r2]', el).forEach((b) => (b.onclick = () => {
+    const a = b.dataset.r2;
+    if (a === 'prev') { rc.i -= 1; rcMove(); }
+    if (a === 'next') { rc.i += 1; rcMove(); }
+    if (a === 'pause') { rc.playing = !rc.playing; b.innerHTML = rc.playing ? I.pause : I.play; b.setAttribute('aria-label', rc.playing ? '자동 넘김 멈춤' : '자동 넘김 시작'); }
+    rcPlay();
+  }));
+  $$('[data-rf2]', el).forEach((b) => (b.onclick = () => {
+    rc.filter = b.dataset.rf2; $$('[data-rf2]', el).forEach((x) => x.setAttribute('aria-pressed', x === b)); rcDraw(); rcPlay();
+  }));
+  window.addEventListener('resize', rcMove);
+  window.addEventListener('hashchange', () => { clearInterval(rc.timer); window.removeEventListener('resize', rcMove); }, { once: true });
+  rcDraw(); rcPlay();
 
   // ---- 학원소식 ----
   const newsList = upcoming.slice(0, 3);
