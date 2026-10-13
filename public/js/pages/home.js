@@ -1,7 +1,7 @@
 import { seed, getSite } from '../backend.js';
 import { esc, $, $$, isPast, WEEK } from '../ui.js';
 import { load, visible, byOrder, teacherCard, gradeTags, photoOf } from './common.js';
-import { mountWorld } from './world.js';
+import { prefetchWorld } from './world.js';
 
 // 강사소개 바로가기 카드 묶음: [필터 키, 버튼 이름, 해당 과목]
 const T_FILTERS = [
@@ -39,7 +39,14 @@ export async function render({ el }) {
   const highlights = visible(results).filter((r) => r.featured).slice(0, 2);
   const vt = visible(teachers).sort(byOrder);
 
-  el.innerHTML = `<div id="sw-root"></div><div class="home wrap">
+  el.innerHTML = `<section class="sw-mini" aria-labelledby="swm-t">
+    <video class="sw-mini-v" muted loop playsinline preload="auto" poster="media/poster-teaser.jpg" src="media/teaser.mp4" aria-hidden="true"></video>
+    <div class="wrap sw-mini-in">
+      <h1 id="swm-t">태산학원 선생님들을<br>만나보세요</h1>
+      <p>스크롤을 내리면 선생님 열한 분이 한 분씩 나옵니다.</p>
+      <a class="btn sw-mini-btn" href="#/world">스크롤월드 보러가기</a>
+    </div>
+  </section><div class="home wrap">
   <section class="h-sec" aria-labelledby="rc-t">
     <div class="recruit">
       <div>
@@ -132,9 +139,10 @@ export async function render({ el }) {
   </section>
   </div>`;
 
-  // ---- 첫 화면 영상(스크롤 월드) ----
-  const unmountWorld = mountWorld($('#sw-root', el), { teachers: vt, leaders: visible(leaders), classes: visible(classes) });
-  window.addEventListener('hashchange', unmountWorld, { once: true });
+  // ---- 첫 화면 영상 배너: 짧은 영상 자동 반복, 스크롤월드 영상은 뒤에서 미리 받기 ----
+  const mini = $('.sw-mini-v', el);
+  if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) mini.play().catch(() => {});
+  setTimeout(() => { if (location.hash === '' || location.hash === '#/') prefetchWorld(); }, 1500);
 
   // ---- 강사소개 바로가기 캐러셀 (모집안내 카드 디자인 그대로) ----
   const st = { filter: 'all', i: 0, playing: !window.matchMedia('(prefers-reduced-motion: reduce)').matches, timer: null };
@@ -156,20 +164,12 @@ export async function render({ el }) {
       const copy = p.lead ? (p.role || '') : ((p.highlights || [])[0] || (p.bio || [])[0] || '');
       const when = p.lead ? '설명회·입시 상담' : (schoolLine(p) || '연합반');
       const photo = p.photo ? `<span class="r-ph"><img src="${esc(photoOf(p))}" alt="" loading="lazy" onerror="this.onerror=null;this.src=this.src.replace(/\\.png$/,'.jpg')"></span>` : '';
-      return `<a class="r-card t-short${k % 2 ? ' alt' : ''}" data-goto="${esc(p.id)}" href="${p.lead ? '#/teachers' : `#/teachers/${esc(p.id)}`}" aria-label="${esc(p.name)} ${p.lead ? esc(p.title || '') : '선생님'} 소개로 이동">
+      return `<a class="r-card t-short${k % 2 ? ' alt' : ''}" href="#/world?t=${esc(p.id)}" aria-label="${esc(p.name)} ${p.lead ? esc(p.title || '') : '선생님'} 소개로 이동">
         <span class="tag">${esc(tag)}</span><p class="copy">${esc(copy)}</p>
         <p class="t1">${esc(p.lead ? '입시 전략' : p.subject)}</p><p class="t2">${esc(p.name)}${p.lead ? ` ${esc(p.title || '')}` : ''}</p><p class="when">${esc(when)}</p>${photo}</a>`;
     }).join('');
     st.i = 0; move();
   }
-  // 바로가기: 위 영상 속 그 선생님 소개 카드로 이동(없으면 선생님 페이지로)
-  track.addEventListener('click', (e) => {
-    const a = e.target.closest('[data-goto]'); if (!a) return;
-    const card = document.getElementById(`sw-${a.dataset.goto}`); if (!card) return;
-    e.preventDefault();
-    const r = card.getBoundingClientRect();
-    window.scrollTo({ top: r.top + window.scrollY + r.height / 2 - window.innerHeight / 2, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
-  });
   function move() {
     const n = cards().length, pv = perView(), max = Math.max(0, n - pv);
     if (st.i > max) st.i = 0; if (st.i < 0) st.i = max;
