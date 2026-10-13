@@ -71,7 +71,7 @@ python3 scripts/deploy_hosting.py # https://taesan-academy.web.app 에 배포
 ```
 
 - 사진·이미지 파일은 저장소에 넣지 않고 배포할 때 받습니다(`scripts/assets.tsv`, `scripts/band_images.tsv`).
-- 강사 사진: 드라이브 `누끼_투명배경` 폴더의 PNG → `scripts/align_photos.py`가 600×800 캔버스에 얼굴 높이 200px·위치를 맞춥니다.
+- 강사 사진: `python3 scripts/teacher_photos.py sheet` → 고른 사진으로 `make 파일=id ...` (배경 제거 + 얼굴 높이 맞춤, 아래·옆 끝은 부드럽게). 결과는 Firebase에 올리면 Pages 배포 때 함께 받아옵니다.
 - 밴드 강좌 소개: `scripts/band_posts.py`를 고친 뒤 `python3 scripts/band_posts.py`로 `public/js/data/band.js`와 이미지 목록을 다시 만듭니다.
 
 ## 데이터 구조(Firestore)
