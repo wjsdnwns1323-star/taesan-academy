@@ -11,45 +11,41 @@ import numpy as np
 from PIL import Image
 
 ROOT = Path(__file__).resolve().parent.parent
-MODEL = Path.home() / '.cache/realesrgan/Real-ESRGAN-x4plus.onnx'
-URL = 'https://huggingface.co/qualcomm/Real-ESRGAN-x4plus/resolve/main/Real-ESRGAN-x4plus.onnx'
+MODEL = Path.home() / '.cache/sr/EDSR_x4.pb'
+URL = 'https://raw.githubusercontent.com/Saafke/EDSR_Tensorflow/master/models/EDSR_x4.pb'
 W, H, TOP = 600, 800, 118
 # 원본(assets/cutouts, 600x800) 기준: 얼굴 중심 x, 머리 꼭대기 y, 배율 — 다른 선생님과 머리 크기를 맞춘 값
 PEOPLE = {'jeong-jeongrae': (295, 120, 1.42), 'kim-hyun': (298, 135, 1.24), 'park-hanbit': (285, 130, 1.02)}
 
 
 def model():
-    if not MODEL.exists():
+    """EDSR x4(공개 초해상도 모델) — opencv-contrib의 dnn_superres로 실행."""
+    if not MODEL.exists() or MODEL.stat().st_size < 1_000_000:
         MODEL.parent.mkdir(parents=True, exist_ok=True)
         subprocess.run(['curl', '-sSL', '-o', str(MODEL), URL], check=True)
-    import onnxruntime as ort
-    return ort.InferenceSession(str(MODEL), providers=['CPUExecutionProvider'])
+    import cv2
+    sr = cv2.dnn_superres.DnnSuperResImpl_create()
+    sr.readModel(str(MODEL)); sr.setModel('edsr', 4)
+    return sr
 
 
-def upscale(sess, rgb):
-    """타일로 나눠 4배 확대(모델 입력 크기가 고정이라 겹치게 잘라 붙임)."""
-    inp = sess.get_inputs()[0]
-    shp = inp.shape
-    T = shp[2] if isinstance(shp[2], int) else 256
-    nhwc = shp[-1] == 3
-    pad = 12
-    h, w = rgb.shape[:2]
-    out = np.zeros((h * 4, w * 4, 3), np.float32)
-    step = T - pad * 2
-    for y in range(0, h, step):
-        for x in range(0, w, step):
+def upscale(sr, rgb):
+    """4배 확대(메모리 때문에 겹치게 잘라서 처리)."""
+    import cv2
+    bgr = (rgb[:, :, ::-1] * 255).astype(np.uint8)
+    h, w = bgr.shape[:2]
+    T, pad = 160, 10
+    out = np.zeros((h * 4, w * 4, 3), np.uint8)
+    for y in range(0, h, T):
+        for x in range(0, w, T):
             y0, x0 = max(0, y - pad), max(0, x - pad)
-            tile = np.zeros((T, T, 3), np.float32)
-            crop = rgb[y0:y0 + T, x0:x0 + T]
-            tile[:crop.shape[0], :crop.shape[1]] = crop
-            t = tile[None] if nhwc else tile.transpose(2, 0, 1)[None]
-            r = sess.run(None, {inp.name: t})[0][0]
-            r = r if nhwc else r.transpose(1, 2, 0)
+            tile = bgr[y0:min(h, y + T + pad), x0:min(w, x + T + pad)]
+            r = sr.upsample(tile)
             oy, ox = (y - y0) * 4, (x - x0) * 4
-            hh, ww = min(step, h - y) * 4, min(step, w - x) * 4
+            hh, ww = min(T, h - y) * 4, min(T, w - x) * 4
             out[y * 4:y * 4 + hh, x * 4:x * 4 + ww] = r[oy:oy + hh, ox:ox + ww]
         print('.', end='', flush=True)
-    return np.clip(out, 0, 1)
+    return out[:, :, ::-1].astype(np.float32) / 255
 
 
 def fill_bottom(c):
