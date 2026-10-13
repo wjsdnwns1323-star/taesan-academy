@@ -10,12 +10,12 @@ function authPage(el, go, query, mode) {
   const join = mode === 'join';
   el.innerHTML = `<div class="gate"><div class="gate-main"><div class="gate-card">
     <h1 class="gate-h">${join ? '회원가입' : '로그인'}</h1>
-    <p class="gate-sub">${join ? '가입하면 수강 신청·설명회 예약·상담 답변을 한곳에서 볼 수 있어요.' : '태산학원은 Google 계정으로 로그인해요. 처음이면 로그인과 동시에 가입돼요.'}</p>
+    <p class="gate-sub">${join ? '가입하면 수강 신청·설명회 예약·상담 답변을 한곳에서 볼 수 있어요.' : 'Google 계정으로 바로 로그인하세요.'}</p>
     ${join ? '<ol class="steps-mini"><li class="cur"><b>STEP 1</b>Google 로그인</li><li><b>STEP 2</b>내 정보 입력</li><li><b>STEP 3</b>가입 완료</li></ol>' : ''}
     <div class="panel">
       <img src="images/brand/logo-dark.png" alt="태산학원" class="gate-logo">
       ${local ? '<div class="callout" style="text-align:left">체험 모드입니다. 아래 이메일로 Google 로그인을 흉내 냅니다. <b>admin@</b>으로 시작하면 관리자 화면을 볼 수 있습니다.</div><label class="field" style="text-align:left"><span>체험용 이메일</span><input class="input" id="demo-email" type="email" placeholder="you@gmail.com"></label>' : ''}
-      <label class="check gate-agree"><input type="checkbox" id="agree"> <span><a class="link" href="#/privacy">개인정보 수집·이용</a>에 동의합니다. (필수)</span></label>
+      ${join ? '<label class="check gate-agree"><input type="checkbox" id="agree"> <span><a class="link" href="#/privacy">개인정보 수집·이용</a>에 동의합니다. (필수)</span></label>' : ''}
       <button type="button" class="gbtn" data-google>${G_ICON} Google 계정으로 ${join ? '시작하기' : '로그인'}</button>
       <p class="form-error" aria-live="polite"></p>
     </div>
@@ -23,7 +23,7 @@ function authPage(el, go, query, mode) {
   </div></div></div>`;
   const b = el.querySelector('[data-google]'), err = el.querySelector('.form-error');
   b.onclick = async () => {
-    if (!el.querySelector('#agree').checked) { err.textContent = '개인정보 수집·이용에 동의해 주세요.'; return; }
+    if (join && !el.querySelector('#agree').checked) { err.textContent = '개인정보 수집·이용에 동의해 주세요.'; return; }
     err.textContent = ''; b.disabled = true;
     try {
       const demo = el.querySelector('#demo-email');
@@ -82,6 +82,7 @@ export async function mypage({ el, go, query = {} }) {
       ${schoolFields({ school: u.school || '', grade: u.grade || '', label: '학생 학교' })}
       <label class="field"><span>학생 이름</span><input class="input" name="studentName" value="${esc(u.studentName || '')}"></label>
       <label class="check"><input type="checkbox" name="marketing" ${u.marketing ? 'checked' : ''}> 개강·설명회 소식 문자 받기</label>
+      ${query.setup && !u.agreed ? '<label class="check"><input type="checkbox" name="agree"> <span><a class="link" href="#/privacy">개인정보 수집·이용</a>에 동의합니다. (필수)</span></label>' : ''}
       <p class="form-error"></p><button class="btn">정보 저장</button></form>`,
   };
   const show = (k) => {
@@ -96,8 +97,9 @@ export async function mypage({ el, go, query = {} }) {
     if (pf) bindSchoolPickers(pf);
     if (pf) pf.onsubmit = async (e) => {
       e.preventDefault(); const d = formData(pf);
+      if (pf.agree && !pf.agree.checked) return (pf.querySelector('.form-error').textContent = '개인정보 수집·이용에 동의해 주세요.');
       if (!phoneOk(d.phone || '')) return (pf.querySelector('.form-error').textContent = '연락처 형식을 확인해 주세요.');
-      await backend.auth.updateProfile({ type: d.type, name: d.name, phone: d.phone, school: d.school, schoolCode: d.schoolCode || (d.school === u.school ? u.schoolCode || '' : ''), schoolFull: d.schoolFull || (d.school === u.school ? u.schoolFull || '' : ''), grade: d.grade, studentName: d.studentName, marketing: !!pf.marketing.checked });
+      await backend.auth.updateProfile({ type: d.type, name: d.name, phone: d.phone, school: d.school, schoolCode: d.schoolCode || (d.school === u.school ? u.schoolCode || '' : ''), schoolFull: d.schoolFull || (d.school === u.school ? u.schoolFull || '' : ''), grade: d.grade, studentName: d.studentName, marketing: !!pf.marketing.checked, ...(pf.agree ? { agreed: true } : {}) });
       toast('정보를 저장했습니다.'); if (query.setup) go('#/mypage');
     };
   };
