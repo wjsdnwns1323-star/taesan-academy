@@ -593,3 +593,9 @@ h1, h2, h3 { letter-spacing: -0.035em; }
 @media (max-width: 1023px) {
   .bt td.empty, .bt td.loading { flex: 1; text-align: center; padding: 36px 0; font-size: 14px; color: var(--muted); }
 }
+
+/* 글꼴 하나로 통일(시스템 글꼴과 섞여 깨져 보이는 문제) */
+html, body, button, input, select, textarea, .bt, .bt-head h1 { font-family: 'Noto Sans KR', sans-serif !important; letter-spacing: -0.01em; }
+/* 자료실 안내: 게시판과 어울리는 한 줄 안내 */
+.bt-note { margin: 0 0 12px; padding: 10px 12px; border-top: 1px solid #e5e5e5; border-bottom: 1px solid #e5e5e5; background: #fafafa; font-size: 13px; color: #555; line-height: 1.6; }
+.bt-note a { color: var(--accent); font-weight: 700; white-space: nowrap; }
