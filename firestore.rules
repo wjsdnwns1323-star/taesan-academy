@@ -6,7 +6,7 @@ service cloud.firestore {
     function signedIn() { return request.auth != null; }
     // 관리자: 관리자 이메일로 '아이디·비밀번호' 로그인한 경우만 (Google 로그인·회원 권한 값으로는 관리자가 될 수 없음)
     function isAdmin() {
-      return signedIn() && request.auth.token.email in ['admin@taesan-academy.firebaseapp.com']
+      return signedIn() && request.auth.token.email in ['qwer@taesan-academy.firebaseapp.com']
         && request.auth.token.firebase.sign_in_provider == 'password';
     }
     function str(v, max) { return v is string && v.size() <= max; }

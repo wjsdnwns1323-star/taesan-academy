@@ -12,11 +12,11 @@ export const firebaseConfig = {
   useStorage: false,
 };
 
-// 관리자 계정(아이디·비밀번호 로그인 전용). 관리자 화면(#/admin)에서 아이디 'admin'과 비밀번호로 로그인합니다.
+// 관리자 계정(아이디·비밀번호 로그인 전용). 관리자 화면(#/admin)에서 아이디 'qwer'와 비밀번호로 로그인합니다.
 // 계정은 Firebase 콘솔 > Authentication > 사용자 추가에서 만듭니다. Google 로그인 계정은 관리자가 될 수 없습니다.
 // firestore.rules / storage.rules 의 관리자 이메일과 같게 유지하세요.
 export const ADMIN_DOMAIN = 'taesan-academy.firebaseapp.com';
-export const adminEmails = ['admin@taesan-academy.firebaseapp.com'];
+export const adminEmails = ['qwer@taesan-academy.firebaseapp.com'];
 
 // 나이스 교육정보 개방 포털(open.neis.go.kr) 인증키. 학교 검색에 씁니다.
 // 비어 있어도 동작하지만 한 번에 5개까지만 찾아집니다. 키를 넣으면 더 많이 찾습니다.

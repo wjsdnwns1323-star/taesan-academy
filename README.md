@@ -27,7 +27,7 @@
 
 ## 체험 모드
 
-`public/js/config.js`의 `apiKey`가 비어 있으면 **체험 모드**로 동작합니다. 모든 기능이 그대로 동작하지만 데이터는 그 브라우저(localStorage)에만 저장됩니다. 관리자 화면은 `#/admin`에서 아이디 `admin`으로 로그인합니다(비밀번호는 처음 넣은 값으로 정해짐).
+`public/js/config.js`의 `apiKey`가 비어 있으면 **체험 모드**로 동작합니다. 모든 기능이 그대로 동작하지만 데이터는 그 브라우저(localStorage)에만 저장됩니다. 관리자 화면은 `#/admin`에서 아이디 `qwer`로 로그인합니다(비밀번호는 처음 넣은 값으로 정해짐).
 
 로컬에서 보기:
 
@@ -53,7 +53,7 @@ firebase login
 firebase deploy --only hosting,firestore,storage
 ```
 
-8. Authentication → 로그인 방법에서 **이메일/비밀번호**도 사용 설정 → 사용자 탭에서 관리자 계정(`admin@taesan-academy.firebaseapp.com`)을 추가하고 비밀번호를 정합니다. 사이트 `#/admin`에서 아이디 `admin`과 그 비밀번호로 로그인합니다.
+8. Authentication → 로그인 방법에서 **이메일/비밀번호**도 사용 설정 → 사용자 탭에서 관리자 계정(`qwer@taesan-academy.firebaseapp.com`)을 추가하고 비밀번호를 정합니다. 사이트 `#/admin`에서 아이디 `qwer`와 그 비밀번호로 로그인합니다.
 9. 관리자 화면에서 아무 메뉴나 처음 저장하면 그 메뉴의 기본 자료(밴드 정리본)가 Firestore로 자동으로 옮겨진 뒤 수정 내용이 저장됩니다.
 
 관리자는 이 관리자 계정 하나뿐입니다(Google 로그인 계정은 관리자가 될 수 없음). 관리자 이메일을 바꾸려면 `public/js/config.js`, `firestore.rules`, `storage.rules` 세 곳을 같이 바꿉니다. 비밀번호는 Firebase 콘솔 → Authentication → 사용자에서 바꿉니다.
