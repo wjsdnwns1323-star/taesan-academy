@@ -101,13 +101,14 @@ def align(src: Path, dst: Path):
     gap = H - (y0 + img.height)
     if gap > 0:
         fade = min(110, img.height // 5)
-        a = canvas.split()[3].load()
+        px = canvas.load()
         bottom = y0 + img.height
         for y in range(max(0, bottom - fade), min(H, bottom)):
             k = (bottom - y) / fade
             for x in range(W):
-                if a[x, y]:
-                    a[x, y] = int(a[x, y] * k)
+                r, g, b, al = px[x, y]
+                if al:
+                    px[x, y] = (r, g, b, int(al * k))
     canvas.save(dst, optimize=True)
     return '얼굴 인식' if found else '윤곽 추정'
 
