@@ -1084,3 +1084,7 @@ body.sw-on .quick { opacity: 0; pointer-events: none; }
 .sw-mini-copy { position: absolute; left: 0; right: 0; top: calc(50% + clamp(48px, 5.4vw, 70px)); margin: 0; }
 .sw-mini:not(.playing):hover .sw-mini-logo { transform: scale(1.03); }
 .sw-mini-logo { transition: transform .25s; }
+/* 검색창·메뉴를 로고 아래끝 쪽으로 살짝 내림 */
+@media (min-width: 1001px) {
+  .header .searchbox, .header .gnb > li > a, .header .menu-btn { transform: translateY(12px); }
+}
