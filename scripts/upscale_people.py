@@ -64,16 +64,18 @@ def fill_bottom(c):
 def main():
     sess = model()
     for pid, (cx, top, s) in PEOPLE.items():
-        src = Image.open(ROOT / f'assets/cutouts/{pid}.png').convert('RGBA')
+        full = Image.open(ROOT / f'assets/cutouts/{pid}.png').convert('RGBA')
+        bx = full.split()[3].getbbox()          # 투명한 빈 곳은 빼고 사람 부분만 확대(속도)
+        src = full.crop(bx)
         rgb = np.asarray(src.convert('RGB'), np.float32) / 255
-        print(pid, end=' ', flush=True)
+        print(pid, src.size, end=' ', flush=True)
         up = (upscale(sess, rgb) * 255).round().astype(np.uint8)
         big = Image.fromarray(up).convert('RGBA')
         big.putalpha(src.split()[3].resize(big.size, Image.LANCZOS))
         s4 = s / 4
         im = big.resize((round(big.width * s4), round(big.height * s4)), Image.LANCZOS)
         c = Image.new('RGBA', (W, H))
-        c.paste(im, (round(W / 2 - cx * s), round(TOP - top * s)), im)
+        c.paste(im, (round(W / 2 - (cx - bx[0]) * s), round(TOP - (top - bx[1]) * s)), im)
         c = fill_bottom(c)
         px, e = c.load(), 48
         for x in list(range(e)) + list(range(W - e, W)):
