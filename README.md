@@ -1,6 +1,8 @@
 # 태산학원 홈페이지
 
-대전 둔산 태산학원의 공식 홈페이지입니다. **사이트: https://taesan-academy.web.app**
+대전 둔산 태산학원의 공식 홈페이지입니다. **사이트: https://taesan.uinone.net** (GitHub Pages, main에 올리면 자동 배포)
+
+- 예비 주소(Firebase Hosting): https://taesan-academy.web.app — 로그인·데이터는 같은 Firebase를 씁니다.
 
  학교별 내신반 시간표, 선생님, 시험 결과, 설명회 예약, 상담, 회원, 관리자 기능을 담고 있습니다.
 
