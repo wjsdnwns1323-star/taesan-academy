@@ -30,11 +30,17 @@ export async function render({ el }) {
   const vt = visible(teachers).sort(byOrder);
 
   el.innerHTML = `<section class="sw-mini" aria-labelledby="swm-t">
-    <video class="sw-mini-v" muted loop playsinline preload="auto" poster="media/poster-teaser.jpg" src="media/teaser.mp4" aria-hidden="true"></video>
+    <img class="sw-mini-bg" src="media/hall-silhouette.webp" alt="" aria-hidden="true">
+    <video class="sw-mini-v" playsinline preload="none" aria-label="태산학원 소개 영상"></video>
     <div class="wrap sw-mini-in">
-      <h1 id="swm-t" class="sr">태산학원 선생님 소개</h1>
-      <a class="btn sw-mini-btn" href="#/world">보러가기</a>
+      <h1 id="swm-t"><img class="sw-mini-logo" src="images/brand/logo-dark.png" alt="태산학원 TAESANEDU"></h1>
+      <p class="sw-mini-copy">큰 산처럼 흔들림 없이, 학생들의 곁을 지킵니다</p>
+      <div class="sw-mini-act">
+        <button class="btn dark sw-mini-play" type="button" data-play><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg>영상 보기</button>
+        <a class="btn ghost sw-mini-go" href="#/world">선생님 소개 보러가기</a>
+      </div>
     </div>
+    <button class="sw-mini-x" type="button" data-stop aria-label="영상 닫기">✕</button>
   </section><div class="home wrap">
   <section class="h-sec" aria-labelledby="rc-t">
     <div class="recruit">
@@ -114,8 +120,15 @@ export async function render({ el }) {
   </div>`;
 
   // ---- 첫 화면 영상 배너: 짧은 영상 자동 반복, 스크롤월드 영상은 뒤에서 미리 받기 ----
-  const mini = $('.sw-mini-v', el);
-  if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) mini.play().catch(() => {});
+  // 평소에는 로고 + 학원 실루엣, "영상 보기"를 눌렀을 때만 영상 재생
+  const box = $('.sw-mini', el), mini = $('.sw-mini-v', el);
+  const stopMini = () => { mini.pause(); box.classList.remove('playing'); };
+  $('[data-play]', el).onclick = () => {
+    if (!mini.getAttribute('src')) mini.src = window.matchMedia('(max-width: 900px)').matches ? 'media/teaser-720.mp4' : 'media/teaser-hd.mp4';
+    box.classList.add('playing'); mini.currentTime = 0; mini.muted = true; mini.play().catch(() => {}); };
+  $('[data-stop]', el).onclick = stopMini;
+  mini.onended = stopMini;
+  mini.onclick = () => (mini.paused ? mini.play() : mini.pause());
   setTimeout(() => { if (location.hash === '' || location.hash === '#/') prefetchWorld(); }, 1500);
 
   // ---- 모집안내 캐러셀 (관리자 > 홈 모집안내에서 편집) ----
