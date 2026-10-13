@@ -28,7 +28,7 @@ async function route() {
   const nav = { home: 'home', study: 'study', community: 'community', menu: 'menu' }[page] || (page === 'post' ? 'community' : '');
   $$('#bottom-nav a').forEach((a) => a.classList.toggle('on', a.dataset.nav === nav));
   const tab = page === 'home' ? 'home' : page === 'study' ? 'study' : page === 'community' ? arg : '';
-  renderSide(location.hash || '#/');
+  try { renderSide(location.hash || '#/'); } catch (e) { console.error(e); }
   window.scrollTo(0, 0);
   const user = be.currentUser();
   if (!user && !PUBLIC.has(page) && page !== 'home' && page !== 'menu') {
