@@ -60,13 +60,15 @@ def sheet():
 def make(pairs):
     from rembg import remove, new_session
     from PIL import Image, ImageOps
-    sess = new_session('birefnet-portrait')
+    import os
+    sess = new_session(os.environ.get('REMBG_MODEL', 'isnet-general-use'))
     tmp = RAW / 'cut'; tmp.mkdir(exist_ok=True)
     for pair in pairs:
         src, pid = pair.rsplit('=', 1)
         im = ImageOps.exif_transpose(Image.open(RAW / src)).convert('RGB')
-        im.thumbnail((1600, 1600))
-        cut = remove(im, session=sess)
+        im.thumbnail((1200, 1200))
+        print('처리 중', src, flush=True)
+        cut = remove(im, session=sess, alpha_matting=False, post_process_mask=True)
         cut.save(tmp / f'{pid}.png')
         print('누끼', src, '→', pid)
     subprocess.run([sys.executable, str(ROOT / 'scripts/align_photos.py'), str(tmp), str(OUT)], check=True)
