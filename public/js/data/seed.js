@@ -12,7 +12,7 @@ export const site = {
   hoursNote: '운영시간은 자료에 없습니다. 관리자 > 사이트 설정에서 입력하세요.',
   kakaoUrl: '',
   blogUrl: 'https://www.band.us/band/61446116',
-  directorName: '',
+  directorName: '김태현',
   greeting:
     '태산학원은 대전 둔산에서 고등 내신을 학교별로 준비하는 학원입니다. 대성고·대신고·대전외고·공주사대부고를 비롯한 학교마다 시험 범위와 출제 경향이 다르기 때문에, 반도 학교별로 나누고 교재도 학교에 맞춰 만듭니다.\n\n수업이 끝나면 매주 과제와 테스트로 확인하고, 시험 직전에는 학교별 직전 보강으로 마무리합니다. 학생 한 명 한 명의 결과로 증명하겠습니다.',
   branches: [
@@ -67,8 +67,8 @@ export const terms = [
 
 export const teachers = [
   {
-    id: 'kim-taehyun', name: '김태현', subject: '국어', aka: ['태현국어'],
-    bio: [],
+    id: 'kim-taehyun', name: '김태현', subject: '국어', aka: ['태현국어'], title: '원장',
+    bio: ['현) 태산학원 원장'],
     schools: ['대성고1', '대신고1', '대신고2', '공주사대부고1', '충남고2'],
     prehigh: ['1% 완성 모의고사+핵심개념반(16주 완성)'],
     roles: ['대성&대신 설명회 연사(9/22, 10/20)'],

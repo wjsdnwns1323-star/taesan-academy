@@ -45,6 +45,10 @@ jobs:
               t = out / (p.stem + '.jpg')
               if p.is_file() and not t.exists():
                   im = Image.open(p).convert('RGB'); im.thumbnail((640, 640)); im.save(t, quality=82)
+          # 강사 누끼 사진: PNG(100~270KB) → WebP(투명 유지, 450x600, 20~40KB)
+          for p in Path('public/images/people').glob('*.png'):
+              im = Image.open(p).convert('RGBA'); im.thumbnail((450, 600), Image.LANCZOS)
+              im.save(p.with_suffix('.webp'), 'WEBP', quality=82, method=6)
           PY
           echo "강사 사진 $(ls public/images/people/*.png | wc -l)장, 수업 카드 $(ls public/images/posters | wc -l)장, 밴드 $(ls public/images/band | wc -l)개"
       - uses: actions/configure-pages@v5

@@ -30,7 +30,7 @@ export async function render({ el }) {
   const vt = visible(teachers).sort(byOrder);
 
   el.innerHTML = `<section class="sw-mini" aria-labelledby="swm-t">
-    <img class="sw-mini-bg" src="media/hall-silhouette.webp" alt="" aria-hidden="true">
+    <img class="sw-mini-bg" src="media/hall-silhouette.webp" alt="" aria-hidden="true" fetchpriority="high" decoding="async">
     <video class="sw-mini-v" playsinline preload="none" aria-label="태산학원 소개 영상"></video>
     <div class="wrap sw-mini-in">
       <h1 id="swm-t"><img class="sw-mini-logo" src="images/brand/logo-dark.png" alt="태산학원 TAESANEDU"></h1>
@@ -129,7 +129,9 @@ export async function render({ el }) {
   $('[data-stop]', el).onclick = stopMini;
   mini.onended = stopMini;
   mini.onclick = () => (mini.paused ? mini.play() : mini.pause());
-  setTimeout(() => { if (location.hash === '' || location.hash === '#/') prefetchWorld(); }, 1500);
+  // 스크롤월드 사진(약 14MB)은 '보러가기'에 손이 갈 때만 미리 받기 — 첫 화면 이미지 로딩을 방해하지 않게
+  const warm = () => prefetchWorld();
+  el.querySelectorAll('a[href^="#/world"]').forEach((a) => ['pointerenter', 'touchstart', 'focus'].forEach((ev) => a.addEventListener(ev, warm, { once: true, passive: true })));
 
   // ---- 모집안내 캐러셀 (관리자 > 홈 모집안내에서 편집) ----
   const st = { filter: 'all', i: 0, playing: !window.matchMedia('(prefers-reduced-motion: reduce)').matches, timer: null };

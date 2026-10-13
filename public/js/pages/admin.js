@@ -48,7 +48,7 @@ const SCHEMA = {
     cols: [['photo', '사진'], ['name', '이름'], ['subject', '과목'], ['brand', '브랜드'], ['schools', '담당']],
     filters: [['subject', '과목', () => S(SUBJECTS)]],
     sections: [
-      ['기본 정보', [F('name', '이름', 'text', { req: true }), F('subject', '과목', 'select', { opts: () => S(SUBJECTS), req: true }), F('brand', '브랜드명', 'text', { ph: '예: 이건준 영어연구소' }), F('photo', '사진', 'image', { hint: '배경을 지운(누끼) 세로 사진이 가장 예쁩니다.' })]],
+      ['기본 정보', [F('name', '이름', 'text', { req: true }), F('subject', '과목', 'select', { opts: () => S(SUBJECTS), req: true }), F('brand', '브랜드명', 'text', { ph: '예: 이건준 영어연구소' }), F('title', '직함', 'text', { ph: '예: 원장 (비우면 표시 안 함)' }), F('photo', '사진', 'image', { hint: '배경을 지운(누끼) 세로 사진이 가장 예쁩니다.' })]],
       ['소개', [F('bio', '약력', 'list'), F('highlights', '대표 결과', 'list', { hint: '첫 줄이 선생님 카드와 홈 바로가기 카드에 나옵니다.' }), F('schools', '담당 학교·반', 'list'), F('grades', '학년 태그', 'list', { hint: '비우면 담당 학교에서 자동으로 만듭니다.' })]],
       ['수업', [F('method', '수업 방식', 'list'), F('materials', '교재', 'list'), F('prehigh', '예비고1 과정', 'list'), F('roles', '설명회·특강', 'list')]],
       ['노출', [F('order', '정렬 순서', 'number'), F('hidden', '사이트에서 숨기기', 'bool')]],

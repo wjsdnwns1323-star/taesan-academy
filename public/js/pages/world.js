@@ -54,7 +54,7 @@ export function prefetchWorld(m = modeNow()) {
   return S;
 }
 
-const FALLBACK = `onerror="this.onerror=null;this.src=this.src.replace(/\\.png$/,'.jpg')"`;
+const FALLBACK = 'decoding="async" onerror="photoFallback(this)"';
 
 const list = (title, items, cls = '') => (items && items.length ? `<div class="sw-block"><h4>${title}</h4><ul class="${cls}">${items.map((i) => `<li>${esc(i)}</li>`).join('')}</ul></div>` : '');
 

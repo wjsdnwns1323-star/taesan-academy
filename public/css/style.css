@@ -1066,3 +1066,15 @@ body.sw-on .quick { opacity: 0; pointer-events: none; }
   .sw-mini-act .btn { height: 42px; min-height: 42px; padding: 0 16px; font-size: 14px; }
 }
 .sw-mini-in .sw-mini-copy { color: var(--violet); text-shadow: 0 1px 0 rgba(255,255,255,.8); }
+
+/* 계정줄: 선 없이, 글자 세로 가운데, 헤더와 한 덩어리로 */
+.util { height: 40px; border-bottom: 0; background: #fff; }
+.util .wrap { align-items: center; }
+.util-links { align-items: center; font-size: 13px; }
+.util-links > * { display: inline-flex; align-items: center; height: 14px; line-height: 1; padding: 0 12px; border-left-color: #e3e3e0; }
+.util-links .who { font-weight: 700; color: var(--text); }
+.header > .wrap { height: 92px; }
+.header { border-bottom: 1px solid var(--line-2); }
+@media (min-width: 1001px) { .header .logo .logo-img { height: 72px; } }
+.tag.lead { background: var(--violet); color: #fff; border-color: var(--violet); }
+.t-title { font-size: .6em; font-weight: 700; color: var(--blue); margin-left: 4px; vertical-align: middle; }

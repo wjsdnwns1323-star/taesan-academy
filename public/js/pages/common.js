@@ -25,16 +25,23 @@ export function pageHead(title, desc = '', crumbs = []) {
 
 const initials = (name = '') => name.slice(-2);
 // 강사 사진: 누끼(투명 배경)·얼굴 높이 맞춘 PNG를 씁니다. 예전 데이터의 .jpg 경로도 같은 PNG로 바꿉니다.
+// 사진: webp(가벼움) → png → jpg 순서로 시도
+window.photoFallback = (im) => {
+  const s = im.getAttribute('src') || '';
+  if (/\.webp$/.test(s)) im.src = s.replace(/\.webp$/, '.png');
+  else if (/\.png$/.test(s)) im.src = s.replace(/\.png$/, '.jpg');
+  else im.onerror = null;
+};
 export function photoOf(t) {
   if (!t || !t.photo) return '';
-  return /^images\/people\/[\w-]+\.jpe?g$/.test(t.photo) ? t.photo.replace(/\.jpe?g$/, '.png') : t.photo;
+  return /^images\/people\/[\w-]+\.(jpe?g|png)$/.test(t.photo) ? t.photo.replace(/\.(jpe?g|png)$/, '.webp') : t.photo;
 }
 export function monogram(t) {
-  if (t.photo) return `<img src="${esc(photoOf(t))}" alt="${esc(t.name)} 선생님" loading="lazy" onerror="this.onerror=null;this.src=this.src.replace(/\\.png$/,'.jpg')">`;
+  if (t.photo) return `<img src="${esc(photoOf(t))}" alt="${esc(t.name)} 선생님" loading="lazy" decoding="async" onerror="photoFallback(this)">`;
   return `<span class="mono" aria-hidden="true">${esc(initials(t.name))}</span>`;
 }
 export function avatar(t) {
-  if (t && t.photo) return `<span class="avatar"><img src="${esc(photoOf(t))}" alt="" loading="lazy" onerror="this.onerror=null;this.src=this.src.replace(/\\.png$/,'.jpg')"></span>`;
+  if (t && t.photo) return `<span class="avatar"><img src="${esc(photoOf(t))}" alt="" loading="lazy" decoding="async" onerror="photoFallback(this)"></span>`;
   return `<span class="avatar" aria-hidden="true">${esc(initials(t?.name || '?'))}</span>`;
 }
 
@@ -52,7 +59,7 @@ export function teacherCard(t) {
   const line = (t.highlights && t.highlights[0]) || '';
   return `<a class="t-card" href="#/teachers/${esc(t.id)}">
     <span class="tags">${gradeTags(t).map((x) => `<span class="tag">${x}</span>`).join('')}</span>
-    <span class="subj">${esc(t.subject)}</span><h3>${esc(t.name)}</h3>
+    <span class="subj">${esc(t.subject)}</span><h3>${esc(t.name)}${t.title ? ` <small class="t-title">${esc(t.title)}</small>` : ''}</h3>
     ${line ? `<p class="hl">${esc(line)}</p>` : ''}
     <span class="ph">${monogram(t)}</span>
   </a>`;
@@ -139,7 +146,7 @@ export async function showClassPlan(c, teacher) {
         ${head ? `<p class="plan-sub">${esc(head)}</p>` : ''}
         <h3 class="plan-title">${esc(classLabel(c))}</h3>
         <p class="plan-desc">${esc(c.teacherName || '')}${c.teacherName ? ' 선생님' : ''} ${c.status ? statusTag(c.status) : ''}</p>
-        ${photo ? `<img class="plan-photo" src="${esc(photo)}" alt="" onerror="this.onerror=null;this.src=this.src.replace(/\\.png$/,'.jpg')">` : ''}
+        ${photo ? `<img class="plan-photo" src="${esc(photo)}" alt="" decoding="async" onerror="photoFallback(this)">` : ''}
         ${c.teacherName ? `<span class="plan-name">${esc(c.subject)} ${esc(c.teacherName)}T</span>` : ''}
       </div>
       <table class="plan-info"><tr><th>개강</th><td>${esc(c.start || '추후 안내')}</td><th>일정</th><td>${esc(c.time || '추후 안내')}</td></tr></table>

@@ -46,7 +46,7 @@ export async function detail({ el, params }) {
     </div>
     <div>
       <p class="subj">${esc(t.subject)}${t.brand ? ` · ${esc(t.brand)}` : ''}</p>
-      <h2>${esc(t.name)}</h2>
+      <h2>${esc(t.name)}${t.title ? ` <small class="t-title">${esc(t.title)}</small>` : ''}</h2>
       ${(t.schools || []).length ? `<p style="margin-top:10px" class="chips">${t.schools.map((s) => `<span class="tag">${esc(s)}</span>`).join('')}</p>` : ''}
       ${listBlock('약력', t.bio)}
       ${res.length ? `<div class="block"><h3>시험 결과</h3><ul>${res.map((r) => `<li><b>${esc(r.exam)} ${esc(r.school)} ${esc(r.grade)}</b> — <span class="mark">${esc(r.headline)}</span> ${esc(r.detail)} ${r.provisional ? '<span class="tag seal">가채점</span>' : ''}</li>`).join('')}</ul></div>` : listBlock('시험 결과', t.highlights)}

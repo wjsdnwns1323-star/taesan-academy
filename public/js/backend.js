@@ -337,6 +337,8 @@ export const onUser = (fn) => { listeners.add(fn); return () => listeners.delete
 // 사이트 설정(전화번호, 주소 등)은 settings/site 문서에서 읽고, 없으면 기본값을 씁니다.
 export async function getSite() {
   const saved = await backend.db.getDoc('settings/site').catch(() => null);
-  return { ...seed.site, ...(saved || {}) };
+  const out = { ...seed.site, ...(saved || {}) };
+  if (!out.directorName) out.directorName = seed.site.directorName;   // 비워 저장돼 있으면 기본값(김태현 원장)
+  return out;
 }
 export { seed };
