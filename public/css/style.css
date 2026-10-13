@@ -1148,3 +1148,29 @@ body.sw-on .sw.ready .sw-rail { opacity: 1; pointer-events: auto; }
 .avatar img.full { position: absolute; width: 178%; height: auto; max-width: none; left: -39%; top: -14%; }
 /* 전체 메뉴(≡)가 열려 있으면 위 메뉴에 마우스를 올려도 작은 펼침 메뉴를 띄우지 않음 */
 .header:has(.allmenu.open) .gnb .drop { display: none !important; }
+
+/* ═════════ 모바일 다듬기 ═════════ */
+@media (max-width: 640px) {
+  /* 표: 글자가 한 자씩 세로로 쪼개지지 않게 — 가로로 밀어서 보기 */
+  .tt-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -16px; padding: 0 16px; }
+  .tt-wrap .tt { min-width: 560px; }
+  .tt-wrap .tt th, .tt-wrap .tt td { white-space: nowrap; }
+  .tt-wrap .tt td.t-title { white-space: normal; min-width: 150px; }
+  /* 오른쪽 빠른 버튼: 작게, 화면 끝으로 */
+  .quick { right: 10px; bottom: 14px; gap: 7px; }
+  .quick a { width: 44px; height: 44px; box-shadow: 0 3px 10px rgba(0,0,0,.12); }
+  .quick a svg, .quick a.tel svg { width: 20px; height: 20px; }
+  /* 본문 오른쪽 끝 글자가 빠른 버튼에 덜 가리도록 */
+  main { padding-bottom: 24px; }
+  .page-head h1, .page-head h2 { word-break: keep-all; }
+  .sw-mini-copy { font-size: 13px; padding: 0 56px; line-height: 1.5; }
+}
+@media (max-width: 380px) {
+  .header .logo .logo-img { height: 46px; }
+  .util-links > * { padding: 0 7px; font-size: 12px; }
+}
+@media (max-width: 640px) {
+  .sw-mini-copy { padding: 0 16px; font-size: 13px; white-space: nowrap; }
+  .tt-wrap .tt td.t-title { font-size: 14px; }
+}
+@media (max-width: 360px) { .sw-mini-copy { font-size: 12px; } }
