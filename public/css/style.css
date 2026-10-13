@@ -1139,3 +1139,7 @@ body.sw-on .sw.ready .sw-rail { opacity: 1; pointer-events: auto; }
 .quick a.tel svg { width: 26px; height: 26px; }
 .quick a.tel:hover { background: var(--blue-2); border-color: var(--blue-2); }
 @media (max-width: 640px) { .quick a.tel svg { width: 21px; height: 21px; } }
+/* 선생님 카드 사진 크게 */
+.t-card .ph:has(img) { width: 64%; height: 92%; right: 6px; }
+@media (max-width: 640px) { .t-card .ph:has(img) { width: 58%; height: 70%; right: 4px; } }
+.t-card .tags, .t-card .subj, .t-card h3, .t-card .hl { position: relative; z-index: 1; }
