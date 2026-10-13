@@ -1,7 +1,7 @@
 // 글쓰기·글 고치기: 게시판·말머리, 사진(여러 장), 파일 첨부, 자료실 규칙 동의
 import * as be from './backend.js';
-import { BOARDS, DATA_RULES, DATA_AGREES } from './boards.js';
-import { LIMITS } from './config.js';
+import { BOARDS, DATA_RULES, DATA_AGREES, WRITE_BOARDS } from './boards.js';
+import { LIMITS, QNA_OPEN } from './config.js';
 import { esc, $, $$, toast, backBar, size, safeImg } from './ui.js';
 
 export async function renderWrite(ctx, editing) {
@@ -15,7 +15,7 @@ export async function renderWrite(ctx, editing) {
   }
   if (me.banned) { view.innerHTML = `${backBar('글쓰기')}<div class="empty">이용이 정지된 계정이라 글을 쓸 수 없어요.</div>`; return; }
 
-  const boards = ['talk', 'study', 'qna', 'data', ...(be.isAdmin() ? ['notice'] : [])];
+  const boards = [...WRITE_BOARDS, ...(QNA_OPEN ? ['qna'] : []), ...(be.isAdmin() ? ['notice'] : [])];
   let board = post?.board || (boards.includes(q.get('board')) ? q.get('board') : 'talk');
   let cat = post?.category || q.get('category') || '';
   // 사진·파일: { kind: 'old', ...meta } 또는 { kind: 'new', file, url }

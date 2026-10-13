@@ -1,27 +1,42 @@
 // 게시판·말머리·학년·과목 정의
-export const GRADES = ['중1', '중2', '중3', '고1', '고2', '고3', 'N수', '학부모', '기타'];
+export const GRADES = ['학부모', '중1', '중2', '중3', '고1', '고2', '고3', 'N수', '기타'];
 export const SUBJECTS = ['국어', '수학', '영어', '과학', '사회', '한국사', '기타'];
 
 export const BOARDS = {
-  talk: {
-    name: '소통해요',
+  news: {
+    name: '소식',
     categories: [
-      { id: 'humor', name: '유머', icon: '🍪', bg: '#fbe6d6' },
-      { id: 'daily', name: '일상대화', icon: '☀️', bg: '#fff3cf' },
-      { id: 'drawing', name: '그림', icon: '🎨', bg: '#e8e4fb' },
-      { id: 'love', name: '썸·연애', icon: '💕', bg: '#fde3e7' },
-      { id: 'worry', name: '고민상담', icon: '🩹', bg: '#fff1c9' },
-      { id: 'school', name: '학교이야기', icon: '🏫', bg: '#e1efe4' },
+      { id: 'admission-news', name: '입시뉴스', icon: '📰', bg: '#e7ecfb' },
+      { id: 'office', name: '교육청·대학 발표', icon: '🏛️', bg: '#eceff4' },
+      { id: 'event', name: '설명회·행사', icon: '📅', bg: '#e3f2ec' },
+      { id: 'local', name: '대전 교육소식', icon: '📍', bg: '#fdeaea' },
     ],
   },
-  study: {
-    name: '공부해요',
+  talk: {
+    name: '수다',
     categories: [
-      { id: 'method', name: '공부법', icon: '✏️', bg: '#fde8da' },
-      { id: 'proof', name: '인증', icon: '🚩', bg: '#e1ecfb' },
-      { id: 'admission', name: '입시·진로', icon: '🎓', bg: '#e6e6f5' },
-      { id: 'news', name: '최신입시', icon: '📰', bg: '#eef0f2' },
-      { id: 'book', name: '문제집·인강', icon: '📗', bg: '#e2f3e5' },
+      { id: 'daily', name: '일상', icon: '☀️', bg: '#fff3cf' },
+      { id: 'parent', name: '학부모 수다', icon: '☕', bg: '#f1e9e1' },
+      { id: 'worry', name: '고민상담', icon: '🩹', bg: '#fff1c9' },
+      { id: 'humor', name: '유머', icon: '😄', bg: '#e8e4fb' },
+    ],
+  },
+  school: {
+    name: '학교',
+    categories: [
+      { id: 'life', name: '학교생활', icon: '🏫', bg: '#e1efe4' },
+      { id: 'exam', name: '내신·시험', icon: '📝', bg: '#e1ecfb' },
+      { id: 'info', name: '학교 정보', icon: 'ℹ️', bg: '#eceff4' },
+      { id: 'transfer', name: '고입·배정', icon: '🧭', bg: '#e6e6f5' },
+    ],
+  },
+  admission: {
+    name: '입시',
+    categories: [
+      { id: 'susi', name: '수시', icon: '🎯', bg: '#e7ecfb' },
+      { id: 'jeongsi', name: '정시·수능', icon: '📚', bg: '#e2f3e5' },
+      { id: 'career', name: '진로', icon: '🎓', bg: '#e6e6f5' },
+      { id: 'method', name: '공부법', icon: '✏️', bg: '#fdf0de' },
     ],
   },
   qna: {
@@ -46,10 +61,13 @@ export const BOARDS = {
 
 export const COMMUNITY_TABS = [
   { id: 'rec', name: '추천' },
-  { id: 'talk', name: '소통해요' },
-  { id: 'study', name: '공부해요' },
-  { id: 'qna', name: '문제풀이' },
+  { id: 'news', name: '소식' },
+  { id: 'talk', name: '수다' },
+  { id: 'school', name: '학교' },
+  { id: 'admission', name: '입시' },
 ];
+// 글을 쓸 수 있는 게시판(문제풀이는 학생 회원이 모이면 config.js 의 QNA_OPEN 으로 엽니다)
+export const WRITE_BOARDS = ['news', 'talk', 'school', 'admission', 'data'];
 
 export function category(board, id) {
   const b = BOARDS[board];

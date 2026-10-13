@@ -1,11 +1,11 @@
 // 이용규칙·자료실 규칙·개인정보 처리방침
 import { DATA_RULES } from './boards.js';
-import { ACADEMY_NAME, SITE_NAME, LIMITS } from './config.js';
+import { ACADEMY_NAME, SITE_NAME, SITE_DESC, LIMITS } from './config.js';
 import { esc, backBar } from './ui.js';
 
 const DOCS = {
   rules: ['커뮤니티 이용규칙', `
-    <p>${SITE_NAME}는 ${ACADEMY_NAME}가 운영하는 회원 전용 커뮤니티입니다. 모두가 편하게 쓸 수 있도록 아래 규칙을 지켜 주세요.</p>
+    <p>${SITE_NAME}은 ${ACADEMY_NAME}가 운영하는 ${SITE_DESC}입니다. 모두가 편하게 쓸 수 있도록 아래 규칙을 지켜 주세요.</p>
     <h3>하면 안 되는 것</h3>
     <ol>
       <li>욕설·비방·조롱, 특정 학생·선생님·학교를 겨냥한 저격 글</li>

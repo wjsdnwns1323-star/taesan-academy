@@ -1,12 +1,12 @@
 // 관리자 화면: 자료 승인, 신고 처리, 회원 관리(권한·정지·개인정보 보기), 공지 쓰기
 import * as be from './backend.js';
-import { esc, $, $$, ago, toast, backBar, itemHtml } from './ui.js';
+import { esc, $, $$, ago, toast, backBar, itemHtml, safeImg } from './ui.js';
 
 export async function renderAdmin(ctx) {
   const { view, q } = ctx;
   if (!be.isAdmin()) { view.innerHTML = `${backBar('관리자')}<div class="empty">관리자만 볼 수 있어요.</div>`; return; }
   const tab = q.get('tab') || 'pending';
-  const tabs = [['pending', '자료 승인'], ['reports', '신고'], ['users', '회원']];
+  const tabs = [['pending', '자료 승인'], ['reports', '신고'], ['users', '회원'], ['banners', '배너·안내']];
   view.innerHTML = `${backBar('관리자', '<a class="btn small" href="#/write?board=notice" style="display:grid;place-items:center">공지 쓰기</a>')}
     <nav class="tabs">${tabs.map(([id, n]) => `<a href="#/admin?tab=${id}" class="${id === tab ? 'on' : ''}">${n}</a>`).join('')}</nav>
     <div id="ab"><div class="loading">불러오는 중…</div></div>`;
@@ -70,6 +70,45 @@ export async function renderAdmin(ctx) {
           toast('바꿨어요'); ctx.go(`#/admin?tab=users&r=${Date.now()}`);
         }
       } catch (err) { toast(be.errorText(err)); }
+    });
+  }
+
+  if (tab === 'banners') {
+    const list = await be.listBanners();
+    if (!ctx.alive()) return;
+    box.innerHTML = `<form class="form" id="bf">
+        <div class="card" style="margin:0"><p><b>배너</b>는 홈·게시판 위에 넘겨 보는 사진이고, <b>상단 안내</b>는 맨 위 띠에 돌아가며 나오는 한 줄 글이에요. 링크는 사이트 안 주소(#/…)나 https:// 주소만 쓸 수 있어요.</p></div>
+        <label class="field"><span>종류</span><select name="kind"><option value="image">배너(사진)</option><option value="text">상단 안내(글)</option></select></label>
+        <label class="field" id="b-img"><span>배너 사진 <small>(가로로 긴 사진 권장, 자동으로 줄여요)</small></span><input type="file" accept="image/*" name="file"></label>
+        <label class="field"><span>글 <small>(상단 안내 문구 / 배너 설명)</small></span><input class="input" name="text" maxlength="100"></label>
+        <label class="field"><span>누르면 갈 곳 <small>(선택)</small></span><input class="input" name="link" maxlength="300" placeholder="예: #/community/news 또는 https://…"></label>
+        <p class="err" id="berr"></p><button class="btn">추가</button></form>
+      <div class="admin-box">${list.map((b) => `<div class="admin-item" data-b="${esc(b.id)}">
+          ${b.kind === 'image' ? `<img src="${safeImg(b.image)}" alt="" style="max-height:120px;border-radius:10px;object-fit:cover">` : '<b>상단 안내</b>'}
+          <div>${esc(b.text)} <small style="color:var(--muted)">${esc(b.link)}</small></div>
+          <div class="btns"><button class="btn small gray" data-del>삭제</button></div></div>`).join('') || '<div class="empty">아직 없어요</div>'}</div>`;
+    const f = $('#bf');
+    f.kind.addEventListener('change', () => $('#b-img').classList.toggle('hidden', f.kind.value !== 'image'));
+    f.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const link = f.link.value.trim();
+      try {
+        if (link && !/^(#\/|https:\/\/)/.test(link)) throw new Error('링크는 #/ 또는 https:// 로 시작해야 해요.');
+        let image = '';
+        if (f.kind.value === 'image') {
+          const file = f.file.files[0];
+          if (!file) throw new Error('배너 사진을 골라 주세요.');
+          image = await be.blobToDataUrl(await be.shrinkImage(file, 1600, 0.8));
+          if (image.length > 900000) image = await be.blobToDataUrl(await be.shrinkImage(file, 1200, 0.7));
+        } else if (!f.text.value.trim()) throw new Error('상단 안내 문구를 적어 주세요.');
+        await be.addBanner({ kind: f.kind.value, image, text: f.text.value.trim(), link });
+        toast('추가했어요. 새로고침하면 보여요.'); ctx.go(`#/admin?tab=banners&r=${Date.now()}`);
+      } catch (err) { $('#berr').textContent = be.errorText(err); }
+    });
+    box.addEventListener('click', async (e) => {
+      const it = e.target.closest('[data-b]');
+      if (!it || !e.target.closest('[data-del]') || !confirm('삭제할까요?')) return;
+      try { await be.deleteBanner(it.dataset.b); it.remove(); toast('삭제했어요'); } catch (err) { toast(be.errorText(err)); }
     });
   }
 }

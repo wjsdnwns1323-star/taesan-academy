@@ -19,7 +19,7 @@ service cloud.firestore {
     function nonEmpty(v, max) { return v is string && v.size() > 0 && v.size() <= max; }
     function recent(t) { return t is int && t > request.time.toMillis() - 86400000 && t < request.time.toMillis() + 86400000; }
     function changed() { return request.resource.data.diff(resource.data).affectedKeys(); }
-    function grades() { return ['중1', '중2', '중3', '고1', '고2', '고3', 'N수', '학부모', '기타']; }
+    function grades() { return ['학부모', '중1', '중2', '중3', '고1', '고2', '고3', 'N수', '기타']; }
 
     // 회원 공개 정보(닉네임·학년·권한)
     match /users/{uid} {
@@ -78,7 +78,7 @@ service cloud.firestore {
       allow create: if active() && request.resource.data.uid == request.auth.uid
         && request.resource.data.keys().hasOnly(['board', 'category', 'title', 'body', 'uid', 'nickname', 'grade', 'createdAt',
              'likeCount', 'commentCount', 'thumb', 'images', 'files', 'approved', 'status', 'acceptedCommentId', 'source'])
-        && request.resource.data.board in ['talk', 'study', 'qna', 'data', 'notice']
+        && request.resource.data.board in ['news', 'talk', 'school', 'admission', 'qna', 'data', 'notice']
         && (request.resource.data.board != 'notice' || isAdmin())
         && request.resource.data.approved == (request.resource.data.board != 'data')
         && (request.resource.data.board != 'data' || nonEmpty(request.resource.data.source, 200))
@@ -181,6 +181,17 @@ service cloud.firestore {
       allow update: if signedIn() && resource.data.to == request.auth.uid
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
       allow delete: if signedIn() && resource.data.to == request.auth.uid;
+    }
+
+    // 배너·상단 안내(누구나 보기, 관리자만 쓰기)
+    match /banners/{id} {
+      allow read: if true;
+      allow create: if isAdmin() && request.resource.data.keys().hasOnly(['kind', 'image', 'text', 'link', 'createdAt'])
+        && request.resource.data.kind in ['image', 'text'] && jpeg(request.resource.data.image, 950000)
+        && str(request.resource.data.text, 100) && str(request.resource.data.link, 300)
+        && (request.resource.data.link == '' || request.resource.data.link.matches('^(#/|https://).*'))
+        && recent(request.resource.data.createdAt);
+      allow delete: if isAdmin();
     }
 
     // 신고

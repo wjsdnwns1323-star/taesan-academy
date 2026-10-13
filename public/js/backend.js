@@ -447,6 +447,15 @@ export async function report({ post, comment, reason }) {
 export const listReports = () => db.query('reports', { eq: { status: 'open' }, limit: 100 });
 export async function closeReport(id) { needAdmin(); await db.update(`reports/${id}`, { status: 'done' }); }
 
+/* ---------------- 배너·상단 안내 ---------------- */
+// banners/{id}: { kind: 'image' | 'text', image(JPEG data 주소), text, link, createdAt }
+export const listBanners = () => db.query('banners', { limit: 50 });
+export async function addBanner(b) {
+  needAdmin();
+  await db.set(`banners/${newId('desc')}`, { kind: b.kind, image: b.image || '', text: b.text || '', link: b.link || '', createdAt: Date.now() });
+}
+export async function deleteBanner(id) { needAdmin(); await db.remove(`banners/${id}`); }
+
 /* ---------------- 관리자 ---------------- */
 export async function listUsers(after) { needAdmin(); return db.query('users', { limit: 200, after }); }
 export async function setUserFlags(uid, patch) { needAdmin(); await db.update(`users/${uid}`, patch); }

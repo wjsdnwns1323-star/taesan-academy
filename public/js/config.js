@@ -9,7 +9,10 @@ export const firebaseConfig = {
   appId: '1:148663191557:web:5ad98379a6fdef62de346c',
 };
 
-export const SITE_NAME = '태산 커뮤니티';
+export const SITE_NAME = '태산입시';
+export const SITE_DESC = '대전 학생·학부모를 위한 입시 정보와 고민 나눔 커뮤니티';
+// 문제풀이 게시판: 학생 회원이 어느 정도 모이면 true 로 바꿔 엽니다
+export const QNA_OPEN = false;
 export const ACADEMY_NAME = '태산학원';
 
 // 아이디 로그인용 내부 이메일 도메인(실제로 메일이 가지 않습니다). 바꾸면 기존 회원이 로그인할 수 없습니다.

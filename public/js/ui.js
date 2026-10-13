@@ -40,7 +40,7 @@ export const ICON = {
 
 // 큰 제목 + 검색·내 정보·알림
 export function topBar(title) {
-  return `<header class="top"><div class="top-row"><h1>${esc(title)}</h1>
+  return `<header class="top page-top"><div class="top-row"><h1>${esc(title)}</h1>
     <a class="icon-btn" href="#/search" aria-label="검색">${ICON.search}</a>
     <a class="icon-btn" href="#/me" aria-label="내 정보">${ICON.user}</a>
     <a class="icon-btn" href="#/notifications" aria-label="알림">${ICON.bell}<i class="dot hidden" id="bell-dot"></i></a>
@@ -75,7 +75,7 @@ function metaHtml(p, { when = true } = {}) {
 export function itemHtml(p) {
   const badge = p.board === 'data' && !p.approved ? ' <span class="badge pending">승인 대기</span>' : '';
   const files = p.files?.length ? ` · 📎${p.files.length}` : '';
-  return `<a class="item${p.board === 'notice' ? ' pinned' : ''}" href="#/post/${p.id}">
+  return `<a class="item${p.board === 'notice' ? ' pinned' : ''}" href="#/post/${p.id}" data-date="${ago(p.createdAt)}">
     <div class="txt">${labelHtml(p)}<h3>${esc(p.title)}${badge}</h3><p>${preview(p.body)}${files}</p>${metaHtml(p)}</div>
     ${safeImg(p.thumb) ? `<div class="th"><img src="${safeImg(p.thumb)}" alt="" loading="lazy"></div>` : ''}</a>`;
 }
@@ -92,6 +92,34 @@ export function qcardHtml(p) {
 export function recCardHtml(p) {
   return `<a class="rec-card" href="#/post/${p.id}">${labelHtml(p)}<h3>${esc(p.title)}</h3><p>${preview(p.body)}</p>${metaHtml(p)}</a>`;
 }
+
+export const safeLink = (s) => (/^(#\/|https:\/\/)/.test(s || '') ? s : '');
+
+// 관리자가 올린 배너(가로로 넘기기, 4초마다 자동)
+export const bannerSlot = () => '<div class="banner hidden" id="banner"><div class="slider b-slider" id="b-slider"></div><div class="dots b-dots" id="b-dots"></div></div>';
+let bannerCache = null;
+export async function fillBanner(list) {
+  const box = $('#banner');
+  if (!box) return;
+  const imgs = (await list).filter((b) => b.kind === 'image' && safeImg(b.image));
+  if (!imgs.length) return;
+  const s = $('#b-slider');
+  s.innerHTML = imgs.map((b) => {
+    const img = `<img src="${safeImg(b.image)}" alt="${esc(b.text || '배너')}">`;
+    const l = safeLink(b.link);
+    return l ? `<a href="${esc(l)}" ${l.startsWith('https') ? 'target="_blank" rel="noopener"' : ''}>${img}</a>` : `<div>${img}</div>`;
+  }).join('');
+  box.classList.remove('hidden');
+  bindDots(s, $('#b-dots'));
+  if (imgs.length > 1) {
+    const t = setInterval(() => {
+      if (!document.body.contains(s)) { clearInterval(t); return; }
+      const w = s.clientWidth, n = s.children.length, i = Math.round(s.scrollLeft / w);
+      s.scrollTo({ left: ((i + 1) % n) * w, behavior: 'smooth' });
+    }, 4000);
+  }
+}
+export function getBanners(listFn) { bannerCache = bannerCache || listFn().catch(() => []); return bannerCache; }
 
 export const fab = (href) => `<a class="fab" href="${href}" aria-label="글쓰기">${ICON.pen}</a>`;
 
