@@ -25,16 +25,18 @@ export function pageHead(title, desc = '', crumbs = []) {
 
 const initials = (name = '') => name.slice(-2);
 // 강사 사진: 누끼(투명 배경)·얼굴 높이 맞춘 PNG를 씁니다. 예전 데이터의 .jpg 경로도 같은 PNG로 바꿉니다.
+const PV = (() => { const v = new URL(import.meta.url).searchParams.get('v'); return v ? `?v=${v}` : ''; })();
 // 사진: webp(가벼움) → png → jpg 순서로 시도
 window.photoFallback = (im) => {
   const s = im.getAttribute('src') || '';
-  if (/\.webp$/.test(s)) im.src = s.replace(/\.webp$/, '.png');
-  else if (/\.png$/.test(s)) im.src = s.replace(/\.png$/, '.jpg');
+  if (/\.webp(\?|$)/.test(s)) im.src = s.replace(/\.webp(?=\?|$)/, '.png');
+  else if (/\.png(\?|$)/.test(s)) im.src = s.replace(/\.png(?=\?|$)/, '.jpg');
   else im.onerror = null;
 };
 export function photoOf(t) {
   if (!t || !t.photo) return '';
-  return /^images\/people\/[\w-]+\.(jpe?g|png)$/.test(t.photo) ? t.photo.replace(/\.(jpe?g|png)$/, '.webp') : t.photo;
+  // 배포할 때마다 붙는 버전(?v=)을 사진에도 붙여, 사진을 바꾸면 바로 새 사진이 보이게
+  return /^images\/people\/[\w-]+\.(jpe?g|png)$/.test(t.photo) ? t.photo.replace(/\.(jpe?g|png)$/, '.webp') + PV : t.photo;
 }
 export function monogram(t) {
   if (t.photo) return `<img src="${esc(photoOf(t))}" alt="${esc(t.name)} 선생님" loading="lazy" decoding="async" onerror="photoFallback(this)">`;
