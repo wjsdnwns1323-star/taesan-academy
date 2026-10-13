@@ -1174,3 +1174,8 @@ body.sw-on .sw.ready .sw-rail { opacity: 1; pointer-events: auto; }
   .tt-wrap .tt td.t-title { font-size: 14px; }
 }
 @media (max-width: 360px) { .sw-mini-copy { font-size: 12px; } }
+/* 모바일: 상단 로고를 정가운데로(메뉴 버튼은 오른쪽 그대로) */
+@media (max-width: 1000px) {
+  .header > .wrap { position: relative; justify-content: flex-end; }
+  .header .logo { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); }
+}
