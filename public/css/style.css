@@ -1134,3 +1134,8 @@ body.sw-on .sw.ready .sw-rail { opacity: 1; pointer-events: auto; }
 .sw-mini:hover .sw-mini-hint, .sw-mini:focus-visible .sw-mini-hint { opacity: .85; }
 .sw-mini:hover .sw-mini-hint svg { transform: translateX(3px); }
 @media (max-width: 640px) { .sw-mini-hint { bottom: 12px; font-size: 12px; } }
+/* 빠른 상담: 전화 버튼(브랜드 청록) */
+.quick a.tel { background: var(--blue); border-color: var(--blue); color: #fff; }
+.quick a.tel svg { width: 26px; height: 26px; }
+.quick a.tel:hover { background: var(--blue-2); border-color: var(--blue-2); }
+@media (max-width: 640px) { .quick a.tel svg { width: 21px; height: 21px; } }

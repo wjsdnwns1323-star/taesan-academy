@@ -189,7 +189,7 @@ function footer() {
 
 function quick() {
   return `<nav class="quick" aria-label="빠른 상담">
-    ${SITE.kakaoUrl ? `<a class="talk" href="${esc(SITE.kakaoUrl)}" target="_blank" rel="noopener" aria-label="카카오톡 상담"><span>TALK</span></a>` : `<a class="talk" href="tel:${SITE.phone.replace(/-/g, '')}" aria-label="전화 상담"><span>CALL</span></a>`}
+    ${SITE.kakaoUrl ? `<a class="talk" href="${esc(SITE.kakaoUrl)}" target="_blank" rel="noopener" aria-label="카카오톡 상담"><span>TALK</span></a>` : `<a class="tel" href="tel:${SITE.phone.replace(/-/g, '')}" aria-label="전화 상담 ${esc(SITE.phone)}" title="전화 상담 ${esc(SITE.phone)}">${ICON.phone}</a>`}
     <a href="#/consult" aria-label="온라인 상담">${ICON.chat}</a>
     <a href="#/location" aria-label="오시는 길">${ICON.pin}</a>
   </nav>`;
