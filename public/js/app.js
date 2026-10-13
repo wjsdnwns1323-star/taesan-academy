@@ -74,7 +74,7 @@ function renderWelcome({ view }) {
     <p>${esc(SITE_DESC)}</p>
     <div class="btns"><a class="btn" href="#/login" style="display:grid;place-items:center">로그인</a>
     <a class="btn gray" href="#/join" style="display:grid;place-items:center">회원가입</a></div></div>
-    <div class="card"><h3>🔒 회원 전용 커뮤니티</h3><p>글과 자료는 가입한 회원만 볼 수 있어요. 실명·전화번호는 관리자만 볼 수 있고 다른 회원에게는 닉네임과 학년만 보여요.</p></div>
+    <div class="card"><h3>🔒 회원 전용 커뮤니티</h3><p>글과 자료는 가입한 회원만 볼 수 있어요. 실명·전화번호·성별·나이는 관리자만 볼 수 있고 다른 회원에게는 아이디(닉네임)와 학생/학부모 구분만 보여요.</p></div>
     <div class="card"><h3>💬 이런 걸 할 수 있어요</h3><p>최신 입시 소식 · 학부모·학생 수다 · 대전 학교 이야기 · 입시 정보 · 자료실 · 좋아요 · 댓글 · 사진·파일 올리기</p></div>
     <div class="menu-list"><a href="#/rules">커뮤니티 이용규칙</a><a href="#/privacy">개인정보 처리방침</a></div>`;
 }
@@ -99,7 +99,7 @@ async function renderHome(ctx) {
   ]);
   if (!ctx.alive()) return;
   fillBanner(getBanners(be.listBanners));
-  const empty = '<div class="empty" style="padding:20px">아직 글이 없어요</div>';
+  const empty = '<div class="empty" style="padding:20px">올라온 글이 없어요</div>';
   $('#h-notice').innerHTML = notices.map(rowHtml).join('') || '<a class="row" href="#/rules"><span class="tag t-notice">공지</span><span class="t">커뮤니티 이용규칙을 꼭 읽어 주세요</span></a>';
   $('#h-hot').innerHTML = hot(recent).slice(0, 5).map(rowHtml).join('') || empty;
   boards.forEach((b, i) => { $(`#h-${b}`).innerHTML = per[i].map(rowHtml).join('') || empty; });
@@ -146,6 +146,8 @@ function tabsHtml(on) {
 }
 
 async function renderCommunity(ctx, tab) {
+  if (tab === 'all' && !matchMedia('(min-width: 1024px)').matches) tab = 'rec';
+  if (tab === 'all') return renderBoardTable(ctx, 'all', { board: 'all', category: '' }, () => '#/community/all');
   if (tab !== 'rec' && (!BOARDS[tab] || ['data', 'notice'].includes(tab) || (tab === 'qna' && !QNA_OPEN))) tab = 'rec';
   if (tab !== 'rec') return renderBoard(ctx, tab);
   const { view } = ctx;
@@ -164,10 +166,10 @@ async function renderCommunity(ctx, tab) {
   for (let i = 0; i < top.length; i += 2) pages.push(top.slice(i, i + 2));
   $('#rec-slider').innerHTML = pages.length
     ? pages.map((pg) => `<div class="rec-page">${pg.map(recCardHtml).join('')}</div>`).join('')
-    : '<div class="empty" style="width:100%">첫 글을 써 보세요!</div>';
+    : '<div class="empty" style="width:100%">올라온 글이 없어요</div>';
   bindDots($('#rec-slider'), $('#rec-dots'));
   const latest = recent.filter((p) => p.board !== 'notice').slice(0, 10);
-  $('#latest').innerHTML = latest.map((p) => (p.board === 'qna' ? qcardHtml(p) : itemHtml(p))).join('') || '<div class="empty">아직 글이 없어요</div>';
+  $('#latest').innerHTML = latest.map((p) => (p.board === 'qna' ? qcardHtml(p) : itemHtml(p))).join('') || '<div class="empty">올라온 글이 없어요</div>';
 }
 
 // 게시판 목록(소통해요·공부해요·문제풀이·자료실·공지)
@@ -213,8 +215,8 @@ async function renderBoard(ctx, board) {
     const rows = await be.listPosts({ ...filter, limit: 20, after });
     if (!ctx.alive()) return;
     if (!after) list.innerHTML = '';
-    list.insertAdjacentHTML('beforeend', rows.map((p) => (board === 'qna' ? qcardHtml(p) : itemHtml(p))).join(''));
-    if (!list.children.length) list.innerHTML = `<div class="empty">${board === 'data' ? '아직 공개된 자료가 없어요' : '아직 글이 없어요'}</div>`;
+    list.insertAdjacentHTML('beforeend', rows.filter((p) => board === 'notice' || !p.pinned).map((p) => (board === 'qna' ? qcardHtml(p) : itemHtml(p))).join(''));
+    if (!list.children.length) list.innerHTML = `<div class="empty">${board === 'data' ? '올라온 글이 없어요' : '올라온 글이 없어요'}</div>`;
     after = rows.length ? rows[rows.length - 1].id : after;
     more.classList.toggle('hidden', rows.length < 20);
     more.disabled = false;
@@ -222,7 +224,7 @@ async function renderBoard(ctx, board) {
   more.addEventListener('click', load);
   if (board !== 'notice') {
     fillBanner(getBanners(be.listBanners));
-    be.listPosts({ board: 'notice', limit: 3 }).then((ns) => { if (ctx.alive()) $('#pins').innerHTML = ns.map(itemHtml).join(''); }).catch(() => {});
+    be.listPosts({ board, pinned: true, limit: 10 }).then((ns) => { if (ctx.alive()) $('#pins').innerHTML = ns.map(itemHtml).join(''); }).catch(() => {});
   }
   await load();
 }
@@ -232,33 +234,35 @@ const fmtDate = (t) => { const d = new Date(t); return Date.now() - t < 86400000
 const ICONS = { news: '📰', talk: '☕', school: '🏫', admission: '🎓', data: '📚', notice: '📢', qna: '❓' };
 async function renderBoardTable(ctx, board, filter, href) {
   const { view, q } = ctx;
-  const b = BOARDS[board];
+  const all = board === 'all';
+  const b = all ? { name: '전체글', categories: [] } : BOARDS[board];
   const per = +(q.get('n') || 15), page = +(q.get('p') || 1), word = (q.get('q') || '').trim(), field = q.get('f') || 'title', period = q.get('d') || '';
   const catName = filter.category ? ` · ${category(board, filter.category).name}` : '';
-  view.innerHTML = `<div class="bt-head"><h1>${ICONS[board] || '📄'} ${esc(b.name)} 게시판${esc(catName)}</h1>
+  view.innerHTML = `<div class="bt-head"><h1>${ICONS[board] || '📋'} ${esc(b.name)}${board === 'all' ? '보기' : ' 게시판'}${esc(catName)}</h1>
       <div class="bt-tools"><label><input type="checkbox" id="hide-n" ${q.get('hn') ? 'checked' : ''}> 공지 숨기기</label>
       <select id="per">${[15, 30, 50].map((n) => `<option value="${n}" ${n === per ? 'selected' : ''}>${n}개씩</option>`).join('')}</select></div></div>
     ${board === 'data' ? `<div class="rules compact"><h3>⚠️ 자료실 규칙 — 꼭 지켜 주세요</h3><ol>${DATA_RULES.slice(0, 3).map((r) => `<li>${esc(r)}</li>`).join('')}</ol><p style="margin:8px 0 0;font-size:14px"><a href="#/data-rules" style="color:var(--warn);font-weight:700">자료실 규칙 전체 보기 ›</a></p></div>` : ''}
-    ${board === 'notice' ? '' : `<div class="bt-cats"><a class="${filter.category ? '' : 'on'}" href="${href({ category: '' })}">전체</a>${b.categories.map((c) => `<a class="${c.id === filter.category ? 'on' : ''}" href="${href({ category: c.id })}">${esc(c.name)}</a>`).join('')}</div>`}
+    ${board === 'notice' || board === 'all' ? '' : `<div class="bt-cats"><a class="${filter.category ? '' : 'on'}" href="${href({ category: '' })}">전체</a>${b.categories.map((c) => `<a class="${c.id === filter.category ? 'on' : ''}" href="${href({ category: c.id })}">${esc(c.name)}</a>`).join('')}</div>`}
     <table class="bt"><colgroup><col style="width:92px"><col><col style="width:150px"><col style="width:110px"><col style="width:70px"><col style="width:70px"></colgroup>
       <thead><tr><th>말머리</th><th>제목</th><th>작성자</th><th>작성일</th><th>조회수</th><th>좋아요</th></tr></thead><tbody id="bt-body"><tr><td colspan="6" class="loading">불러오는 중…</td></tr></tbody></table>
     <div class="bt-foot"><div class="pager" id="pager"></div>
       <form class="bt-search" id="bt-search"><select name="d"><option value="">전체기간</option><option value="7" ${period === '7' ? 'selected' : ''}>1주</option><option value="30" ${period === '30' ? 'selected' : ''}>1개월</option><option value="365" ${period === '365' ? 'selected' : ''}>1년</option></select>
         <select name="f"><option value="title">제목만</option><option value="all" ${field === 'all' ? 'selected' : ''}>제목+내용</option><option value="author" ${field === 'author' ? 'selected' : ''}>글작성자</option></select>
         <input name="q" value="${esc(word)}" placeholder="검색어를 입력해주세요"><button aria-label="검색"><svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.8-4.8"/></svg></button></form></div>
-    ${board !== 'notice' || be.isAdmin() ? fab(`#/write?board=${board}${filter.category ? `&category=${encodeURIComponent(filter.category)}` : ''}`) : ''}`;
+    ${!all && (board !== 'notice' || be.isAdmin()) ? fab(`#/write?board=${board}${filter.category ? `&category=${encodeURIComponent(filter.category)}` : ''}`) : ''}`;
   const qs = (patch) => { const u = new URLSearchParams(q); Object.entries(patch).forEach(([k, v]) => (v ? u.set(k, v) : u.delete(k))); return `#/${board === 'data' ? 'study' : board === 'notice' ? 'notices' : `community/${board}`}?${u}`; };
   $('#per').addEventListener('change', (e) => ctx.go(qs({ n: e.target.value, p: '' })));
   $('#hide-n').addEventListener('change', (e) => ctx.go(qs({ hn: e.target.checked ? '1' : '' })));
   $('#bt-search').addEventListener('submit', (e) => { e.preventDefault(); const f = e.target; ctx.go(qs({ q: f.q.value.trim(), f: f.f.value, d: f.d.value, p: '' })); });
   const [notices, rows] = await Promise.all([
-    board === 'notice' || q.get('hn') ? [] : be.listPosts({ board: 'notice', limit: 10 }),
-    be.listPosts({ board, category: filter.category, limit: 500 }),
+    [],
+    be.listPosts(all ? { limit: 500 } : { board, category: filter.category, limit: 500 }).then((r) => (all ? r.filter((p) => p.board !== 'notice') : r)),
   ]);
   if (!ctx.alive()) return;
+  notices.push(...(board === 'notice' || all || q.get('hn') ? [] : rows.filter((p) => p.pinned)));
   const since = period ? Date.now() - +period * 86400000 : 0;
   const k = word.toLowerCase();
-  const hits = rows.filter((p) => p.createdAt >= since && (!k || (field === 'author' ? p.nickname.toLowerCase().includes(k)
+  const hits = rows.filter((p) => (all || !p.pinned) && p.createdAt >= since && (!k || (field === 'author' ? p.nickname.toLowerCase().includes(k)
     : (field === 'all' ? `${p.title} ${p.body}` : p.title).toLowerCase().includes(k))));
   const pages = Math.max(1, Math.ceil(hits.length / per));
   const list = hits.slice((page - 1) * per, page * per);
@@ -266,7 +270,7 @@ async function renderBoardTable(ctx, board, filter, href) {
     <td class="tt"><a href="#/post/${p.id}">${esc(p.title)}${p.images?.length ? ' <i class="ico">🖼</i>' : ''}${p.files?.length ? ' <i class="ico">📎</i>' : ''}${p.commentCount ? ` <em>[${p.commentCount}]</em>` : ''}${p.board === 'data' && !p.approved ? ' <span class="badge pending">승인 대기</span>' : ''}</a></td>
     <td class="au">${esc(p.nickname)} <small>${esc(p.grade)}</small></td><td>${fmtDate(p.createdAt)}</td><td>${(p.viewCount || 0).toLocaleString()}</td><td>${(p.likeCount || 0).toLocaleString()}</td></tr>`;
   $('#bt-body').innerHTML = (page === 1 ? notices.map((p) => tr(p, true)).join('') : '') + list.map((p) => tr(p, board === 'notice')).join('')
-    || '<tr><td colspan="6" class="empty">등록된 글이 없어요</td></tr>';
+    || '<tr><td colspan="6" class="empty">올라온 글이 없어요</td></tr>';
   $('#pager').innerHTML = Array.from({ length: Math.min(pages, 10) }, (_, i) => `<a class="${i + 1 === page ? 'on' : ''}" href="${qs({ p: String(i + 1) })}">${i + 1}</a>`).join('');
 }
 
@@ -314,7 +318,7 @@ function renderMenu({ view }) {
       : '<h3>로그인하고 함께해요</h3><p>글·댓글·자료는 회원만 볼 수 있어요.</p><div style="display:flex;gap:8px;margin-top:12px"><a class="btn small" href="#/login" style="display:grid;place-items:center">로그인</a><a class="btn small gray" href="#/join" style="display:grid;place-items:center">회원가입</a></div>'}</div>
     <div class="menu-list">
       <div class="group">커뮤니티</div>
-      ${COMMUNITY_TABS.slice(1).map((t) => `<a href="#/community/${t.id}">${t.name}</a>`).join('')}${QNA_OPEN ? '<a href="#/community/qna">문제풀이</a>' : ''}<a href="#/study">스터디 자료실</a><a href="#/notices">공지사항</a>
+      ${COMMUNITY_TABS.slice(1).map((t) => `<a href="#/community/${t.id}">${t.name}</a>`).join('')}${QNA_OPEN ? '<a href="#/community/qna">문제풀이</a>' : ''}<a href="#/study">자료실</a><a href="#/notices">공지사항</a>
       ${me ? `<div class="group">내 활동</div><a href="#/me">내 정보·내가 쓴 글</a><a href="#/notifications">알림</a>` : ''}
       ${me?.role === 'admin' ? '<div class="group">관리</div><a href="#/admin">관리자 화면</a><a href="#/write?board=notice">공지 쓰기</a>' : ''}
       <div class="group">안내</div><a href="#/rules">커뮤니티 이용규칙</a><a href="#/data-rules">자료실 규칙</a><a href="#/privacy">개인정보 처리방침</a>
@@ -348,7 +352,7 @@ function renderSide(hash) {
     <div class="s-card">${sideTab === 'info' ? info : mine}</div>
     <form class="s-search" id="s-search"><input name="q" aria-label="검색어"><button>검색</button></form>
     <nav class="s-menu">
-      ${link('#/community/rec', '전체글보기', '📋')}${link('#/', '인기글', '🔥')}
+      ${link('#/community/all', '전체글보기', '📋')}${link('#/community/rec', '인기글', '🔥')}
       <h4>입시 정보</h4>${board('news', '📰')}${board('admission', '🎓')}
       <h4>우리들 이야기</h4>${board('talk', '☕')}${board('school', '🏫')}
       ${QNA_OPEN ? `<h4>공부</h4>${board('qna', '❓')}` : ''}

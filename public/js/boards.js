@@ -1,5 +1,6 @@
 // 게시판·말머리·학년·과목 정의
 export const GRADES = ['학부모', '중1', '중2', '중3', '고1', '고2', '고3', 'N수', '기타'];
+export const STUDENT_GRADES = ['중1', '중2', '중3', '고1', '고2', '고3', 'N수'];
 export const SUBJECTS = ['국어', '수학', '영어', '과학', '사회', '한국사', '기타'];
 
 export const BOARDS = {

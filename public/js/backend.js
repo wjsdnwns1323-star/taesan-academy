@@ -193,7 +193,8 @@ const emailOf = (username) => `${username.toLowerCase()}@${LOGIN_DOMAIN}`;
 export async function signUp(f) {
   const username = f.username.trim().toLowerCase();
   if (!USERNAME_RE.test(username)) throw new Error('아이디는 영문 소문자·숫자·_ 4~20자입니다.');
-  if (await db.get(`nicknames/${f.nickname}`).catch(() => null)) throw new Error('이미 있는 닉네임입니다.');
+  f.nickname = f.nickname || username; // 닉네임은 처음엔 아이디(내 정보에서 바꿀 수 있음)
+  if (await db.get(`nicknames/${f.nickname}`).catch(() => null)) throw new Error('이미 쓰고 있는 아이디입니다.');
   signingUp = true;
   const t = Date.now();
   let uid;
@@ -202,7 +203,7 @@ export async function signUp(f) {
     await db.batch([
       // 체험 모드에서만 아이디 admin 이 관리자가 됩니다(실제 사이트 관리자는 scripts/create_admin.py로 만듭니다)
       { op: 'set', path: `users/${uid}`, data: { username, nickname: f.nickname, grade: f.grade, role: DEMO && username === 'admin' ? 'admin' : 'member', banned: false, createdAt: t } },
-      { op: 'set', path: `users/${uid}/private/info`, data: { realName: f.realName, phone: f.phone, age: f.age, guardianConsent: !!f.guardianConsent, agreedAt: t } },
+      { op: 'set', path: `users/${uid}/private/info`, data: { realName: f.realName, phone: f.phone, gender: f.gender, age: f.age, memberType: f.memberType, childGrade: f.childGrade || '', guardianConsent: !!f.guardianConsent, agreedAt: t } },
       { op: 'set', path: `nicknames/${f.nickname}`, data: { uid } },
     ]);
   } catch (e) {
@@ -318,13 +319,14 @@ export const blobToDataUrl = (b) => new Promise((res) => { const r = new FileRea
 
 /* ---------------- 글 ---------------- */
 // 목록: 조건은 모두 '같음'(==)이고 정렬은 시간순 ID로 합니다.
-export async function listPosts({ board, category, grade, subject, status, limit = 20, after } = {}) {
+export async function listPosts({ board, category, grade, subject, status, pinned, limit = 20, after } = {}) {
   const eq = { approved: true };
   if (board) eq.board = board;
   if (category) eq.category = category;
   if (grade) eq.grade = grade;
   if (subject) eq.category = subject;
   if (status) eq.status = status;
+  if (pinned) eq.pinned = true;
   return db.query('posts', { eq, limit, after });
 }
 export const listMyPosts = (uid = me?.uid, after) => db.query('posts', { eq: { uid }, limit: 30, after });
@@ -364,6 +366,7 @@ export async function createPost(input) {
     approved: input.board !== 'data',
     status: input.board === 'qna' ? 'open' : '',
     acceptedCommentId: '',
+    pinned: !!input.pinned && isAdmin(), // 이 게시판 공지(관리자만)
     source: input.source || '',
   };
   await db.set(`posts/${id}`, post);

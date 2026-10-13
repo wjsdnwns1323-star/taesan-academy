@@ -1,6 +1,6 @@
 // 로그인·회원가입·내 정보
 import * as be from './backend.js';
-import { GRADES } from './boards.js';
+import { GRADES, STUDENT_GRADES } from './boards.js';
 import { SITE_NAME } from './config.js';
 import { esc, $, toast, backBar, itemHtml, qcardHtml } from './ui.js';
 
@@ -37,16 +37,19 @@ export function renderJoin(ctx) {
   if (be.currentUser()) { location.replace('#/'); return; }
   view.innerHTML = `${backBar('회원가입')}
     <form class="form" id="jf" novalidate>
-      <div class="card" style="margin:0"><p>🔒 실명·전화번호·나이는 <b>관리자만</b> 볼 수 있어요. 다른 회원에게는 닉네임과 학년만 보여요.</p></div>
+      <div class="card" style="margin:0"><p>🔒 실명·전화번호·성별·나이는 <b>관리자만</b> 볼 수 있어요. 다른 회원에게는 아이디(닉네임)와 학생/학부모 구분만 보여요.</p></div>
       <label class="field"><span>아이디</span><input class="input" name="username" autocomplete="username" autocapitalize="off" placeholder="영문 소문자·숫자·_ 4~20자"></label>
       <div class="row2">
         <label class="field"><span>비밀번호</span><input class="input" type="password" name="password" autocomplete="new-password" placeholder="8자 이상"></label>
         <label class="field"><span>비밀번호 확인</span><input class="input" type="password" name="password2" autocomplete="new-password"></label>
       </div>
-      <label class="field"><span>닉네임</span><input class="input" name="nickname" maxlength="12" placeholder="2~12자, 커뮤니티에 보이는 이름"></label>
       <div class="row2">
         <label class="field"><span>실명</span><input class="input" name="realName" maxlength="20" autocomplete="name"></label>
-        <label class="field"><span>학년</span><select name="grade">${GRADES.map((g) => `<option>${g}</option>`).join('')}</select></label>
+        <label class="field"><span>성별</span><select name="gender"><option value="">선택</option><option>남</option><option>여</option></select></label>
+      </div>
+      <div class="row2">
+        <label class="field"><span>학생/학부모</span><select name="memberType"><option value="">선택</option><option>학생</option><option>학부모</option></select></label>
+        <label class="field"><span id="grade-label">학년</span><select name="grade"><option value="">선택</option>${STUDENT_GRADES.map((g) => `<option>${g}</option>`).join('')}</select></label>
       </div>
       <div class="row2">
         <label class="field"><span>전화번호</span><input class="input" name="phone" inputmode="tel" autocomplete="tel" placeholder="010-0000-0000"></label>
@@ -54,29 +57,33 @@ export function renderJoin(ctx) {
       </div>
       <div class="field">
         <label class="check"><input type="checkbox" name="agreeRules"> <span>[필수] <a href="#/rules" target="_blank" style="text-decoration:underline">커뮤니티 이용규칙</a>에 동의합니다.</span></label>
-        <label class="check"><input type="checkbox" name="agreePrivacy"> <span>[필수] <a href="#/privacy" target="_blank" style="text-decoration:underline">개인정보 수집·이용</a>(실명, 전화번호, 나이, 학년 / 회원 관리·학원 연락 목적 / 탈퇴 시까지 보관)에 동의합니다.</span></label>
+        <label class="check"><input type="checkbox" name="agreePrivacy"> <span>[필수] <a href="#/privacy" target="_blank" style="text-decoration:underline">개인정보 수집·이용</a>(실명, 전화번호, 성별, 나이, 학생·학부모 구분과 학년 / 회원 관리·학원 연락 목적 / 탈퇴 시까지 보관)에 동의합니다.</span></label>
         <label class="check hidden" id="guardian"><input type="checkbox" name="guardianConsent"> <span>[필수] 만 14세 미만이라 <b>보호자(부모님)의 동의</b>를 받았습니다.</span></label>
       </div>
       <p class="err" id="err"></p>
       <button class="btn">가입하기</button>
     </form>`;
   const f = $('#jf');
+  f.memberType.addEventListener('change', () => { $('#grade-label').textContent = f.memberType.value === '학부모' ? '자녀 학년' : '학년'; });
   f.age.addEventListener('input', () => $('#guardian').classList.toggle('hidden', !(+f.age.value > 0 && +f.age.value < 14)));
   f.addEventListener('submit', async (e) => {
     e.preventDefault();
     const err = $('#err');
     const v = {
-      username: f.username.value.trim().toLowerCase(), password: f.password.value, nickname: f.nickname.value.trim(),
-      realName: f.realName.value.trim(), grade: f.grade.value, phone: f.phone.value.replace(/\s/g, ''), age: parseInt(f.age.value, 10),
+      username: f.username.value.trim().toLowerCase(), password: f.password.value,
+      realName: f.realName.value.trim(), gender: f.gender.value, memberType: f.memberType.value,
+      grade: f.memberType.value === '학부모' ? '학부모' : f.grade.value, childGrade: f.memberType.value === '학부모' ? f.grade.value : '', phone: f.phone.value.replace(/\s/g, ''), age: parseInt(f.age.value, 10),
       guardianConsent: f.guardianConsent.checked,
     };
     const problem = !be.USERNAME_RE.test(v.username) ? '아이디는 영문 소문자·숫자·_ 4~20자입니다.'
       : v.password.length < 8 ? '비밀번호는 8자 이상이어야 해요.'
       : v.password !== f.password2.value ? '비밀번호 확인이 맞지 않아요.'
-      : v.nickname.length < 2 || v.nickname.length > 12 || /[/\s]/.test(v.nickname) ? '닉네임은 띄어쓰기·/ 없이 2~12자로 정해 주세요.'
       : !v.realName ? '실명을 입력해 주세요.'
       : !/^01[0-9]-?[0-9]{3,4}-?[0-9]{4}$/.test(v.phone) ? '휴대전화 번호를 확인해 주세요. (예: 010-1234-5678)'
+      : !v.gender ? '성별을 골라 주세요.'
       : !(v.age >= 8 && v.age <= 99) ? '나이를 숫자로 입력해 주세요.'
+      : !v.memberType ? '학생인지 학부모인지 골라 주세요.'
+      : !f.grade.value ? (v.memberType === '학부모' ? '자녀 학년을 골라 주세요.' : '학년을 골라 주세요.')
       : !f.agreeRules.checked || !f.agreePrivacy.checked ? '필수 동의 항목에 체크해 주세요.'
       : v.age < 14 && !v.guardianConsent ? '만 14세 미만은 보호자 동의가 필요해요.'
       : '';
@@ -100,19 +107,20 @@ export async function renderMe(ctx) {
       <small style="color:var(--sub)">@${esc(me.username)} · ${esc(me.grade)}${me.role === 'admin' ? ' · 관리자' : ''}${me.banned ? ' · <b style="color:var(--danger)">이용 정지</b>' : ''}</small></div></div></div>
     <form class="form" id="pf">
       <div class="row2">
-        <label class="field"><span>닉네임</span><input class="input" name="nickname" maxlength="12" value="${esc(me.nickname)}"></label>
+        <label class="field"><span>닉네임</span><input class="input" name="nickname" maxlength="20" value="${esc(me.nickname)}"></label>
         <label class="field"><span>학년</span><select name="grade">${GRADES.map((g) => `<option ${g === me.grade ? 'selected' : ''}>${g}</option>`).join('')}</select></label>
       </div>
       <div class="row2">
         <label class="field"><span>실명 <small>(관리자만 봄)</small></span><input class="input" name="realName" maxlength="20" value="${esc(priv?.realName || '')}"></label>
         <label class="field"><span>나이</span><input class="input" type="number" name="age" value="${esc(priv?.age ?? '')}"></label>
       </div>
+      <p style="margin:0;color:var(--sub);font-size:14px">${esc(priv?.memberType || '')}${priv?.childGrade ? ` · 자녀 ${esc(priv.childGrade)}` : ''}${priv?.gender ? ` · ${esc(priv.gender)}` : ''}</p>
       <label class="field"><span>전화번호 <small>(관리자만 봄)</small></span><input class="input" name="phone" inputmode="tel" value="${esc(priv?.phone || '')}"></label>
       <p class="err" id="perr"></p>
       <button class="btn dark">정보 저장</button>
     </form>
     <div class="sec-title" style="padding-top:10px"><h2>내가 쓴 글</h2></div>
-    <div class="post-list">${posts.map((p) => (p.board === 'qna' ? qcardHtml(p) : itemHtml(p))).join('') || '<div class="empty">아직 쓴 글이 없어요</div>'}</div>
+    <div class="post-list">${posts.map((p) => (p.board === 'qna' ? qcardHtml(p) : itemHtml(p))).join('') || '<div class="empty">올라온 글이 없어요</div>'}</div>
     <form class="form" id="pwf"><h3 style="margin:10px 0 0">비밀번호 바꾸기</h3>
       <input class="input" type="password" name="old" placeholder="지금 비밀번호" autocomplete="current-password">
       <input class="input" type="password" name="pw" placeholder="새 비밀번호(8자 이상)" autocomplete="new-password">
@@ -123,7 +131,7 @@ export async function renderMe(ctx) {
     e.preventDefault();
     const f = e.target;
     const v = { nickname: f.nickname.value.trim(), grade: f.grade.value, realName: f.realName.value.trim(), phone: f.phone.value.replace(/\s/g, ''), age: parseInt(f.age.value, 10) };
-    const problem = v.nickname.length < 2 || /[/\s]/.test(v.nickname) ? '닉네임은 띄어쓰기·/ 없이 2~12자로 정해 주세요.'
+    const problem = v.nickname.length < 2 || /[/\s]/.test(v.nickname) ? '닉네임은 띄어쓰기·/ 없이 2~20자로 정해 주세요.'
       : !v.realName ? '실명을 입력해 주세요.'
       : !/^01[0-9]-?[0-9]{3,4}-?[0-9]{4}$/.test(v.phone) ? '휴대전화 번호를 확인해 주세요.'
       : !(v.age >= 8 && v.age <= 99) ? '나이를 확인해 주세요.' : '';

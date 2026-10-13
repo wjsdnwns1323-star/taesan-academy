@@ -30,12 +30,12 @@ service cloud.firestore {
         && request.resource.data.role == 'member' && request.resource.data.banned == false
         && request.resource.data.username.matches('^[a-z0-9_]{4,20}$')
         && request.auth.token.email.split('@')[0] == request.resource.data.username
-        && nonEmpty(request.resource.data.nickname, 12) && request.resource.data.grade in grades()
+        && nonEmpty(request.resource.data.nickname, 20) && request.resource.data.grade in grades()
         && recent(request.resource.data.createdAt)
         && getAfter(/databases/$(database)/documents/nicknames/$(request.resource.data.nickname)).data.uid == uid;
       allow update: if (signedIn() && request.auth.uid == uid
                          && changed().hasOnly(['nickname', 'grade'])
-                         && nonEmpty(request.resource.data.nickname, 12) && request.resource.data.grade in grades()
+                         && nonEmpty(request.resource.data.nickname, 20) && request.resource.data.grade in grades()
                          && getAfter(/databases/$(database)/documents/nicknames/$(request.resource.data.nickname)).data.uid == uid)
                     || (isAdmin() && changed().hasOnly(['role', 'banned'])
                          && request.resource.data.role in ['member', 'admin'] && request.resource.data.banned is bool);
@@ -45,7 +45,9 @@ service cloud.firestore {
       match /private/{doc} {
         allow read: if (signedIn() && request.auth.uid == uid) || isAdmin();
         allow create: if signedIn() && request.auth.uid == uid && doc == 'info'
-          && request.resource.data.keys().hasOnly(['realName', 'phone', 'age', 'guardianConsent', 'agreedAt'])
+          && request.resource.data.keys().hasOnly(['realName', 'phone', 'gender', 'age', 'memberType', 'childGrade', 'guardianConsent', 'agreedAt'])
+          && request.resource.data.gender in ['남', '여'] && request.resource.data.memberType in ['학생', '학부모']
+          && request.resource.data.childGrade in ['', '중1', '중2', '중3', '고1', '고2', '고3', 'N수']
           && nonEmpty(request.resource.data.realName, 20)
           && request.resource.data.phone.matches('^01[0-9]-?[0-9]{3,4}-?[0-9]{4}$')
           && request.resource.data.age is int && request.resource.data.age >= 8 && request.resource.data.age <= 99
@@ -64,7 +66,7 @@ service cloud.firestore {
     match /nicknames/{nick} {
       allow get: if true;
       allow create: if signedIn() && request.resource.data.keys().hasOnly(['uid']) && request.resource.data.uid == request.auth.uid
-        && nonEmpty(nick, 12);
+        && nonEmpty(nick, 20);
       allow delete: if (signedIn() && resource.data.uid == request.auth.uid) || isAdmin();
     }
 
@@ -77,7 +79,8 @@ service cloud.firestore {
 
       allow create: if active() && request.resource.data.uid == request.auth.uid
         && request.resource.data.keys().hasOnly(['board', 'category', 'title', 'body', 'uid', 'nickname', 'grade', 'createdAt',
-             'likeCount', 'commentCount', 'thumb', 'images', 'files', 'approved', 'status', 'acceptedCommentId', 'source'])
+             'likeCount', 'commentCount', 'thumb', 'images', 'files', 'approved', 'status', 'acceptedCommentId', 'source', 'pinned'])
+        && (!('pinned' in request.resource.data) || request.resource.data.pinned == false || isAdmin())
         && request.resource.data.board in ['news', 'talk', 'school', 'admission', 'qna', 'data', 'notice']
         && (request.resource.data.board != 'notice' || isAdmin())
         && request.resource.data.approved == (request.resource.data.board != 'data')
@@ -179,7 +182,7 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly(['to', 'from', 'fromName', 'type', 'postId', 'text', 'read', 'createdAt'])
         && request.resource.data.type in ['comment', 'accepted', 'approved', 'rejected']
         && (request.resource.data.type in ['comment', 'accepted'] || isAdmin())
-        && str(request.resource.data.to, 128) && str(request.resource.data.fromName, 12) && str(request.resource.data.postId, 40)
+        && str(request.resource.data.to, 128) && str(request.resource.data.fromName, 20) && str(request.resource.data.postId, 40)
         && str(request.resource.data.text, 80) && request.resource.data.read == false && recent(request.resource.data.createdAt);
       allow update: if signedIn() && resource.data.to == request.auth.uid
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
