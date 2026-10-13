@@ -29,6 +29,8 @@ async function route() {
   $$('#bottom-nav a').forEach((a) => a.classList.toggle('on', a.dataset.nav === nav));
   const tab = page === 'home' ? 'home' : page === 'study' ? 'study' : page === 'community' ? arg : '';
   try { renderSide(location.hash || '#/'); } catch (e) { console.error(e); }
+  const mt = page === 'home' ? 'home' : page === 'study' ? 'study' : page === 'notices' ? 'notices' : page === 'community' ? (arg || 'rec') : '';
+  $$('#m-tabs a').forEach((a) => a.classList.toggle('on', a.dataset.t === mt));
   window.scrollTo(0, 0);
   const user = be.currentUser();
   // 비회원: 홈·게시판 목록(제목)은 볼 수 있고, 글 내용·글쓰기 등은 로그인 필요
@@ -149,7 +151,6 @@ function tabsHtml(on) {
 }
 
 async function renderCommunity(ctx, tab) {
-  if (tab === 'all' && !matchMedia('(min-width: 1024px)').matches) tab = 'rec';
   if (tab === 'all') return renderBoardTable(ctx, 'all', { board: 'all', category: '' }, () => '#/community/all');
   if (tab !== 'rec' && (!BOARDS[tab] || ['data', 'notice'].includes(tab) || (tab === 'qna' && !QNA_OPEN))) tab = 'rec';
   if (tab !== 'rec') return renderBoard(ctx, tab);
@@ -200,7 +201,7 @@ async function renderBoard(ctx, board) {
     filters = `<div class="chips">${gradeSel}<a class="chip ${filter.category ? '' : 'on'}" href="${href({ category: '' })}">전체</a>
       ${b.categories.map((c) => `<a class="chip ${c.id === filter.category ? 'on' : ''}" href="${href({ category: c.id })}">${esc(c.name)}</a>`).join('')}</div>`;
   }
-  if (matchMedia('(min-width: 1024px)').matches) return renderBoardTable(ctx, board, filter, href);
+  return renderBoardTable(ctx, board, filter, href);
   const head = board === 'data'
     ? `${topBar('입시 자료실')}${topEnd}<div class="rules compact"><h3>⚠️ 자료실 규칙 — 꼭 지켜 주세요</h3><ol>${DATA_RULES.slice(0, 3).map((r) => `<li>${esc(r)}</li>`).join('')}</ol>
        <p style="margin:8px 0 0;font-size:14px"><a href="#/data-rules" style="color:var(--warn);font-weight:700">자료실 규칙 전체 보기 ›</a></p></div>`
@@ -271,7 +272,7 @@ async function renderBoardTable(ctx, board, filter, href) {
   const list = hits.slice((page - 1) * per, page * per);
   const tr = (p, pin) => `<tr class="${pin ? 'pin' : ''}"><td><span class="tag ${pin ? 't-notice fill' : `t-${p.board}`}">${pin ? '공지' : esc(category(p.board, p.category).name)}</span></td>
     <td class="tt"><a href="#/post/${p.id}">${esc(p.title)}${p.images?.length ? ' <i class="ico">🖼</i>' : ''}${p.files?.length ? ' <i class="ico">📎</i>' : ''}${p.commentCount ? ` <em>[${p.commentCount}]</em>` : ''}${p.board === 'data' && !p.approved ? ' <span class="badge pending">승인 대기</span>' : ''}</a></td>
-    <td class="au">${esc(p.nickname)} <small>${esc(p.grade)}</small></td><td>${fmtDate(p.createdAt)}</td><td>${(p.viewCount || 0).toLocaleString()}</td><td>${(p.likeCount || 0).toLocaleString()}</td></tr>`;
+    <td class="au">${esc(p.nickname)} <small>${esc(p.grade)}</small></td><td data-au="${esc(p.nickname)} · ">${fmtDate(p.createdAt)}</td><td>${(p.viewCount || 0).toLocaleString()}</td><td>${(p.likeCount || 0).toLocaleString()}</td></tr>`;
   $('#bt-body').innerHTML = (page === 1 ? notices.map((p) => tr(p, true)).join('') : '') + list.map((p) => tr(p, board === 'notice')).join('')
     || '<tr><td colspan="6" class="empty">올라온 글이 없어요</td></tr>';
   $('#pager').innerHTML = Array.from({ length: Math.min(pages, 10) }, (_, i) => `<a class="${i + 1 === page ? 'on' : ''}" href="${qs({ p: String(i + 1) })}">${i + 1}</a>`).join('');
