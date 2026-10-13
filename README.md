@@ -1,6 +1,6 @@
 # 태산 커뮤니티
 
-태산학원이 운영하는 회원 전용 학생 커뮤니티입니다. **사이트: https://taesan-academy.web.app**
+태산학원이 운영하는 회원 전용 학생 커뮤니티입니다. **사이트: https://taesan.uinone.net** (main에 올리면 GitHub Pages로 자동 배포, 예비 주소 https://taesan-academy.web.app)
 
 - 프레임워크·빌드 없이 동작하는 정적 사이트(HTML + ES 모듈)
 - 서버: Firebase **Authentication(아이디·비밀번호) + Firestore + Hosting**. 무료 요금제(Spark)로 동작합니다.
@@ -34,13 +34,15 @@
 
 ## 처음 설치 / 기존 데이터 지우고 새로 배포 (Cloud Shell)
 
+taesan.uinone.net 은 이 코드가 main에 합쳐지면 자동으로 바뀝니다. Firebase 데이터·규칙·관리자는 아래 스크립트로 준비합니다.
+
 [Cloud Shell](https://shell.cloud.google.com/?project=taesan-academy)에서:
 
 ```bash
 git clone https://github.com/wjsdnwns1323-star/taesan-academy.git && cd taesan-academy
 python3 scripts/reset_firebase.py   # ⚠️ 기존 Firestore 데이터·로그인 계정 전부 삭제(프로젝트 ID를 입력해야 진행)
 python3 scripts/deploy_rules.py     # 보안 규칙 배포 + 아이디·비밀번호 로그인 켜기
-python3 scripts/deploy_hosting.py   # https://taesan-academy.web.app 에 사이트 배포(예전 사이트는 덮어써짐)
+python3 scripts/deploy_hosting.py   # 예비 주소 https://taesan-academy.web.app 에도 배포(예전 사이트는 덮어써짐)
 python3 scripts/create_admin.py     # 관리자 아이디·비밀번호 만들기(비밀번호는 화면에 안 보이고 저장되지 않음)
 ```
 
