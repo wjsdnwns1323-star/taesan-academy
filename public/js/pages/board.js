@@ -1,5 +1,6 @@
 import { esc, $, $$ } from '../ui.js';
 import { load, visible, pageHead } from './common.js';
+import { imgAttrs, hydrateMedia } from '../media.js';
 
 const sortNotices = (rows) => [...rows].sort((a, b) => (Number(!!b.pinned) - Number(!!a.pinned)) || (b.date || '').localeCompare(a.date || ''));
 
@@ -38,11 +39,12 @@ export async function noticeView({ el, params }) {
   const n = all[i];
   if (!n) { el.innerHTML = `<div class="wrap page"><div class="empty"><p>공지를 찾을 수 없습니다.</p><p><a class="btn" href="#/notice">목록으로</a></p></div></div>`; return; }
   const prev = all[i + 1], next = all[i - 1];
+  const imgs = (n.images || []).length ? n.images : n.image ? [n.image] : [];
   el.innerHTML = `${pageHead('공지사항', '', [['공지사항', '#/notice'], [n.title]])}
   <div class="wrap page"><article class="article">
     <h2 style="font-size:26px;font-weight:900;margin-bottom:10px">${esc(n.title)}</h2>
     <p class="meta">${n.pinned ? '<span class="tag">공지</span>' : ''}<span class="tag muted">${esc(n.category || '안내')}</span><span class="num">${esc(n.date)}</span></p>
-    ${n.image ? `<img src="${esc(n.image)}" alt="" style="margin-top:20px;border-radius:var(--radius)">` : ''}
+    ${imgs.length ? `<div class="nt-imgs">${imgs.map((f, k) => `<img ${imgAttrs(f)} alt="${esc(n.title)} 사진 ${k + 1}" loading="${k ? 'lazy' : 'eager'}">`).join('')}</div>` : ''}
     <div class="body">${esc(n.body)}</div>
     <nav class="nav" aria-label="이전·다음 글">
       <span>${prev ? `<a class="link" href="#/notice/${esc(prev.id)}">이전 글: ${esc(prev.title)}</a>` : ''}</span>
@@ -50,6 +52,7 @@ export async function noticeView({ el, params }) {
       <span>${next ? `<a class="link" href="#/notice/${esc(next.id)}">다음 글: ${esc(next.title)}</a>` : ''}</span>
     </nav>
   </article></div>`;
+  hydrateMedia(el);
 }
 
 export async function faq({ el }) {

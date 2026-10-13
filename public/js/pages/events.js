@@ -9,6 +9,7 @@ const baseOf = (e) => (seed.events || []).find((x) => x.id === e.id) || {};
 let POSTS = [];
 const postsOf = (e) => (e.bandPosts || baseOf(e).bandPosts || []).map((id) => POSTS.find((x) => String(x.id) === String(id) && !x.hidden)).filter(Boolean);
 function thumbOf(e) {
+  if ((e.imgs || []).length) return e.imgs[0];
   for (const p of postsOf(e)) if ((p.imgs || []).length) return p.imgs[0];
   const c = posterCodes(e.src || baseOf(e).src)[0];
   return c ? posterUrl(c) : '';
@@ -52,6 +53,8 @@ export async function detail({ el, params }) {
   const hero = thumbOf(e);
   const fig = (src, cap) => `<figure class="pc-card"><a ${linkAttrs(src)} title="크게 보기"><img ${imgAttrs(src)} alt="${esc(cap)}" loading="lazy"></a></figure>`;
   const posterHtml = posterCodes(e.src || base.src).filter((c) => posterUrl(c) !== hero && !shown.has(c) && shown.add(c)).map((c) => fig(posterUrl(c), POSTERS[c])).join('');
+  const own = (e.imgs || []).filter((f) => f !== hero);
+  const ownHtml = own.length ? `<section class="plan-sec ev-band"><h4>사진</h4><div class="pc-list" style="margin-top:12px">${own.map((f) => fig(f, e.title)).join('')}</div></section>` : '';
   const bandHtml = posts.map((p) => `<section class="plan-sec ev-band">
       <h4>설명회 안내 <small>${esc(p.date)} · 밴드 게시글</small></h4>
       ${p.text ? `<div class="plan-text">${esc(p.text)}</div>` : ''}
@@ -72,7 +75,7 @@ export async function detail({ el, params }) {
       </dl>
       ${(e.program || []).length ? `<div class="block"><h3>${diag ? '진행 순서' : '프로그램'}</h3><ol class="steps">${e.program.map((p) => `<li>${esc(p)}</li>`).join('')}</ol></div>` : ''}
       ${e.body ? `<div class="block"><h3>안내</h3><p style="white-space:pre-line">${esc(e.body)}</p></div>` : ''}
-      ${bandHtml}
+      ${ownHtml}${bandHtml}
     </div>
     <div class="card ev-form">
       ${open ? `<h2 style="font-size:20px;font-weight:900;color:var(--ink);margin-bottom:14px">${diag ? '진단고사 신청' : '예약하기'}</h2>

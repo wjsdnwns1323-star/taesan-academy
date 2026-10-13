@@ -75,13 +75,14 @@ const SCHEMA = {
   events: {
     title: '설명회·특강', one: '설명회', view: '#/events',
     desc: '설명회·특강·진단고사 목록과 상세 페이지입니다. 상태가 "모집중·마감임박"이면 예약을 받습니다.',
-    cols: [['type', '구분'], ['date', '날짜'], ['title', '제목'], ['place', '장소'], ['status', '상태']],
+    cols: [['imgs', '사진'], ['type', '구분'], ['date', '날짜'], ['title', '제목'], ['place', '장소'], ['status', '상태']],
     filters: [['status', '상태', () => S(['모집중', '마감임박', '마감', '종료'])]],
     sections: [
       ['기본', [F('type', '구분', 'select', { opts: () => S(['설명회', '특강', '진단고사']) }), F('title', '제목', 'text', { req: true }), F('status', '상태', 'select', { opts: () => S(['모집중', '마감임박', '마감', '종료']) })]],
       ['일시·장소', [F('date', '날짜', 'date', { hint: '비우면 "상시"로 표시' }), F('time', '시간', 'text', { ph: '예: 19:30' }), F('dateNote', '날짜 메모', 'text'), F('place', '장소', 'text'), F('target', '대상', 'text')]],
       ['내용', [F('speakers', '연사', 'text'), F('benefit', '참석 혜택', 'text'), F('program', '프로그램', 'list'), F('body', '추가 안내문', 'textarea')]],
-      ['밴드 안내·포스터', [F('bandPosts', '설명회 안내', 'posts', { hint: '첫 번째 안내의 글과 이미지가 상세 페이지에 나오고, 첫 이미지가 목록 썸네일이 됩니다.' }), F('src', '포스터 번호', 'text', { ph: '예: P85,P86' })]],
+      ['사진·포스터', [F('imgs', '사진', 'images', { hint: '첫 번째 사진이 목록 썸네일과 상세 페이지 대표 이미지가 됩니다. 비우면 연결한 설명회 안내의 첫 이미지를 씁니다.' }),
+        F('bandPosts', '설명회 안내', 'posts', { hint: '첫 번째 안내의 글과 이미지가 상세 페이지에 나옵니다.' }), F('src', '포스터 번호', 'text', { ph: '예: P85,P86' })]],
       ['노출', [F('hidden', '사이트에서 숨기기', 'bool')]],
     ],
   },
@@ -99,9 +100,9 @@ const SCHEMA = {
   notices: {
     title: '공지사항', one: '공지', view: '#/notice',
     desc: '공지사항 게시판과 홈 공지 목록입니다. "상단 고정"한 글이 먼저 나옵니다.',
-    cols: [['pinned', '고정'], ['category', '분류'], ['title', '제목'], ['date', '게시일']],
+    cols: [['pinned', '고정'], ['images', '사진'], ['category', '분류'], ['title', '제목'], ['date', '게시일']],
     filters: [['category', '분류', () => S(['안내', '개강', '설명회', '실적', '예비고1', '진단고사', '휴원'])]],
-    sections: [['공지', [F('title', '제목', 'text', { req: true }), F('category', '분류', 'select', { opts: () => S(['안내', '개강', '설명회', '실적', '예비고1', '진단고사', '휴원']) }), F('date', '게시일', 'date'), F('pinned', '상단 고정', 'bool'), F('image', '이미지', 'image'), F('body', '내용', 'textarea', { rows: 12 }), F('hidden', '사이트에서 숨기기', 'bool')]]],
+    sections: [['공지', [F('title', '제목', 'text', { req: true }), F('category', '분류', 'select', { opts: () => S(['안내', '개강', '설명회', '실적', '예비고1', '진단고사', '휴원']) }), F('date', '게시일', 'date'), F('pinned', '상단 고정', 'bool'), F('body', '내용', 'textarea', { rows: 12 }), F('images', '사진', 'images', { hint: '공지 본문 위에 이 순서대로 나옵니다.' }), F('hidden', '사이트에서 숨기기', 'bool')]]],
   },
   faqs: {
     title: '자주 묻는 질문', one: '질문', view: '#/faq', sortable: true,
@@ -269,12 +270,13 @@ function drawer({ title, sub = '', body, foot = '', wide = false, onMount }) {
   let dirty = false;
   const close = async (force) => {
     if (dirty && force !== true && !(await confirmBox('저장하지 않은 내용이 있습니다. 닫을까요?'))) return;
-    el.remove(); document.removeEventListener('keydown', onKey); document.body.style.overflow = ''; prev?.focus?.();
+    el.remove(); document.removeEventListener('keydown', onKey); window.removeEventListener('hashchange', onHash); document.body.style.overflow = ''; prev?.focus?.();
   };
+  const onHash = () => close(true); // 다른 메뉴로 이동하면 편집 창을 닫습니다.
   const onKey = (e) => { if (e.key === 'Escape' && !document.querySelector('.modal')) close(); };
   el.querySelector('.drw-dim').onclick = () => close();
   el.querySelector('.drw-x').onclick = () => close();
-  document.addEventListener('keydown', onKey);
+  document.addEventListener('keydown', onKey); window.addEventListener('hashchange', onHash);
   document.body.appendChild(el); document.body.style.overflow = 'hidden';
   el.addEventListener('input', () => { dirty = true; });
   el.addEventListener('change', () => { dirty = true; });
@@ -287,7 +289,9 @@ function drawer({ title, sub = '', body, foot = '', wide = false, onMount }) {
 /* ───────────── 필드 그리기·읽기 ───────────── */
 let TEACHERS = [], POSTS = [];
 const optList = (o) => (typeof o === 'function' ? o() : o || []);
-const imgItem = (f) => `<figure class="img-item" data-f="${esc(f)}"><img ${imgAttrs(f)} alt=""><div><button type="button" data-mv="-1" aria-label="앞으로">◀</button><button type="button" data-mv="1" aria-label="뒤로">▶</button><button type="button" data-rm aria-label="빼기">✕</button></div></figure>`;
+const imgItem = (f) => `<figure class="img-item" draggable="true" data-f="${esc(f)}"><span class="img-no num" aria-hidden="true"></span><img ${imgAttrs(f)} alt="" draggable="false">
+  <div><button type="button" data-mv="-1" aria-label="앞으로" title="앞으로">◀</button><button type="button" data-first aria-label="대표 사진으로" title="맨 앞(대표)으로">★</button><button type="button" data-mv="1" aria-label="뒤로" title="뒤로">▶</button><button type="button" data-rm aria-label="빼기" title="빼기">✕</button></div></figure>`;
+const imagesOf = (r, k) => (Array.isArray(r[k]) && r[k].length ? r[k] : k === 'images' && r.image ? [r.image] : []);
 const postLabel = (p) => `${p.kind === 'event' ? '[설명회]' : '[강좌]'} ${p.date || ''} ${p.title || ''}`;
 
 function fieldHTML(f, v) {
@@ -319,9 +323,12 @@ function fieldHTML(f, v) {
         <div class="toolbar"><label class="btn sm ghost">사진 올리기<input type="file" accept="image/*" data-upload="${f.k}" hidden></label>${v ? `<button type="button" class="btn sm ghost" data-clear="${f.k}">사진 빼기</button>` : ''}</div>
         <input type="hidden" name="${f.k}" value="${esc(v || '')}">${hint}</div>`;
     case 'images':
-      return `<div class="field full"><span>${lab}</span><div class="img-list" data-imgs="${f.k}">${(v || []).map(imgItem).join('')}</div>
-        <div class="toolbar" style="margin-top:8px"><label class="btn sm ghost">사진 올리기<input type="file" accept="image/*" multiple data-imgs-upload="${f.k}" hidden></label>
-        <input class="input" style="flex:1;min-width:200px" data-imgs-url="${f.k}" placeholder="또는 이미지 주소 붙여넣고 Enter (밴드 이미지 우클릭 → 이미지 주소 복사)"></div>${hint}</div>`;
+      return `<div class="field full"><span>${lab} <em class="img-cnt" data-imgs-cnt="${f.k}"></em></span>
+        <div class="img-drop" data-drop="${f.k}"><div class="img-list" data-imgs="${f.k}">${(v || []).map(imgItem).join('')}</div>
+          <p class="img-empty">사진을 여기로 끌어다 놓거나 아래 "사진 올리기"를 누르세요. 여러 장을 한 번에 고를 수 있습니다.</p></div>
+        <div class="toolbar" style="margin-top:8px"><label class="btn sm ghost">사진 올리기 (여러 장)<input type="file" accept="image/*" multiple data-imgs-upload="${f.k}" hidden></label>
+        <input class="input" style="flex:1;min-width:200px" data-imgs-url="${f.k}" placeholder="또는 이미지 주소 붙여넣고 Enter (밴드 이미지 우클릭 → 이미지 주소 복사)"></div>
+        <small>첫 번째 사진이 대표 사진입니다. 사진을 끌어서 옮기거나 ◀ ▶ ★(맨 앞으로) 버튼으로 순서를 바꿉니다.</small>${hint}</div>`;
     default:
       return `<label class="field"><span>${lab}</span><input class="input" type="${f.t === 'number' ? 'number' : f.t === 'date' ? 'date' : 'text'}" name="${f.k}" value="${esc(v ?? '')}"${ph}>${hint}</label>`;
   }
@@ -345,37 +352,71 @@ function bindFields(box, col) {
     const wrap = b.closest('.field'); wrap.querySelector(`input[name="${b.dataset.clear}"]`).value = ''; wrap.querySelector('.img-one').innerHTML = '<em>사진 없음</em>'; b.remove();
     wrap.dispatchEvent(new Event('input', { bubbles: true }));
   }));
-  // 여러 장
-  const wire = (list) => {
-    $$('[data-mv]', list).forEach((b) => (b.onclick = () => {
-      const it = b.closest('.img-item'); const d = Number(b.dataset.mv);
-      if (d < 0 && it.previousElementSibling) it.parentNode.insertBefore(it, it.previousElementSibling);
-      if (d > 0 && it.nextElementSibling) it.parentNode.insertBefore(it.nextElementSibling, it);
-      list.dispatchEvent(new Event('input', { bubbles: true }));
-    }));
-    $$('[data-rm]', list).forEach((b) => (b.onclick = () => { b.closest('.img-item').remove(); list.dispatchEvent(new Event('input', { bubbles: true })); }));
+  // 여러 장: 버튼·끌어서 순서 바꾸기, 파일 끌어다 놓기, 여러 장 한 번에 올리기
+  const sync = (list) => {
+    const n = list.children.length;
+    const c = box.querySelector(`[data-imgs-cnt="${list.dataset.imgs}"]`); if (c) c.textContent = n ? `${n}장` : '';
+    list.closest('.img-drop')?.classList.toggle('empty', !n);
   };
-  $$('[data-imgs]', box).forEach(wire);
-  const addImg = (key, f) => { const list = box.querySelector(`[data-imgs="${key}"]`); list.insertAdjacentHTML('beforeend', imgItem(f)); hydrateMedia(list); wire(list); list.dispatchEvent(new Event('input', { bubbles: true })); };
+  const changed = (list) => { sync(list); list.dispatchEvent(new Event('input', { bubbles: true })); };
+  const addImg = (key, f) => { const list = box.querySelector(`[data-imgs="${key}"]`); list.insertAdjacentHTML('beforeend', imgItem(f)); hydrateMedia(list); changed(list); };
+  const upload = async (key, files) => {
+    const arr = [...files].filter((f) => f.type.startsWith('image/'));
+    if (!arr.length) { toast('사진 파일만 올릴 수 있습니다.'); return; }
+    box.dataset.uploading = Number(box.dataset.uploading || 0) + 1;
+    let ok = 0;
+    try {
+      for (const [i, file] of arr.entries()) {
+        if (file.size > 20 * 1024 * 1024) { toast(`${file.name}: 20MB 이하만 올릴 수 있습니다.`); continue; }
+        toast(arr.length > 1 ? `사진 올리는 중… (${i + 1}/${arr.length})` : `${file.name} 올리는 중…`);
+        try {
+          let data = await shrinkImage(file, 1600);
+          if (data.length > 950000) data = await shrinkImage(file, 1100);
+          const id = await backend.db.add('media', { data, name: file.name, from: col });
+          addImg(key, `media:${id}`); ok++;
+        } catch (e) { toast(`${file.name}: 올리지 못했습니다 (${e.message})`); }
+      }
+    } finally { box.dataset.uploading = Number(box.dataset.uploading) - 1; }
+    if (ok) toast(`${ok}장을 올렸습니다.${ok > 1 ? ' 끌어서 순서를 바꿀 수 있습니다.' : ''}`);
+  };
+  $$('[data-imgs]', box).forEach((list) => {
+    sync(list);
+    list.addEventListener('click', (e) => {
+      const b = e.target.closest('button'); const it = b?.closest('.img-item'); if (!it) return;
+      if (b.dataset.mv === '-1' && it.previousElementSibling) list.insertBefore(it, it.previousElementSibling);
+      else if (b.dataset.mv === '1' && it.nextElementSibling) list.insertBefore(it.nextElementSibling, it);
+      else if (b.hasAttribute('data-first')) list.prepend(it);
+      else if (b.hasAttribute('data-rm')) it.remove();
+      else return;
+      changed(list);
+    });
+    let drag = null;
+    list.addEventListener('dragstart', (e) => {
+      drag = e.target.closest('.img-item'); if (!drag) return;
+      drag.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', drag.dataset.f);
+    });
+    list.addEventListener('dragover', (e) => {
+      if (!drag) return; e.preventDefault();
+      const over = e.target.closest('.img-item'); if (!over || over === drag) return;
+      const r = over.getBoundingClientRect();
+      list.insertBefore(drag, e.clientX > r.left + r.width / 2 ? over.nextSibling : over);
+    });
+    list.addEventListener('drop', (e) => { if (drag) e.preventDefault(); });
+    list.addEventListener('dragend', () => { if (!drag) return; drag.classList.remove('dragging'); drag = null; changed(list); });
+    // 컴퓨터의 사진 파일을 끌어다 놓기
+    const zone = list.closest('.img-drop');
+    const hasFiles = (e) => !drag && [...(e.dataTransfer?.types || [])].includes('Files');
+    zone.addEventListener('dragover', (e) => { if (!hasFiles(e)) return; e.preventDefault(); zone.classList.add('over'); });
+    zone.addEventListener('dragleave', (e) => { if (!zone.contains(e.relatedTarget)) zone.classList.remove('over'); });
+    zone.addEventListener('drop', (e) => { if (!hasFiles(e)) return; e.preventDefault(); zone.classList.remove('over'); upload(list.dataset.imgs, e.dataTransfer.files); });
+  });
   $$('[data-imgs-url]', box).forEach((inp) => (inp.onkeydown = (e) => {
     if (e.key !== 'Enter') return; e.preventDefault();
     const u = inp.value.trim().split('?')[0];
     if (!/^https?:\/\//.test(u)) { toast('http로 시작하는 이미지 주소를 넣어 주세요.'); return; }
     addImg(inp.dataset.imgsUrl, u); inp.value = '';
   }));
-  $$('[data-imgs-upload]', box).forEach((inp) => (inp.onchange = async () => {
-    for (const file of inp.files) {
-      if (file.size > 20 * 1024 * 1024) { toast(`${file.name}: 20MB 이하만 올릴 수 있습니다.`); continue; }
-      toast(`${file.name} 올리는 중…`);
-      try {
-        let data = await shrinkImage(file, 1600);
-        if (data.length > 950000) data = await shrinkImage(file, 1100);
-        const id = await backend.db.add('media', { data, name: file.name, from: col });
-        addImg(inp.dataset.imgsUpload, `media:${id}`);
-      } catch (e) { toast(`올리지 못했습니다: ${e.message}`); }
-    }
-    inp.value = '';
-  }));
+  $$('[data-imgs-upload]', box).forEach((inp) => (inp.onchange = async () => { const files = [...inp.files]; inp.value = ''; await upload(inp.dataset.imgsUpload, files); }));
   // 안내 연결
   $$('[data-posts]', box).forEach((list) => {
     const wireP = () => {
@@ -428,14 +469,15 @@ async function content(main, col, query) {
   const shownCols = () => cfg.cols.filter(([k]) => !st.f[k]);
 
   const cell = (r, k) => {
-    const v = r[k];
+    let v = r[k];
     if (k === 'sg') return esc(`${r.school || ''} ${r.grade || ''}`.trim());
     if (k === 'status') return statusTag(v || '모집중');
     if (k === 'term') return esc(seed.terms.find((t) => t.id === v)?.short || v);
     if (k === 'kind') return v === 'event' ? '<span class="tag">설명회</span>' : '<span class="tag">강좌</span>';
     if (k === 'for') return v === 'pre' ? '예비고1' : '고1·고2';
     if (k === 'photo') return v ? `<img class="th-img round" src="${esc(v)}" alt="">` : '<span class="th-img round none"></span>';
-    if (k === 'imgs') return (v || []).length ? `<img class="th-img" ${imgAttrs(v[0])} alt=""><small class="num"> ${v.length}</small>` : '<span class="th-img none"></span>';
+    if (k === 'images') v = imagesOf(r, k);
+    if (k === 'imgs' || k === 'images') return (v || []).length ? `<img class="th-img" ${imgAttrs(v[0])} alt=""><small class="num"> ${v.length}</small>` : '<span class="th-img none"></span>';
     if (k === 'href') return `<code>${esc(v || '')}</code>`;
     if (typeof v === 'boolean') return v ? '✓' : '';
     if (Array.isArray(v)) return esc(v.slice(0, 3).join(', ') + (v.length > 3 ? ` 외 ${v.length - 3}` : ''));
@@ -497,7 +539,8 @@ async function content(main, col, query) {
 
   const edit = (r, preset) => {
     const isNew = !r;
-    const base = r || preset || { ...(col === 'notices' ? { date: new Date().toISOString().slice(0, 10), category: '안내' } : {}), ...(col === 'classes' ? { term: st.f.term || 'final' } : {}), ...(col === 'bandPosts' ? { kind: 'class' } : {}), ...(col === 'events' ? { type: '설명회', status: '모집중', place: '태산학원 본관' } : {}) };
+    let base = r || preset || { ...(col === 'notices' ? { date: new Date().toISOString().slice(0, 10), category: '안내' } : {}), ...(col === 'classes' ? { term: st.f.term || 'final' } : {}), ...(col === 'bandPosts' ? { kind: 'class' } : {}), ...(col === 'events' ? { type: '설명회', status: '모집중', place: '태산학원 본관' } : {}) };
+    if (col === 'notices') base = { ...base, images: imagesOf(base, 'images') };
     drawer({
       title: isNew ? `새 ${cfg.one}` : `${cfg.one} 수정`,
       sub: isNew ? '' : esc(r.title || r.name || r.q || r.t1 || ''),
@@ -509,7 +552,9 @@ async function content(main, col, query) {
         bindFields(box, col);
         box.querySelector('[data-cancel]').onclick = () => close();
         const save = async () => {
+          if (Number(box.dataset.uploading || 0) > 0) { toast('사진을 올리는 중입니다. 다 올라간 뒤 저장해 주세요.'); return; }
           const d = readFields(form, fields);
+          if (col === 'notices') d.image = '';
           const err = form.querySelector('.form-error');
           const miss = fields.filter((f) => f.req && !(Array.isArray(d[f.k]) ? d[f.k].length : d[f.k]));
           if (miss.length) { err.textContent = `필수 항목을 채워 주세요: ${miss.map((f) => f.l).join(', ')}`; form.elements[miss[0].k]?.focus?.(); return; }
