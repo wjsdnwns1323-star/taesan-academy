@@ -28,8 +28,9 @@ jobs:
           get() { [ -s "public/$1" ] || curl -fsSL -m 30 "$LIVE/$1" -o "public/$1" || { rm -f "public/$1"; return 1; }; }
           mkdir -p public/images/people public/images/posters public/images/band/t
           # 강사 사진: 운영 중인 사진(누끼·얼굴 맞춤)을 받아옴. 데이터에 있는 모든 선생님 사진 + 예전 원본 폴더
-          for k in $( (grep -o "images/people/[a-z-]*\.png" public/js/data/seed.js | xargs -n1 basename; ls assets/cutouts) | sort -u ); do
+          for k in $( (grep -o "images/people/[a-z-]*\.png" public/js/data/seed.js | xargs -n1 basename; ls assets/cutouts assets/people) | sort -u ); do
             rm -f "public/images/people/$k"
+            if [ -f "assets/people/$k" ]; then cp "assets/people/$k" "public/images/people/$k"; continue; fi   # 저장소에 직접 맞춘 사진이 있으면 그것을 씀
             get "images/people/$k" || { [ -f "assets/cutouts/$k" ] && cp "assets/cutouts/$k" "public/images/people/$k"; } || true
           done
           while IFS=$'\t' read -r key id title; do
