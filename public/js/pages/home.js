@@ -42,8 +42,7 @@ export async function render({ el }) {
   el.innerHTML = `<section class="sw-mini" aria-labelledby="swm-t">
     <video class="sw-mini-v" muted loop playsinline preload="auto" poster="media/poster-teaser.jpg" src="media/teaser.mp4" aria-hidden="true"></video>
     <div class="wrap sw-mini-in">
-      <h1 id="swm-t">태산학원 선생님들을<br>만나보세요</h1>
-      <p>스크롤을 내리면 선생님 열한 분이 한 분씩 나옵니다.</p>
+      <h1 id="swm-t" class="sr">태산학원 선생님 소개</h1>
       <a class="btn sw-mini-btn" href="#/world">보러가기</a>
     </div>
   </section><div class="home wrap">
