@@ -2,6 +2,7 @@ import { backend, getUser, seed } from '../backend.js';
 import { esc, $, statusTag, dayParts, isPast, formData, toast, CONSENT, phoneOk } from '../ui.js';
 import { load, visible, pageHead, clearCache } from './common.js';
 import { imgAttrs, linkAttrs, hydrateMedia, isMedia } from '../media.js';
+import { schoolFields, bindSchoolPickers } from '../school.js';
 import { POSTERS, posterCodes, posterUrl } from '../data/posters.js';
 
 const baseOf = (e) => (seed.events || []).find((x) => x.id === e.id) || {};
@@ -78,8 +79,9 @@ export async function detail({ el, params }) {
       <form id="rsv" novalidate>
         <label class="field"><span>${diag ? '학생 이름' : '신청자 이름'}</span><input class="input" name="name" required value="${esc(u?.name || '')}"></label>
         <label class="field"><span>연락처</span><input class="input" name="phone" inputmode="tel" required placeholder="010-0000-0000" value="${esc(u?.phone || '')}"></label>
+        ${diag ? '' : schoolFields({ school: u?.school || '', grade: u?.grade || '', label: '학생 학교 (현재)' })}
         <div class="row2">
-          <label class="field"><span>${diag ? '응시 학교' : '학생 학교'}</span>${diag ? '<select class="select" name="school"><option>대성고</option><option>대신고</option></select>' : `<input class="input" name="school" value="${esc(u?.school || '')}">`}</label>
+          ${diag ? '<label class="field"><span>응시 학교</span><select class="select" name="school"><option>대성고</option><option>대신고</option></select></label>' : ''}
           <label class="field"><span>${diag ? '과목' : '인원'}</span>${diag ? '<select class="select" name="subjects"><option>국어</option><option>수학</option><option>영어</option><option>국어·수학·영어</option></select>' : '<select class="select" name="people"><option>1</option><option>2</option><option>3</option></select>'}</label>
         </div>
         ${diag ? '<label class="field"><span>희망 날짜·시간</span><input class="input" name="wish" placeholder="예: 10/18(토) 오후"></label>' : ''}
@@ -92,6 +94,7 @@ export async function detail({ el, params }) {
   hydrateMedia(el);
   const f = $('#rsv', el);
   if (!f) return;
+  bindSchoolPickers(f);
   f.onsubmit = async (ev) => {
     ev.preventDefault();
     const d = formData(f); const err = f.querySelector('.form-error');
@@ -102,7 +105,7 @@ export async function detail({ el, params }) {
     try {
       await backend.db.add('reservations', {
         eventId: e.id, eventTitle: e.title, eventDate: e.date || '', name: d.name.trim(), phone: d.phone.trim(),
-        school: d.school || '', people: Number(d.people || 1), subjects: d.subjects || '', wish: d.wish || '',
+        school: d.school || '', grade: d.grade || '', people: Number(d.people || 1), subjects: d.subjects || '', wish: d.wish || '',
         uid: getUser()?.uid || '', status: '접수',
       });
       clearCache();

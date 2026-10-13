@@ -1,6 +1,7 @@
 import { backend, getUser, seed, isAdmin } from '../backend.js';
 import { esc, $, $$, formData, toast, statusTag, fmtDate, phoneOk, modal, confirmBox } from '../ui.js';
 import { pageHead } from './common.js';
+import { schoolFields, bindSchoolPickers } from '../school.js';
 
 const G_ICON = `<svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.5l6.7-6.7C35.6 2.4 30.2 0 24 0 14.6 0 6.6 5.4 2.7 13.3l7.8 6C12.4 13.6 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.1 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.4c-.5 2.9-2.2 5.3-4.6 7l7.2 5.6c4.2-3.9 7.1-9.6 7.1-17.1z"/><path fill="#FBBC05" d="M10.5 28.7A14.5 14.5 0 0 1 9.5 24c0-1.6.3-3.2.8-4.7l-7.8-6A24 24 0 0 0 0 24c0 3.9.9 7.5 2.6 10.7l7.9-6z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.2-5.6c-2 1.4-4.7 2.3-8.7 2.3-6.3 0-11.6-4.1-13.5-9.8l-7.9 6C6.6 42.6 14.6 48 24 48z"/></svg>`;
 
@@ -78,8 +79,7 @@ export async function mypage({ el, go, query = {} }) {
       <label class="field"><span>회원 구분</span><select class="select" name="type">${['학부모', '학생'].map((t) => `<option ${u.type === t ? 'selected' : ''}>${t}</option>`).join('')}</select></label></div>
       <div class="row2"><label class="field"><span>이름</span><input class="input" name="name" value="${esc(u.name || '')}"></label>
       <label class="field"><span>연락처</span><input class="input" name="phone" value="${esc(u.phone || '')}"></label></div>
-      <div class="row2"><label class="field"><span>학생 학교</span><input class="input" name="school" value="${esc(u.school || '')}"></label>
-      <label class="field"><span>학년</span><input class="input" name="grade" value="${esc(u.grade || '')}"></label></div>
+      ${schoolFields({ school: u.school || '', grade: u.grade || '', label: '학생 학교' })}
       <label class="field"><span>학생 이름</span><input class="input" name="studentName" value="${esc(u.studentName || '')}"></label>
       <label class="check"><input type="checkbox" name="marketing" ${u.marketing ? 'checked' : ''}> 개강·설명회 소식 문자 받기</label>
       <p class="form-error"></p><button class="btn">정보 저장</button></form>`,
@@ -93,10 +93,11 @@ export async function mypage({ el, go, query = {} }) {
       rsv.find((r) => r.id === b.dataset.cancel).status = '취소'; show('rsv'); toast('예약을 취소했습니다.');
     }));
     const pf = $('#pf', el);
+    if (pf) bindSchoolPickers(pf);
     if (pf) pf.onsubmit = async (e) => {
       e.preventDefault(); const d = formData(pf);
       if (!phoneOk(d.phone || '')) return (pf.querySelector('.form-error').textContent = '연락처 형식을 확인해 주세요.');
-      await backend.auth.updateProfile({ type: d.type, name: d.name, phone: d.phone, school: d.school, grade: d.grade, studentName: d.studentName, marketing: !!pf.marketing.checked });
+      await backend.auth.updateProfile({ type: d.type, name: d.name, phone: d.phone, school: d.school, schoolCode: d.schoolCode || (d.school === u.school ? u.schoolCode || '' : ''), schoolFull: d.schoolFull || (d.school === u.school ? u.schoolFull || '' : ''), grade: d.grade, studentName: d.studentName, marketing: !!pf.marketing.checked });
       toast('정보를 저장했습니다.'); if (query.setup) go('#/mypage');
     };
   };

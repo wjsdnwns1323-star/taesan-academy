@@ -696,3 +696,15 @@ button.u-link:hover, a.u-link:hover { color: #111; }
 .util { height: auto; padding: 8px 0 6px; }
 .util-right { flex-direction: column; align-items: flex-end; gap: 6px; }
 .util-links { min-height: 20px; }
+
+/* 학교 검색 */
+.field.sp { position: relative; }
+.sp-list { position: absolute; left: 0; right: 0; top: calc(100% - 22px); z-index: 30; margin: 0; padding: 4px 0; list-style: none; background: #fff; border: 1px solid #cfd1d6; border-radius: 6px; box-shadow: 0 10px 24px rgba(17,26,29,.12); max-height: 280px; overflow-y: auto; }
+.sp-list li { padding: 9px 14px; cursor: pointer; display: grid; }
+.sp-list li b { font-size: 15px; font-weight: 600; }
+.sp-list li small { font-size: 12px; color: var(--muted); }
+.sp-list li:hover, .sp-list li.on { background: var(--blue-soft); }
+.sp-list li.none { color: var(--muted); font-size: 14px; cursor: default; }
+.sp-list li.none:hover { background: none; }
+.sp-hint { font-size: 12px; color: var(--muted); margin-top: 4px; display: block; }
+.row2 { align-items: start; } .field { align-content: start; }

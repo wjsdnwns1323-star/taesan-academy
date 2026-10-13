@@ -15,3 +15,7 @@ export const firebaseConfig = {
 // 관리자 Google 계정. 이 계정으로 Google 로그인하면 관리자 화면이 열립니다.
 // firestore.rules / storage.rules 의 ADMIN_EMAILS 목록과 같게 유지하세요.
 export const adminEmails = ['wjsdnwns1323@uinone.net'];
+
+// 나이스 교육정보 개방 포털(open.neis.go.kr) 인증키. 학교 검색에 씁니다.
+// 비어 있어도 동작하지만 한 번에 5개까지만 찾아집니다. 키를 넣으면 더 많이 찾습니다.
+export const neisKey = '';

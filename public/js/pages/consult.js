@@ -1,3 +1,4 @@
+import { schoolFields, bindSchoolPickers } from '../school.js';
 import { backend, getUser, seed } from '../backend.js';
 import { esc, $, formData, toast, CONSENT, phoneOk, fmtDate } from '../ui.js';
 import { pageHead, clearCache } from './common.js';
@@ -18,10 +19,7 @@ export async function online({ el }) {
         <label class="field"><span>이름</span><input class="input" name="name" required value="${esc(u?.name || '')}"></label>
         <label class="field"><span>연락처</span><input class="input" name="phone" inputmode="tel" required placeholder="010-0000-0000" value="${esc(u?.phone || '')}"></label>
       </div>
-      <div class="row2">
-        <label class="field"><span>학교</span><select class="select" name="school">${schoolOptions(u?.school)}</select></label>
-        <label class="field"><span>학년</span><select class="select" name="grade"><option value="">선택</option>${['중3', '고1', '고2', '고3'].map((g) => `<option ${u?.grade === g ? 'selected' : ''}>${g}</option>`).join('')}</select></label>
-      </div>
+      ${schoolFields({ school: u?.school || '', grade: u?.grade || '', label: '학교' })}
       <div class="row2">
         <label class="field"><span>상담 분야</span><select class="select" name="topic"><option>수강 문의</option><option>시간표·반 배정</option><option>설명회·진단고사</option><option>성적·학습 상담</option><option>기타</option></select></label>
         <label class="field"><span>관심 과목</span><select class="select" name="subject"><option value="">선택</option>${seed.subjects.map((s) => `<option>${s}</option>`).join('')}</select></label>
@@ -34,6 +32,7 @@ export async function online({ el }) {
     </form>
   </div></div></div>`;
   const f = $('#cf', el);
+  bindSchoolPickers(f);
   f.onsubmit = async (e) => {
     e.preventDefault();
     const d = formData(f); const err = f.querySelector('.form-error');
@@ -62,10 +61,7 @@ export async function visit({ el }) {
         <label class="field"><span>학부모·학생 이름</span><input class="input" name="name" required value="${esc(u?.name || '')}"></label>
         <label class="field"><span>연락처</span><input class="input" name="phone" inputmode="tel" required placeholder="010-0000-0000" value="${esc(u?.phone || '')}"></label>
       </div>
-      <div class="row2">
-        <label class="field"><span>학생 학교</span><select class="select" name="school">${schoolOptions(u?.school)}</select></label>
-        <label class="field"><span>학년</span><select class="select" name="grade"><option value="">선택</option>${['중3', '고1', '고2', '고3'].map((g) => `<option ${u?.grade === g ? 'selected' : ''}>${g}</option>`).join('')}</select></label>
-      </div>
+      ${schoolFields({ school: u?.school || '', grade: u?.grade || '', label: '학생 학교' })}
       <div class="row2">
         <label class="field"><span>희망 날짜</span><input class="input" type="date" name="date" min="${min}" required></label>
         <label class="field"><span>희망 시간</span><select class="select" name="time" required><option value="">선택</option>${slots.map((s) => `<option>${s}</option>`).join('')}</select></label>
@@ -78,6 +74,7 @@ export async function visit({ el }) {
     </form>
   </div></div></div>`;
   const f = $('#vf', el);
+  bindSchoolPickers(f);
   f.onsubmit = async (e) => {
     e.preventDefault();
     const d = formData(f); const err = f.querySelector('.form-error');

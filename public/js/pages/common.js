@@ -2,6 +2,7 @@ import { backend, getUser } from '../backend.js';
 import { esc, modal, toast, formData, CONSENT, phoneOk, statusTag } from '../ui.js';
 import { POSTERS, TEACHER_POSTERS, posterCodes, posterUrl } from '../data/posters.js';
 import { imgAttrs, linkAttrs, hydrateMedia } from '../media.js';
+import { schoolFields, bindSchoolPickers } from '../school.js';
 
 // 같은 화면에서 여러 번 읽지 않도록 잠깐 보관
 const cache = {};
@@ -72,16 +73,14 @@ export function applyClass(c) {
         <label class="field"><span>학생 이름</span><input class="input" name="studentName" required value="${esc(u?.studentName || u?.name || '')}"></label>
         <label class="field"><span>연락처</span><input class="input" name="phone" required inputmode="tel" placeholder="010-0000-0000" value="${esc(u?.phone || '')}"></label>
       </div>
-      <div class="row2">
-        <label class="field"><span>학교</span><input class="input" name="school" value="${esc(c.school && c.school !== '연합반' ? c.school : u?.school || '')}"></label>
-        <label class="field"><span>학년</span><input class="input" name="grade" value="${esc(c.grade || u?.grade || '')}"></label>
-      </div>
+      ${schoolFields({ school: c.school && c.school !== '연합반' ? c.school : u?.school || '', grade: c.grade || u?.grade || '' })}
       <label class="field"><span>남길 말 <small>(선택)</small></span><textarea class="textarea" name="memo" style="min-height:80px" placeholder="예: 현재 성적, 희망 시간"></textarea></label>
       ${CONSENT}
       <p class="form-error" aria-live="polite"></p>
       <button class="btn block">${closed ? '대기 신청하기' : '수강 신청하기'}</button>
     </form>`,
     onMount(box, close) {
+      bindSchoolPickers(box);
       const f = box.querySelector('form');
       f.onsubmit = async (e) => {
         e.preventDefault();
