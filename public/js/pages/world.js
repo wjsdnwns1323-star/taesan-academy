@@ -2,7 +2,7 @@
 // 스크롤 위치에 맞춰 유화 복도 영상이 넘어가고, 영상 속 선생님이 화면 가운데 올 때 소개 카드가 지나갑니다.
 // 카드 내용은 선생님·강좌 데이터(관리자 화면에서 수정)를 그대로 씁니다.
 import { esc, statusTag } from '../ui.js';
-import { photoOf, gradeTags } from './common.js';
+import { photoOf, gradeTags, load as loadCol, visible } from './common.js';
 
 // 영상 구간(초). desktop = 가로 영상, mobile = 세로 영상. 영상을 바꾸면 이 숫자만 맞추면 됩니다.
 const VIDEO = {
@@ -23,6 +23,17 @@ const TOUR = [
   ['jeong-jeongrae', [25.9, 28.45], [25.85, 28.15]],
   ['kim-hyun', [28.45, 30], [28.15, 30]],
 ];
+// 영상 미리 받기: 홈에서 미리 받아 두면 '보러가기'를 눌렀을 때 바로 부드럽게 탐색됩니다.
+const CACHE = {};
+const modeNow = () => (window.innerWidth / window.innerHeight < 0.9 ? 'mobile' : 'desktop');
+export function prefetchWorld(m = modeNow()) {
+  if (!CACHE[m]) {
+    CACHE[m] = fetch(VIDEO[m].src).then((r) => { if (!r.ok) throw new Error(r.status); return r.blob(); })
+      .then((b) => URL.createObjectURL(b)).catch(() => { delete CACHE[m]; return null; });
+  }
+  return CACHE[m];
+}
+
 const FALLBACK = `onerror="this.onerror=null;this.src=this.src.replace(/\\.png$/,'.jpg')"`;
 
 const list = (title, items, cls = '') => (items && items.length ? `<div class="sw-block"><h4>${title}</h4><ul class="${cls}">${items.map((i) => `<li>${esc(i)}</li>`).join('')}</ul></div>` : '');
@@ -106,7 +117,7 @@ export function mountWorld(el, { teachers, leaders, classes }) {
 
   let mode = null, V = null, map = [], cur = 0, ready = false, dur = 30, raf = 0, alive = true;
   const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const portrait = () => window.innerWidth / window.innerHeight < 0.9;
+  const portrait = () => modeNow() === 'mobile';
 
   function layout() {
     if (!V) return;
@@ -147,13 +158,11 @@ export function mountWorld(el, { teachers, leaders, classes }) {
       vid.addEventListener('loadeddata', () => { dur = vid.duration || 30; ready = true; stage.classList.add('ready'); vid.currentTime = cur = t || target(); }, { once: true });
       vid.src = url; vid.load();
     };
-    use(V.src);                                   // 바로 스트리밍으로 시작
-    try {                                         // 다 받으면 메모리에서 재생(스크롤 탐색이 부드러움)
-      const res = await fetch(V.src);
-      if (!res.ok) throw new Error(res.status);
-      const blob = await res.blob();
-      if (alive && m === mode) { loadEl.hidden = true; use(URL.createObjectURL(blob)); }
-    } catch (e) { /* 스트리밍 그대로 사용 */ }
+    const pending = prefetchWorld(m);
+    let done = false;
+    pending.then((url) => { done = true; if (url && alive && m === mode) { loadEl.hidden = true; use(url); } });
+    await new Promise((r) => setTimeout(r, 120));   // 이미 받아 둔 영상이면 바로 씀
+    if (!done) use(V.src);                         // 아직이면 스트리밍으로 먼저 시작
   }
   const setHdr = () => { const h = document.querySelector('.header'); document.documentElement.style.setProperty('--hdr', `${h ? Math.round(h.getBoundingClientRect().height) : 0}px`); };
   setHdr();
@@ -180,4 +189,19 @@ export function mountWorld(el, { teachers, leaders, classes }) {
   };
   window.__swCleanup = cleanup;
   return cleanup;
+}
+
+// '#/world' 화면: 스크롤월드 전체. ?t=선생님id 로 들어오면 그 선생님 카드 위치에서 시작합니다.
+export async function render({ el, query }) {
+  const [teachers, leaders, classes] = await Promise.all([loadCol('teachers'), loadCol('leaders'), loadCol('classes')]);
+  el.innerHTML = '<div id="sw-root"></div>';
+  const cleanup = mountWorld(el.querySelector('#sw-root'), { teachers: visible(teachers), leaders: visible(leaders), classes: visible(classes) });
+  window.addEventListener('hashchange', cleanup, { once: true });
+  if (query.t) {
+    setTimeout(() => {
+      const card = document.getElementById(`sw-${query.t}`); if (!card) return;
+      const r = card.getBoundingClientRect();
+      window.scrollTo({ top: r.top + window.scrollY + r.height / 2 - window.innerHeight / 2, behavior: 'auto' });
+    }, 80);
+  }
 }

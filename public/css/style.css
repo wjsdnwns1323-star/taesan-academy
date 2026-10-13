@@ -990,3 +990,17 @@ body.sw-on .quick { opacity: 0; pointer-events: none; }
 .nmap-iw span { opacity: .8; }
 .map-links { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 @media (max-width: 640px) { .map-box { aspect-ratio: 4 / 3; } }
+
+/* 홈 첫 화면 영상 배너(화면 절반 높이) — '스크롤월드 보러가기' 버튼으로 #/world 를 엽니다 */
+.sw-mini { position: relative; height: 50vh; height: 50svh; min-height: 340px; max-height: 560px; overflow: hidden; background: #1a2129; display: flex; align-items: flex-end; }
+.sw-mini-v { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.sw-mini::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(12, 20, 24, .62) 0%, rgba(12, 20, 24, .25) 45%, rgba(12, 20, 24, 0) 70%), linear-gradient(0deg, rgba(12, 20, 24, .35), rgba(12, 20, 24, 0) 40%); pointer-events: none; }
+.sw-mini-in { position: relative; z-index: 1; width: 100%; padding-bottom: clamp(28px, 5vh, 52px); color: #fff; }
+.sw-mini-in h1 { font-size: clamp(30px, 3.6vw, 48px); font-weight: 800; letter-spacing: -0.04em; line-height: 1.2; text-shadow: 0 2px 16px rgba(0, 0, 0, .35); }
+.sw-mini-in p { margin-top: 10px; font-size: 17px; color: rgba(255, 255, 255, .9); }
+.sw-mini-btn { margin-top: 20px; height: 52px; padding: 0 26px; font-size: 16px; border-radius: 999px; }
+@media (max-width: 640px) {
+  .sw-mini { min-height: 300px; }
+  .sw-mini-in p { font-size: 15px; }
+  .sw-mini-btn { height: 46px; }
+}

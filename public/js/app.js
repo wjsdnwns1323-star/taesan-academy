@@ -3,6 +3,7 @@ import { esc, $, $$, toast } from './ui.js';
 
 const PAGES = {
   home: () => import('./pages/home.js'),
+  world: () => import('./pages/world.js'),
   timetable: () => import('./pages/timetable.js'),
   teachers: () => import('./pages/teachers.js'),
   results: () => import('./pages/results.js'),
@@ -37,6 +38,7 @@ const ROUTES = [
   ['/join', 'account', 'join', ''],
   ['/mypage', 'account', 'mypage', ''],
   ['/search', 'search', 'render', ''],
+  ['/world', 'world', 'render', 'teachers'],
   ['/admin', 'admin', 'render', ''],
   ['/admin/:tab', 'admin', 'render', ''],
 ];
