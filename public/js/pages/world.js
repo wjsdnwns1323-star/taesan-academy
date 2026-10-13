@@ -88,22 +88,9 @@ export function mountWorld(el, { teachers, leaders, classes }) {
   el.innerHTML = `<section class="sw" aria-label="태산학원 선생님 소개">
     <div class="sw-stage" aria-hidden="true"><img class="sw-poster" alt=""><video muted playsinline preload="none"></video><span class="sw-load">영상 불러오는 중</span></div>
     <div class="sw-steps">
-      <div class="sw-step sw-hero" data-seg="hero">
-        <div class="sw-panel sw-intro">
-          <h1>태산학원</h1>
-          <p>대성고, 대신고, 대전외고, 공주사대부고, 동산고, 대전예고. 학교마다 시험이 다르니까 반도 학교별로 나눴습니다.</p>
-          <div class="sw-act"><a class="btn" href="#/timetable?term=final">기말대비 학교별 시간표</a><a class="btn ghost" href="#/events">설명회 예약</a></div>
-          <p class="sw-cue">아래로 내리면 선생님들이 한 분씩 나옵니다</p>
-        </div>
-      </div>
-      <div class="sw-step sw-dissolve" data-seg="dissolve"><p class="sw-whisper">강의실 2 앞 복도에 선생님들이 모입니다</p></div>
-      <div class="sw-step sw-reveal" data-seg="reveal">
-        <div class="sw-panel sw-roster">
-          <h2>태산학원 선생님들</h2>
-          <p>이름을 누르면 그 선생님 소개로 바로 내려갑니다.</p>
-          <dl>${groups.map(([k, arr]) => `<dt>${esc(k)}</dt><dd>${arr.map((p) => `<button type="button" data-goto="${esc(p.id)}">${esc(p.name)}${p.title ? ` ${esc(p.title)}` : ''}</button>`).join('')}</dd>`).join('')}</dl>
-        </div>
-      </div>
+      <div class="sw-step sw-hero" data-seg="hero"><p class="sw-hint" aria-hidden="true">아래로 내려 보세요</p></div>
+      <div class="sw-step sw-dissolve" data-seg="dissolve" aria-hidden="true"></div>
+      <div class="sw-step sw-reveal" data-seg="reveal" aria-hidden="true"></div>
       <div class="sw-step sw-settle" data-seg="settle" aria-hidden="true"></div>
       ${tour.map(([id, d, m]) => `<div class="sw-step sw-t" id="sw-${esc(id)}" data-d="${d}" data-m="${m}">${people[id].title ? leaderCard(people[id]) : teacherCard(people[id], classes)}</div>`).join('')}
     </div>
@@ -144,6 +131,7 @@ export function mountWorld(el, { teachers, leaders, classes }) {
       cur += reduce ? tgt - cur : (tgt - cur) * 0.2;
       if (Math.abs(vid.currentTime - cur) > 0.02 && !vid.seeking) vid.currentTime = cur;
     }
+    root.classList.toggle('sw-moved', window.scrollY > 40);
     document.body.classList.toggle('sw-on', root.getBoundingClientRect().bottom > window.innerHeight * 0.6);
     raf = requestAnimationFrame(tick);
   }

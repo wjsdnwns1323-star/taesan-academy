@@ -970,3 +970,11 @@ body.sw-on .quick { opacity: 0; pointer-events: none; }
   .sw-mini-in p { font-size: 15px; }
   .sw-mini-btn { height: 46px; }
 }
+/* 스크롤월드 시작: 안내 카드 없이 영상만, 아래쪽에 작은 스크롤 안내 */
+.sw-hero { justify-content: center; text-align: center; }
+.sw-hero .sw-hint { margin: 0 auto; }
+.sw-hint { position: relative; margin: 0; padding: 8px 18px 30px; color: #fff; font-size: 15px; font-weight: 600; letter-spacing: -0.02em; text-shadow: 0 1px 10px rgba(0, 0, 0, .5); transition: opacity .4s; }
+.sw-hint::after { content: ''; position: absolute; left: 50%; bottom: 6px; width: 10px; height: 10px; margin-left: -5px; border-right: 2px solid #fff; border-bottom: 2px solid #fff; transform: rotate(45deg); animation: sw-bob 1.6s ease-in-out infinite; }
+.sw-moved .sw-hint { opacity: 0; }
+@keyframes sw-bob { 0%, 100% { translate: 0 0; } 50% { translate: 0 6px; } }
+@media (prefers-reduced-motion: reduce) { .sw-hint::after { animation: none; } }
