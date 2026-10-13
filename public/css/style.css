@@ -1179,3 +1179,16 @@ body.sw-on .sw.ready .sw-rail { opacity: 1; pointer-events: auto; }
   .header > .wrap { position: relative; justify-content: flex-end; }
   .header .logo { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); }
 }
+/* 모바일: 위 계정줄은 숨기고(≡ 메뉴 안으로), 로고는 크게 */
+@media (max-width: 1000px) {
+  .util { display: none; }
+  .header > .wrap { height: 84px; }
+  .header .logo .logo-img { height: 64px; }
+}
+@media (max-width: 380px) { .header .logo .logo-img { height: 58px; } }
+.dr-acct { margin-top: 14px; padding: 14px; border-radius: 10px; background: var(--blue-soft); }
+.dr-who { margin: 0 0 10px; font-size: 14px; color: var(--sub); }
+.dr-who b { color: var(--text); font-size: 16px; }
+.dr-acct-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+.dr-acct-btns .btn { flex: 1 1 auto; }
+.dr-acct-btns .btn { justify-content: center; text-align: center; }

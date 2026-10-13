@@ -157,9 +157,12 @@ function drawer() {
         <button class="icon-btn" data-close aria-label="메뉴 닫기">${ICON.close}</button>
       </div>
       <form data-search style="display:flex;gap:6px;margin-top:16px"><input class="input" name="q" placeholder="강사·과목·학교 검색" style="min-height:40px"><button class="btn sm">검색</button></form>
-      <div class="toolbar" style="margin-top:12px">
-        ${u ? '<a class="btn sm ghost" href="#/mypage">마이페이지</a><button class="btn sm dark" type="button" data-logout>로그아웃</button>' : '<a class="btn sm" href="#/login">로그인</a><a class="btn sm ghost" href="#/join">회원가입</a>'}
-        ${isAdmin() ? '<a class="btn sm gray" href="#/admin">관리자</a>' : ''}
+      <div class="dr-acct">
+        ${u ? `<p class="dr-who"><b>${esc(u.name || '회원')}</b>님 반갑습니다</p>` : '<p class="dr-who">로그인하면 신청 내역을 볼 수 있어요</p>'}
+        <div class="dr-acct-btns">
+          ${u ? `<a class="btn sm ghost" href="#/mypage">마이페이지</a>${isAdmin() ? '<a class="btn sm ghost" href="#/admin">관리자</a>' : ''}<button class="btn sm dark" type="button" data-logout>로그아웃</button>`
+              : '<a class="btn sm" href="#/login">로그인</a><a class="btn sm ghost" href="#/join">회원가입</a>'}
+        </div>
       </div>
       ${MENU.map((m) => `<h4>${m.label}</h4>${m.groups.map(([t, h]) => `<a href="${h}">${esc(t)}</a>`).join('')}`).join('')}
     </div></div>`;
