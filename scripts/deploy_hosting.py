@@ -20,7 +20,7 @@ TOKEN = subprocess.check_output(['gcloud', 'auth', 'print-access-token'], text=T
 
 CONFIG = {
     'rewrites': [{'glob': '**', 'path': '/index.html'}],
-    'headers': [{'glob': '**/*.@(js|css)', 'headers': {'Cache-Control': 'public, max-age=300'}}],
+    'headers': [{'glob': '**/*.@(js|css|html)', 'headers': {'Cache-Control': 'no-cache'}}],
 }
 
 
