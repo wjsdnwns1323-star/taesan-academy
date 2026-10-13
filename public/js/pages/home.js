@@ -18,7 +18,7 @@ const fmtDay = (iso) => {
 };
 const shortDay = (iso) => { const d = new Date(`${iso}T00:00:00`); return `${d.getMonth() + 1}. ${d.getDate()}(${WEEK[d.getDay()]})`; };
 
-export async function render({ el }) {
+export async function render({ el, go }) {
   const [teachers, results, events, notices, leaders, classes, links0, site, banners0] = await Promise.all([load('teachers'), load('results'), load('events'), load('notices'), load('leaders'), load('classes'), load('quicklinks').catch(() => seed.quicklinks), getSite(), load('banners').catch(() => seed.banners)]);
   const RECRUIT = visible(banners0).sort(byOrder);
   const LINKS = visible(links0).sort(byOrder);
@@ -29,14 +29,12 @@ export async function render({ el }) {
   const highlights = visible(results).filter((r) => r.featured).slice(0, 2);
   const vt = visible(teachers).sort(byOrder);
 
-  el.innerHTML = `<section class="sw-mini" role="button" tabindex="0" aria-label="태산학원 소개 영상 보기">
+  el.innerHTML = `<section class="sw-mini" role="button" tabindex="0" aria-label="선생님 소개 보러가기">
     <img class="sw-mini-bg" src="media/hall-silhouette.webp" alt="" aria-hidden="true" fetchpriority="high" decoding="async">
-    <video class="sw-mini-v" playsinline preload="none" aria-label="태산학원 소개 영상"></video>
     <div class="wrap sw-mini-in">
       <h1 id="swm-t"><img class="sw-mini-logo" src="images/brand/logo-dark.png" alt="태산학원 TAESANEDU"></h1>
       <p class="sw-mini-copy">큰 산처럼 흔들림 없이, 학생들의 곁을 지킵니다</p>
     </div>
-    <button class="sw-mini-x" type="button" data-stop aria-label="영상 닫기">✕</button>
   </section><div class="home wrap">
   <section class="h-sec" aria-labelledby="rc-t">
     <div class="recruit">
@@ -115,20 +113,12 @@ export async function render({ el }) {
   </section>
   </div>`;
 
-  // ---- 첫 화면 영상 배너: 짧은 영상 자동 반복, 스크롤월드 영상은 뒤에서 미리 받기 ----
-  // 평소에는 로고 + 학원 실루엣, "영상 보기"를 눌렀을 때만 영상 재생
-  const box = $('.sw-mini', el), mini = $('.sw-mini-v', el);
-  const stopMini = () => { mini.pause(); box.classList.remove('playing'); };
-  box.onclick = (e) => {
-    if (box.classList.contains('playing') || e.target.closest('[data-stop]')) return;
-    if (!mini.getAttribute('src')) mini.src = 'media/teaser.mp4';
-    box.classList.add('playing'); mini.currentTime = 0; mini.muted = true; mini.play().catch(() => {}); };
-  $('[data-stop]', el).onclick = (e) => { e.stopPropagation(); stopMini(); };
-  mini.onended = stopMini;
-  mini.onclick = () => (mini.paused ? mini.play() : mini.pause());
-  // 스크롤월드 사진(약 14MB)은 '보러가기'에 손이 갈 때만 미리 받기 — 첫 화면 이미지 로딩을 방해하지 않게
-  const warm = () => prefetchWorld();
-  el.querySelectorAll('a[href^="#/world"]').forEach((a) => ['pointerenter', 'touchstart', 'focus'].forEach((ev) => a.addEventListener(ev, warm, { once: true, passive: true })));
+  // ---- 첫 화면 배너: 누르면 스크롤월드(선생님 소개)로 이동, 손이 가면 사진 미리 받기 ----
+  const box = $('.sw-mini', el);
+  const goWorld = () => go('#/world');
+  box.onclick = goWorld;
+  box.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); goWorld(); } };
+  ['pointerenter', 'touchstart', 'focus'].forEach((ev) => box.addEventListener(ev, () => prefetchWorld(), { once: true, passive: true }));
 
   // ---- 모집안내 캐러셀 (관리자 > 홈 모집안내에서 편집) ----
   const st = { filter: 'all', i: 0, playing: !window.matchMedia('(prefers-reduced-motion: reduce)').matches, timer: null };
