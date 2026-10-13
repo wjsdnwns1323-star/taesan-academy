@@ -1,93 +1,119 @@
-// 화면 공통 도구
-export const esc = (v) =>
-  String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+// 화면 공통 도구: 글자 이스케이프, 시간 표시, 상단바, 글 카드, 알림 메시지
+import { category } from './boards.js';
+import { currentUser, fileUrl, hasUnread } from './backend.js';
 
+export const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 export const $ = (sel, root = document) => root.querySelector(sel);
 export const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 
-export const icons = {
-  search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>',
-  user: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>',
-  menu: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16"/></svg>',
-  close: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6 6 18"/></svg>',
-  phone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/></svg>',
-  chat: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16v11H9l-5 4z"/></svg>',
-  pin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-6.5-7-12a7 7 0 0 1 14 0c0 5.5-7 12-7 12z"/><circle cx="12" cy="9" r="2.5"/></svg>',
-  cal: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
-};
+export function ago(t) {
+  const s = Math.max(0, (Date.now() - t) / 1000);
+  if (s < 60) return '방금 전';
+  if (s < 3600) return `${Math.floor(s / 60)}분 전`;
+  if (s < 86400) return `${Math.floor(s / 3600)}시간 전`;
+  if (s < 86400 * 7) return `${Math.floor(s / 86400)}일 전`;
+  const d = new Date(t);
+  return `${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()}`;
+}
+// 글에 저장된 미리보기 사진은 data:image/jpeg 주소만 씁니다(다른 값은 무시)
+export const safeImg = (s) => (/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(s || '') ? s : '');
+export const size = (n) => (n > 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)}MB` : `${Math.max(1, Math.round(n / 1024))}KB`);
 
 export function toast(msg) {
-  const el = document.createElement('div');
-  el.className = 'toast'; el.setAttribute('role', 'status'); el.textContent = msg;
-  document.body.appendChild(el);
-  setTimeout(() => el.remove(), 2600);
+  const t = $('#toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toast.t);
+  toast.t = setTimeout(() => t.classList.remove('show'), 2400);
 }
 
-// 모달: content는 HTML 문자열, onMount(box, close)로 이벤트 연결
-export function modal({ title, sub = '', content, onMount }) {
-  const prev = document.activeElement;
-  const el = document.createElement('div');
-  el.className = 'modal';
-  el.innerHTML = `<div class="dim"></div>
-    <div class="box" role="dialog" aria-modal="true" aria-labelledby="mdl-t">
-      <button class="icon-btn close" aria-label="닫기">${icons.close}</button>
-      <h2 id="mdl-t">${esc(title)}</h2>${sub ? `<p class="sub">${sub}</p>` : ''}
-      <div class="mdl-c">${content}</div>
-    </div>`;
-  const close = () => { el.remove(); document.removeEventListener('keydown', onKey); prev?.focus?.(); };
-  const onKey = (e) => { if (e.key === 'Escape') close(); };
-  el.querySelector('.dim').onclick = close;
-  el.querySelector('.close').onclick = close;
-  document.addEventListener('keydown', onKey);
-  document.body.appendChild(el);
-  const first = el.querySelector('input, select, textarea, button:not(.close)');
-  (first || el.querySelector('.close')).focus();
-  onMount?.(el.querySelector('.box'), close);
-  return close;
+export const ICON = {
+  search: '<svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.8-4.8"/></svg>',
+  user: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.2"/><circle cx="12" cy="10" r="3.2"/><path d="M6.2 18.4c1.3-2 3.4-3.1 5.8-3.1s4.5 1.1 5.8 3.1"/></svg>',
+  bell: '<svg viewBox="0 0 24 24"><path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.6 1.8H4.4z"/><path d="M10 20.5a2.2 2.2 0 0 0 4 0"/></svg>',
+  back: '<svg viewBox="0 0 24 24"><path d="M15 5 8 12l7 7"/></svg>',
+  heart: '<svg viewBox="0 0 24 24"><path d="M12 21s-7.5-4.6-9.6-9.3C1 8.4 3 4.8 6.6 4.8c2.1 0 3.6 1.2 4.4 2.5h2c.8-1.3 2.3-2.5 4.4-2.5 3.6 0 5.6 3.6 4.2 6.9C19.5 16.4 12 21 12 21z"/></svg>',
+  chat: '<svg viewBox="0 0 24 24"><path d="M12 3.5c-5.2 0-9.3 3.6-9.3 8 0 2.3 1.1 4.4 3 5.9l-.6 3.4 3.7-1.9c1 .3 2.1.5 3.2.5 5.2 0 9.3-3.6 9.3-8s-4.1-7.9-9.3-7.9zM7.8 13a1.3 1.3 0 1 1 0-2.6 1.3 1.3 0 0 1 0 2.6zm4.2 0a1.3 1.3 0 1 1 0-2.6 1.3 1.3 0 0 1 0 2.6zm4.2 0a1.3 1.3 0 1 1 0-2.6 1.3 1.3 0 0 1 0 2.6z"/></svg>',
+  pen: '<svg viewBox="0 0 24 24"><path d="M3 17.3V21h3.7L17.8 9.9l-3.7-3.7zM20.7 7a1 1 0 0 0 0-1.4l-2.3-2.3a1 1 0 0 0-1.4 0l-1.8 1.8 3.7 3.7z"/></svg>',
+  chevron: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#999" stroke-width="2"><path d="m9 6 6 6-6 6"/></svg>',
+};
+
+// 큰 제목 + 검색·내 정보·알림
+export function topBar(title) {
+  return `<header class="top"><div class="top-row"><h1>${esc(title)}</h1>
+    <a class="icon-btn" href="#/search" aria-label="검색">${ICON.search}</a>
+    <a class="icon-btn" href="#/me" aria-label="내 정보">${ICON.user}</a>
+    <a class="icon-btn" href="#/notifications" aria-label="알림">${ICON.bell}<i class="dot hidden" id="bell-dot"></i></a>
+  </div>`;
+}
+export const topEnd = '</header>';
+
+export function backBar(title, right = '') {
+  return `<header class="top"><div class="top-row"><button class="back" data-back aria-label="뒤로">${ICON.back}</button><h2>${esc(title)}</h2>${right}</div></header>`;
 }
 
-export function confirmBox(message) {
-  return new Promise((resolve) => {
-    modal({
-      title: '확인', content: `<p>${esc(message)}</p><div class="toolbar" style="justify-content:flex-end;margin-top:20px">
-        <button class="btn ghost" data-no>취소</button><button class="btn" data-yes>확인</button></div>`,
-      onMount(box, close) {
-        box.querySelector('[data-no]').onclick = () => { close(); resolve(false); };
-        box.querySelector('[data-yes]').onclick = () => { close(); resolve(true); };
-      },
-    });
+export async function refreshBell() {
+  const dot = $('#bell-dot');
+  if (!dot || !currentUser()) return;
+  try { dot.classList.toggle('hidden', !(await hasUnread())); } catch { /* 알림 확인 실패는 무시 */ }
+}
+
+export function labelHtml(p) {
+  const c = category(p.board, p.category);
+  const ic = p.board === 'qna' ? '<span class="ic q">?</span>' : `<span class="ic" style="background:${c.bg}">${c.icon}</span>`;
+  return `<span class="label">${ic}${esc(c.name)}</span>`;
+}
+
+const preview = (s) => esc(String(s || '').replace(/\s+/g, ' ').slice(0, 120));
+
+function metaHtml(p, { when = true } = {}) {
+  return `<div class="meta"><span class="when">${esc(p.grade)}${when ? ` · ${ago(p.createdAt)}` : ''}</span>
+    <span class="cnt">${ICON.heart}${p.likeCount || 0}</span><span class="cnt">${ICON.chat}${p.commentCount || 0}</span></div>`;
+}
+
+// 소통해요·공부해요·자료실 목록 한 줄
+export function itemHtml(p) {
+  const badge = p.board === 'data' && !p.approved ? ' <span class="badge pending">승인 대기</span>' : '';
+  const files = p.files?.length ? ` · 📎${p.files.length}` : '';
+  return `<a class="item${p.board === 'notice' ? ' pinned' : ''}" href="#/post/${p.id}">
+    <div class="txt">${labelHtml(p)}<h3>${esc(p.title)}${badge}</h3><p>${preview(p.body)}${files}</p>${metaHtml(p)}</div>
+    ${safeImg(p.thumb) ? `<div class="th"><img src="${safeImg(p.thumb)}" alt="" loading="lazy"></div>` : ''}</a>`;
+}
+
+// 문제풀이 카드(사진 크게)
+export function qcardHtml(p) {
+  const st = p.status === 'solved' ? '<span class="badge solved">해결</span>' : '<span class="badge open">답변 기다리는 중</span>';
+  return `<a class="qcard" href="#/post/${p.id}">${labelHtml(p)} ${st}<h3>${esc(p.title)}</h3>
+    ${safeImg(p.thumb) ? `<div class="shot"><img src="${safeImg(p.thumb)}" alt="" loading="lazy"></div>` : `<p style="margin:-4px 0 12px;color:var(--sub)">${preview(p.body)}</p>`}
+    ${metaHtml(p)}</a>`;
+}
+
+// 추천 카드(테두리 카드)
+export function recCardHtml(p) {
+  return `<a class="rec-card" href="#/post/${p.id}">${labelHtml(p)}<h3>${esc(p.title)}</h3><p>${preview(p.body)}</p>${metaHtml(p)}</a>`;
+}
+
+export const fab = (href) => `<a class="fab" href="${href}" aria-label="글쓰기">${ICON.pen}</a>`;
+
+// 가로로 넘기는 영역 아래 점 표시
+export function bindDots(slider, dots) {
+  if (!slider || !dots) return;
+  const n = slider.children.length;
+  dots.innerHTML = n > 1 ? Array.from({ length: n }, (_, i) => `<i class="${i ? '' : 'on'}"></i>`).join('') : '';
+  slider.addEventListener('scroll', () => {
+    const w = slider.children[0]?.getBoundingClientRect().width + 12 || 1;
+    const i = Math.round(slider.scrollLeft / w);
+    $$('i', dots).forEach((d, k) => d.classList.toggle('on', k === i));
+  }, { passive: true });
+}
+
+// <img data-file="id"> 들을 실제 사진으로 채웁니다
+export function loadImages(root) {
+  $$('img[data-file]', root).forEach(async (img) => {
+    try { img.src = await fileUrl(img.dataset.file); } catch { img.alt = '사진을 불러오지 못했습니다'; }
   });
 }
 
-export const formData = (form) => Object.fromEntries(new FormData(form).entries());
-
-export const statusTag = (s) => {
-  if (!s) return '';
-  const cls = s === '마감' || s === '종료' ? 'seal' : s === '마감임박' ? 'marker' : s === '진행중' || s === '모집중' ? 'ok' : 'muted';
-  return `<span class="tag ${cls}">${esc(s)}</span>`;
-};
-
-export function fmtDate(iso) {
-  if (!iso) return '';
-  const d = new Date(iso);
-  if (isNaN(d)) return iso;
-  const p = (n) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}.${p(d.getMonth() + 1)}.${p(d.getDate())}`;
+export function linkify(text) {
+  return esc(text).replace(/https?:\/\/[^\s<]+/g, (u) => `<a href="${u}" target="_blank" rel="noopener noreferrer nofollow">${u}</a>`);
 }
-export const WEEK = ['일', '월', '화', '수', '목', '금', '토'];
-export function dayParts(iso) {
-  const d = new Date(`${iso}T00:00:00`);
-  if (!iso || isNaN(d)) return null;
-  return { m: d.getMonth() + 1, d: d.getDate(), w: WEEK[d.getDay()] };
-}
-export function isPast(iso) {
-  if (!iso) return false;
-  const d = new Date(`${iso}T23:59:59`);
-  return d < new Date();
-}
-
-export const phoneOk = (v) => /^0\d{1,2}-?\d{3,4}-?\d{4}$/.test(String(v).trim());
-
-// 개인정보 수집 동의 문구
-export const CONSENT = `<div class="consent">수집 항목: 이름, 연락처, 학교·학년, 문의 내용<br>이용 목적: 상담·신청 확인 연락<br>보관 기간: 목적 달성 후 1년 또는 삭제 요청 시까지</div>
-  <label class="check"><input type="checkbox" name="agree" required> 개인정보 수집·이용에 동의합니다.</label>`;

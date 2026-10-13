@@ -1,251 +1,276 @@
-import { initBackend, backend, getSite, getUser, isAdmin, onUser, seed } from './backend.js';
-import { esc, $, $$, toast } from './ui.js';
+// 화면 이동(해시 주소)과 홈·커뮤니티·자료실·검색·알림·메뉴 화면
+import * as be from './backend.js';
+import { BOARDS, COMMUNITY_TABS, GRADES, SUBJECTS, DATA_RULES, category } from './boards.js';
+import { SITE_NAME, ACADEMY_NAME } from './config.js';
+import {
+  esc, $, $$, ago, toast, topBar, topEnd, backBar, refreshBell, itemHtml, qcardHtml, recCardHtml, fab, bindDots, ICON,
+} from './ui.js';
+import { renderPost } from './post.js';
+import { renderWrite } from './write.js';
+import { renderLogin, renderJoin, renderMe } from './account.js';
+import { renderAdmin } from './admin.js';
+import { renderDoc } from './docs.js';
 
-const PAGES = {
-  home: () => import('./pages/home.js'),
-  world: () => import('./pages/world.js'),
-  timetable: () => import('./pages/timetable.js'),
-  teachers: () => import('./pages/teachers.js'),
-  results: () => import('./pages/results.js'),
-  events: () => import('./pages/events.js'),
-  board: () => import('./pages/board.js'),
-  consult: () => import('./pages/consult.js'),
-  account: () => import('./pages/account.js'),
-  about: () => import('./pages/about.js'),
-  search: () => import('./pages/search.js'),
-  admin: () => import('./pages/admin.js'),
-};
+const view = $('#view');
+const PUBLIC = new Set(['login', 'join', 'rules', 'privacy', 'data-rules']);
 
-// [경로 패턴, 페이지, 내보낸 함수, 메뉴 키]
-const ROUTES = [
-  ['/', 'home', 'render', ''],
-  ['/timetable', 'timetable', 'render', 'timetable'],
-  ['/teachers', 'teachers', 'list', 'teachers'],
-  ['/teachers/:id', 'teachers', 'detail', 'teachers'],
-  ['/curriculum', 'teachers', 'curriculum', 'teachers'],
-  ['/results', 'results', 'render', 'results'],
-  ['/events', 'events', 'list', 'about'],
-  ['/events/:id', 'events', 'detail', 'about'],
-  ['/notice', 'board', 'noticeList', 'about'],
-  ['/notice/:id', 'board', 'noticeView', 'about'],
-  ['/faq', 'board', 'faq', 'consult'],
-  ['/consult', 'consult', 'online', 'consult'],
-  ['/visit', 'consult', 'visit', 'consult'],
-  ['/about', 'about', 'about', 'about'],
-  ['/location', 'about', 'location', 'about'],
-  ['/privacy', 'about', 'privacy', 'about'],
-  ['/login', 'account', 'login', ''],
-  ['/join', 'account', 'join', ''],
-  ['/mypage', 'account', 'mypage', ''],
-  ['/search', 'search', 'render', ''],
-  ['/world', 'world', 'render', 'teachers'],
-  ['/admin', 'admin', 'render', ''],
-  ['/admin/:tab', 'admin', 'render', ''],
-];
-
-// 메뉴: [제목, 링크, 하위메뉴?, 새 글 표시?]
-const MENU = [
-  { key: 'about', label: '학원안내', href: '#/about', groups: [
-    ['학원 소개', '#/about'], ['공지사항', '#/notice'],
-    ['학원 상담', '#/consult', [['자주 묻는 질문', '#/faq'], ['온라인 상담', '#/consult'], ['방문 상담 예약', '#/visit']]],
-    ['입시설명회·공개특강', '#/events'], ['진단고사 신청', '#/events/e-diag'], ['위치안내', '#/location'],
-  ] },
-  { key: 'timetable', label: '내신 시간표', href: '#/timetable', groups: [
-    ['2026년 2학기', '#/timetable', [['기말대비 학교별 내신반', '#/timetable?term=final', 1], ['중간대비(지난 학기)', '#/timetable?term=mid']]],
-    ['예비고1', '#/timetable?term=pre', [['겨울 예비고1 과정', '#/timetable?term=pre', 1]]],
-    ['학교별 보기', '#/timetable', seed.schools.slice(0, 6).map((s) => [s.id, `#/timetable?term=final&school=${encodeURIComponent(s.id)}`])],
-  ] },
-  { key: 'teachers', label: '선생님', href: '#/teachers', groups: [
-    ['선생님 커리큘럼', '#/curriculum'],
-    ['선생님', '#/teachers', [['전체', '#/teachers'], ...seed.subjects.map((s) => [s, `#/teachers?subject=${encodeURIComponent(s)}`])]],
-  ] },
-  { key: 'results', label: '시험 결과', href: '#/results', groups: [
-    ['2026 2학기 중간고사', '#/results?exam=2026 2학기 중간', [['가채점 결과', '#/results?exam=2026 2학기 중간', 1]]],
-    ['전체 결과', '#/results'],
-  ] },
-  { key: 'pre', label: '예비고1', href: '#/timetable?term=pre', groups: [
-    ['예비고1 과정', '#/timetable?term=pre', [['국어 올인원', '#/timetable?term=pre&subject=국어'], ['영어 PRE 반', '#/timetable?term=pre&subject=영어'], ['물리 3단계', '#/timetable?term=pre&subject=물리']]],
-    ['고교 선택 설명회', '#/events'], ['대성대신 진단고사', '#/events/e-diag'],
-  ] },
-  { key: 'my', label: '재원생 전용', href: '#/mypage', groups: [
-    ['내 신청 내역', '#/mypage'], ['수강 신청 현황', '#/mypage'], ['온라인 상담 답변', '#/mypage'], ['자주 묻는 질문', '#/faq'],
-  ] },
-];
-
-const ICON = {
-  check: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1.5l2.6 1.9 3.2-.1 1 3 2.6 1.9-1 3.1 1 3-2.6 1.9-1 3.1-3.2-.1L12 22.5l-2.6-1.9-3.2.1-1-3.1L2.6 15.7l1-3-1-3.1 2.6-1.9 1-3 3.2.1z"/><path d="M8 12l3 3 5-6" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-  search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>',
-  menu: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 6h18M3 12h18M3 18h18"/></svg>',
-  close: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6 6 18"/></svg>',
-  mountain: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M2 19 9.5 6l4 6.8L16 9l6 10z"/></svg>',
-  phone: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6.6 10.8a15.5 15.5 0 0 0 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1A17 17 0 0 1 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1z"/></svg>',
-  pin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 21s-7-6.5-7-12a7 7 0 0 1 14 0c0 5.5-7 12-7 12z"/><circle cx="12" cy="9" r="2.5"/></svg>',
-  pinF: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a7 7 0 0 0-7 7c0 5.3 7 13 7 13s7-7.7 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg>',
-  chat: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21l3-4M7 9h10M7 12.5h7"/></svg>',
-};
-
-let SITE = null;
-
-function parseHash() {
-  const raw = location.hash.replace(/^#/, '') || '/';
-  const [path, qs = ''] = raw.split('?');
-  const query = Object.fromEntries(new URLSearchParams(qs));
-  for (const [pattern, page, fn, menu] of ROUTES) {
-    const pp = pattern.split('/'), ap = path.split('/');
-    if (pp.length !== ap.length) continue;
-    const params = {};
-    if (pp.every((seg, i) => (seg.startsWith(':') ? ((params[seg.slice(1)] = decodeURIComponent(ap[i])), true) : seg === ap[i]))) {
-      return { page, fn, menu, params, query, path };
-    }
-  }
-  return { page: null, path, query: {} };
+function parse() {
+  const raw = location.hash.replace(/^#\/?/, '');
+  const [path, qs] = raw.split('?');
+  return { parts: path.split('/').filter(Boolean), q: new URLSearchParams(qs || '') };
 }
 
-export const go = (hash) => { if (location.hash === hash) render(); else location.hash = hash; };
-
-function ddayText() {
-  const d = Math.ceil((new Date('2026-11-19T00:00:00+09:00') - new Date()) / 864e5);
-  return d > 0 ? `D-${d}` : d === 0 ? 'D-DAY' : '';
-}
-const NEWB = '<span class="n-badge" aria-label="새 소식">N</span>';
-const groupHTML = (cls) => (g) => {
-  const [t, h, subs] = g;
-  return `<a class="d-h" href="${h}">${esc(t)}</a>${subs ? subs.map(([st, sh, n]) => `<a class="d-s" href="${sh}">${esc(st)}${n ? NEWB : ''}</a>`).join('') : ''}`;
-};
-
-function topbar() {
-  const u = getUser();
-  return `<div class="util"><div class="wrap">
-    <div class="util-left">
-      ${backend.mode === 'local' ? '<span class="mode-badge" title="Firebase 연결 전입니다. 입력한 내용은 이 브라우저에만 저장됩니다.">체험 모드</span>' : ''}
-    </div>
-    <div class="util-right">
-      <div class="util-links">
-        ${u ? `<span class="u-txt who">${esc(u.name || '회원')}님</span><a class="u-link" href="#/mypage">마이페이지</a>${isAdmin() ? '<a class="u-link" href="#/admin">관리자</a>' : ''}<button class="u-link" type="button" data-logout>로그아웃</button>`
-            : '<a class="u-link" href="#/login">로그인</a><a class="u-link" href="#/join">회원가입</a>'}
-      </div>
-      <form class="searchbox" role="search" data-search><span class="pill">검색</span>
-        <label class="sr" for="g-q">사이트 검색</label><input id="g-q" name="q" placeholder="강사명, 과목명, 학교명을 입력하세요." autocomplete="off">
-        <button aria-label="검색">${ICON.search}</button></form>
-    </div>
-  </div></div>`;
-}
-
-function header(active) {
-  return `<header class="header"><div class="wrap">
-    <a class="logo" href="#/" aria-label="태산학원 홈">
-      <span class="tag-line">대전 둔산<br>학교별 내신</span>
-      <img class="logo-img" src="images/brand/logo-dark.png" alt="태산학원 TAESANEDU">
-    </a>
-    <nav aria-label="주 메뉴" style="flex:1;height:100%;display:flex"><ul class="gnb">
-      ${MENU.map((m) => `<li><a href="${m.href}" ${active === m.key ? 'aria-current="page"' : ''}>${m.label}</a>
-        <div class="drop">${m.groups.map(groupHTML()).join('')}</div></li>`).join('')}
-    </ul></nav>
-    <button class="menu-btn" aria-label="전체 메뉴" aria-expanded="false" data-allmenu>${ICON.menu}</button>
-  </div>
-  <div class="allmenu" id="allmenu"><div class="wrap">
-    ${MENU.map((m) => `<div><h4>${m.label}</h4>${m.groups.map(groupHTML()).join('')}</div>`).join('')}
-  </div></div></header><div class="dim-all" id="dim-all"></div>`;
-}
-
-function drawer() {
-  const u = getUser();
-  return `<div class="drawer" id="drawer" aria-hidden="true"><div class="dim" data-close></div>
-    <div class="panel" role="dialog" aria-label="전체 메뉴">
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <a class="logo" href="#/"><img class="logo-img" src="images/brand/logo-dark.png" alt="태산학원"></a>
-        <button class="icon-btn" data-close aria-label="메뉴 닫기">${ICON.close}</button>
-      </div>
-      <form data-search style="display:flex;gap:6px;margin-top:16px"><input class="input" name="q" placeholder="강사·과목·학교 검색" style="min-height:40px"><button class="btn sm">검색</button></form>
-      <div class="toolbar" style="margin-top:12px">
-        ${u ? '<a class="btn sm ghost" href="#/mypage">마이페이지</a><button class="btn sm dark" type="button" data-logout>로그아웃</button>' : '<a class="btn sm" href="#/login">로그인</a><a class="btn sm ghost" href="#/join">회원가입</a>'}
-        ${isAdmin() ? '<a class="btn sm gray" href="#/admin">관리자</a>' : ''}
-      </div>
-      ${MENU.map((m) => `<h4>${m.label}</h4>${m.groups.map(([t, h]) => `<a href="${h}">${esc(t)}</a>`).join('')}`).join('')}
-    </div></div>`;
-}
-
-function footer() {
-  const main = SITE.branches[0];
-  return `<footer class="footer">
-    <div class="f-top"><div class="wrap">
-      <h4><img src="images/brand/logo-dark.png" alt="태산학원" style="height:52px;display:inline-block;vertical-align:middle"></h4>
-      <div><span class="tel">${ICON.phone}<a class="num" href="tel:${SITE.phone.replace(/-/g, '')}">${esc(SITE.phone)}</a>
-        ${SITE.hours ? `<span class="hours"><em>상담</em>${esc(SITE.hours)}</span>` : ''}</span>
-        ${SITE.hours ? '' : '<p class="note">※ 상담 가능 시간은 전화로 확인해 주세요.</p>'}</div>
-      <span class="addr">${ICON.pinF}${esc(main.address)}</span>
-    </div></div>
-    <div class="f-links"><div class="wrap">
-      <a href="#/about">학원소개</a><a href="#/notice">공지사항</a><a href="#/consult">온라인 상담</a><a class="on" href="#/privacy">개인정보처리방침</a>
-      ${SITE.blogUrl ? `<a href="${esc(SITE.blogUrl)}" target="_blank" rel="noopener">태산학원 밴드</a>` : ''}
-    </div></div>
-    <div class="f-info"><div class="wrap">
-      <b style="color:var(--sub)">태산학원 본관</b> ${esc(main.address)} | 문의전화 ${esc(SITE.phone)}<br>
-      <b style="color:var(--sub)">태산2관</b> ${esc(SITE.branches[1]?.address || '주소는 상담 시 안내')}<br>
-      © ${new Date().getFullYear()} 태산학원. 개인정보는 상담·신청 확인 목적으로만 사용합니다.
-    </div></div>
-  </footer>`;
-}
-
-function quick() {
-  return `<nav class="quick" aria-label="빠른 상담">
-    ${SITE.kakaoUrl ? `<a class="talk" href="${esc(SITE.kakaoUrl)}" target="_blank" rel="noopener" aria-label="카카오톡 상담"><span>TALK</span></a>` : `<a class="talk" href="tel:${SITE.phone.replace(/-/g, '')}" aria-label="전화 상담"><span>CALL</span></a>`}
-    <a href="#/consult" aria-label="온라인 상담">${ICON.chat}</a>
-    <a href="#/location" aria-label="오시는 길">${ICON.pin}</a>
-  </nav>`;
-}
-
-async function render() {
-  const route = parseHash();
-  const app = document.getElementById('app');
-  const isAdminPage = route.page === 'admin';
-  app.innerHTML = `${topbar()}${header(route.menu)}${drawer()}<main id="main" tabindex="-1"></main>${isAdminPage ? '' : footer() + quick()}`;
-  bindShell();
-  const main = $('#main');
-  if (!route.page) {
-    main.innerHTML = `<div class="wrap page"><div class="empty"><p>찾는 페이지가 없습니다.</p><p><a class="btn" href="#/">홈으로</a></p></div></div>`;
+let seq = 0;
+async function route() {
+  const my = ++seq;
+  const { parts, q } = parse();
+  const [page = 'home', arg] = parts;
+  const nav = { home: 'home', study: 'study', community: 'community', menu: 'menu' }[page] || (page === 'post' ? 'community' : '');
+  $$('#bottom-nav a').forEach((a) => a.classList.toggle('on', a.dataset.nav === nav));
+  window.scrollTo(0, 0);
+  const user = be.currentUser();
+  if (!user && !PUBLIC.has(page) && page !== 'home' && page !== 'menu') {
+    location.hash = `#/login?next=${encodeURIComponent(location.hash)}`;
     return;
   }
+  view.innerHTML = '<div class="loading">불러오는 중…</div>';
+  const ctx = { view, q, arg, alive: () => my === seq, go: (h) => { location.hash = h; } };
   try {
-    const mod = await PAGES[route.page]();
-    await mod[route.fn]({ el: main, params: route.params, query: route.query, site: SITE, user: getUser(), go, rerender: render });
+    switch (page) {
+      case 'home': await (user ? renderHome(ctx) : renderWelcome(ctx)); break;
+      case 'community': await renderCommunity(ctx, arg || 'rec'); break;
+      case 'study': await renderBoard(ctx, 'data'); break;
+      case 'notices': await renderBoard(ctx, 'notice'); break;
+      case 'post': await renderPost(ctx); break;
+      case 'write': case 'edit': await renderWrite(ctx, page === 'edit'); break;
+      case 'search': await renderSearch(ctx); break;
+      case 'notifications': await renderNotifications(ctx); break;
+      case 'menu': renderMenu(ctx); break;
+      case 'login': renderLogin(ctx); break;
+      case 'join': renderJoin(ctx); break;
+      case 'me': await renderMe(ctx); break;
+      case 'admin': await renderAdmin(ctx); break;
+      case 'rules': case 'privacy': case 'data-rules': renderDoc(ctx, page); break;
+      default: view.innerHTML = `${backBar('페이지 없음')}<div class="empty">없는 페이지입니다.</div>`;
+    }
   } catch (e) {
     console.error(e);
-    main.innerHTML = `<div class="wrap page"><div class="callout seal">페이지를 불러오지 못했습니다: ${esc(e.message)}<br>새로고침해도 같으면 학원으로 연락해 주세요.</div></div>`;
+    if (ctx.alive()) view.innerHTML = `${backBar('오류')}<div class="empty">${esc(be.errorText(e))}</div>`;
   }
-  if (!route.query._keep) window.scrollTo(0, 0);
+  if (ctx.alive()) refreshBell();
 }
 
-function bindShell() {
-  $$('[data-search]').forEach((f) => f.addEventListener('submit', (e) => {
-    e.preventDefault(); const q = f.q.value.trim(); go(`#/search?q=${encodeURIComponent(q)}`);
-  }));
-  const am = $('#allmenu'), dimAll = $('#dim-all'), amBtn = $('[data-allmenu]');
-  const setAll = (open) => { am.classList.toggle('open', open); dimAll.classList.toggle('open', open); amBtn.setAttribute('aria-expanded', open); amBtn.innerHTML = open ? ICON.close : ICON.menu; };
-  if (amBtn) amBtn.onclick = () => {
-    if (window.matchMedia('(max-width: 1000px)').matches) { const dr = $('#drawer'); dr.classList.add('open'); dr.setAttribute('aria-hidden', 'false'); return; }
-    setAll(!am.classList.contains('open'));
+document.addEventListener('click', (e) => {
+  if (e.target.closest('[data-back]')) {
+    if (history.length > 1) history.back(); else location.hash = '#/';
+  }
+});
+
+/* ---------------- 홈 ---------------- */
+function renderWelcome({ view }) {
+  view.innerHTML = `<div class="hero"><div class="logo">태</div><h1>${esc(SITE_NAME)}</h1>
+    <p>${esc(ACADEMY_NAME)} 학생들이 공부·입시·학교 이야기를 나누는 곳</p>
+    <div class="btns"><a class="btn" href="#/login" style="display:grid;place-items:center">로그인</a>
+    <a class="btn gray" href="#/join" style="display:grid;place-items:center">회원가입</a></div></div>
+    <div class="card"><h3>🔒 회원 전용 커뮤니티</h3><p>글과 자료는 가입한 회원만 볼 수 있어요. 실명·전화번호는 관리자만 볼 수 있고 다른 회원에게는 닉네임과 학년만 보여요.</p></div>
+    <div class="card"><h3>💬 이런 걸 할 수 있어요</h3><p>소통해요 · 공부해요 · 문제풀이(답변 채택) · 자료실 · 좋아요 · 댓글 · 사진·파일 올리기</p></div>
+    <div class="menu-list"><a href="#/rules">커뮤니티 이용규칙</a><a href="#/privacy">개인정보 처리방침</a></div>`;
+}
+
+async function renderHome(ctx) {
+  const { view } = ctx;
+  const me = be.currentUser();
+  view.innerHTML = `${topBar(SITE_NAME)}${topEnd}
+    <div class="home-head"><h1>${esc(me.nickname)}님, 반가워요 👋</h1><p>${esc(me.grade)} · 오늘도 같이 공부해요</p></div>
+    <div class="slider" id="notice-slider"></div><div class="dots" id="notice-dots"></div>
+    <div class="sec-title"><a class="all" href="#/community/rec">더 보기</a><h2>지금 인기 있는 글</h2></div>
+    <div class="mini" id="hot"><div class="loading">불러오는 중…</div></div>
+    <div class="sec-title"><a class="all" href="#/community/qna?status=open">더 보기</a><h2>답변을 기다리는 질문</h2></div>
+    <div class="mini" id="open-q"></div>
+    <div class="sec-title"><a class="all" href="#/study">자료실</a><h2>새로 올라온 자료</h2></div>
+    <div class="mini" id="new-data"></div>
+    ${emojiRow()}`;
+  const [notices, recent, openQ, data] = await Promise.all([
+    be.listPosts({ board: 'notice', limit: 5 }),
+    be.listPosts({ limit: 100 }),
+    be.listPosts({ board: 'qna', status: 'open', limit: 3 }),
+    be.listPosts({ board: 'data', limit: 3 }),
+  ]);
+  if (!ctx.alive()) return;
+  fillNotices(notices);
+  const mini = (list, rank) => (list.length ? list.map((p, i) => `<a href="#/post/${p.id}">${rank ? `<span class="rank">${i + 1}</span>` : ''}
+    <span class="t">${esc(p.title)}</span><small>${esc(category(p.board, p.category).name)} · ${ago(p.createdAt)}</small></a>`).join('') : '<div class="empty" style="padding:24px">아직 글이 없어요</div>');
+  $('#hot').innerHTML = mini(hot(recent).slice(0, 5), true);
+  $('#open-q').innerHTML = mini(openQ);
+  $('#new-data').innerHTML = mini(data);
+}
+
+// 최근 7일 글 중 좋아요·댓글이 많은 순
+function hot(list) {
+  const week = Date.now() - 7 * 86400000;
+  const score = (p) => (p.likeCount || 0) * 2 + (p.commentCount || 0) + (p.createdAt > week ? 3 : 0);
+  return list.filter((p) => p.board !== 'notice').sort((a, b) => score(b) - score(a) || b.createdAt - a.createdAt);
+}
+
+function fillNotices(notices) {
+  const s = $('#notice-slider');
+  if (!s) return;
+  s.innerHTML = notices.length
+    ? notices.map((n) => `<a class="notice-card" href="#/post/${n.id}">📢 <span>${esc(n.title)}</span>${ICON.chevron}</a>`).join('')
+    : `<a class="notice-card" href="#/rules">📢 <span>커뮤니티 이용규칙을 꼭 읽어 주세요</span>${ICON.chevron}</a>`;
+  bindDots(s, $('#notice-dots'));
+}
+
+function emojiRow() {
+  const pick = [['talk', 'love'], ['talk', 'worry'], ['talk', 'humor'], ['talk', 'daily'], ['study', 'proof'], ['study', 'method'], ['study', 'news'], ['talk', 'drawing']];
+  return `<div class="emoji-row">${pick.map(([b, c]) => {
+    const x = category(b, c);
+    return `<a href="#/community/${b}?category=${c}"><span style="background:${x.bg}">${x.icon}</span>${esc(x.name)}</a>`;
+  }).join('')}</div>`;
+}
+
+/* ---------------- 커뮤니티 ---------------- */
+function tabsHtml(on) {
+  return `<nav class="tabs">${COMMUNITY_TABS.map((t) => `<a href="#/community/${t.id}" class="${t.id === on ? 'on' : ''}">${t.name}</a>`).join('')}</nav>`;
+}
+
+async function renderCommunity(ctx, tab) {
+  if (tab !== 'rec' && !BOARDS[tab]) tab = 'rec';
+  if (tab !== 'rec') return renderBoard(ctx, tab);
+  const { view } = ctx;
+  view.innerHTML = `${topBar('커뮤니티')}${tabsHtml('rec')}${topEnd}
+    <div class="slider" id="notice-slider"></div><div class="dots" id="notice-dots"></div>
+    <div class="sec-title"><h2>추천 게시글</h2><p>좋아요와 댓글이 많은 글을 골랐어요</p></div>
+    <div class="slider" id="rec-slider"><div class="loading" style="width:100%">불러오는 중…</div></div><div class="dots" id="rec-dots"></div>
+    <div class="sec-title"><h2>최신 글</h2></div><div class="post-list" id="latest"></div>
+    ${emojiRow()}${fab('#/write?board=talk')}`;
+  const [notices, recent] = await Promise.all([be.listPosts({ board: 'notice', limit: 5 }), be.listPosts({ limit: 100 })]);
+  if (!ctx.alive()) return;
+  fillNotices(notices);
+  const top = hot(recent).slice(0, 10);
+  const pages = [];
+  for (let i = 0; i < top.length; i += 2) pages.push(top.slice(i, i + 2));
+  $('#rec-slider').innerHTML = pages.length
+    ? pages.map((pg) => `<div class="rec-page">${pg.map(recCardHtml).join('')}</div>`).join('')
+    : '<div class="empty" style="width:100%">첫 글을 써 보세요!</div>';
+  bindDots($('#rec-slider'), $('#rec-dots'));
+  const latest = recent.filter((p) => p.board !== 'notice').slice(0, 10);
+  $('#latest').innerHTML = latest.map((p) => (p.board === 'qna' ? qcardHtml(p) : itemHtml(p))).join('') || '<div class="empty">아직 글이 없어요</div>';
+}
+
+// 게시판 목록(소통해요·공부해요·문제풀이·자료실·공지)
+async function renderBoard(ctx, board) {
+  const { view, q } = ctx;
+  const b = BOARDS[board];
+  const filter = { board, category: q.get('category') || '', grade: q.get('grade') || '', status: q.get('status') || '' };
+  const href = (patch) => {
+    const n = { ...filter, ...patch };
+    const qs = new URLSearchParams(Object.entries(n).filter(([k, v]) => v && k !== 'board')).toString();
+    const base = board === 'data' ? '#/study' : board === 'notice' ? '#/notices' : `#/community/${board}`;
+    return base + (qs ? `?${qs}` : '');
   };
-  if (dimAll) dimAll.onclick = () => setAll(false);
-  $$('a', am).forEach((a) => a.addEventListener('click', () => setAll(false)));
-  $$('[data-logout]').forEach((a) => a.addEventListener('click', async (e) => {
-    e.preventDefault(); await backend.auth.signOut(); toast('로그아웃했습니다.'); go('#/');
-  }));
-  const dr = $('#drawer');
-  $$('[data-close]', dr).forEach((b) => (b.onclick = () => { dr.classList.remove('open'); dr.setAttribute('aria-hidden', 'true'); }));
-  $$('a', dr).forEach((a) => a.addEventListener('click', () => dr.classList.remove('open')));
-  const skip = $('.skip');
-  if (skip) skip.onclick = (e) => { e.preventDefault(); $('#main')?.focus(); };
+  const gradeSel = `<select class="pill-select${filter.grade ? ' set' : ''}" data-f="grade" aria-label="학년">
+    <option value="">${board === 'qna' ? '학년' : '전 학년'}</option>${GRADES.map((g) => `<option ${g === filter.grade ? 'selected' : ''}>${g}</option>`).join('')}</select>`;
+  let filters = '';
+  if (board === 'qna') {
+    filters = `<div class="chips">${gradeSel}
+      <select class="pill-select${filter.category ? ' set' : ''}" data-f="category" aria-label="과목"><option value="">과목</option>
+        ${SUBJECTS.map((s) => `<option ${s === filter.category ? 'selected' : ''}>${s}</option>`).join('')}</select>
+      <select class="pill-select${filter.status ? ' set' : ''}" data-f="status" aria-label="상태"><option value="">상태</option>
+        <option value="open" ${filter.status === 'open' ? 'selected' : ''}>답변 기다리는 중</option>
+        <option value="solved" ${filter.status === 'solved' ? 'selected' : ''}>해결</option></select></div>`;
+  } else if (board !== 'notice') {
+    filters = `<div class="chips">${gradeSel}<a class="chip ${filter.category ? '' : 'on'}" href="${href({ category: '' })}">전체</a>
+      ${b.categories.map((c) => `<a class="chip ${c.id === filter.category ? 'on' : ''}" href="${href({ category: c.id })}">${esc(c.name)}</a>`).join('')}</div>`;
+  }
+  const head = board === 'data'
+    ? `${topBar('스터디 자료실')}${topEnd}<div class="rules compact"><h3>⚠️ 자료실 규칙 — 꼭 지켜 주세요</h3><ol>${DATA_RULES.slice(0, 3).map((r) => `<li>${esc(r)}</li>`).join('')}</ol>
+       <p style="margin:8px 0 0;font-size:14px"><a href="#/data-rules" style="color:#c2410c;font-weight:700">자료실 규칙 전체 보기 ›</a></p></div>`
+    : board === 'notice' ? backBar('공지사항') : `${topBar('커뮤니티')}${tabsHtml(board)}${topEnd}`;
+  const canWrite = board !== 'notice' || be.isAdmin();
+  view.innerHTML = `${head}${filters}<div class="post-list" id="list"><div class="loading">불러오는 중…</div></div>
+    <button class="more hidden" id="more">더 보기</button>
+    ${canWrite ? fab(`#/write?board=${board}${filter.category ? `&category=${encodeURIComponent(filter.category)}` : ''}`) : ''}`;
+  $$('select[data-f]', view).forEach((s) => s.addEventListener('change', () => ctx.go(href({ [s.dataset.f]: s.value }))));
+
+  let after = null;
+  const list = $('#list'), more = $('#more');
+  const load = async () => {
+    more.disabled = true;
+    const rows = await be.listPosts({ ...filter, limit: 20, after });
+    if (!ctx.alive()) return;
+    if (!after) list.innerHTML = '';
+    list.insertAdjacentHTML('beforeend', rows.map((p) => (board === 'qna' ? qcardHtml(p) : itemHtml(p))).join(''));
+    if (!list.children.length) list.innerHTML = `<div class="empty">${board === 'data' ? '아직 공개된 자료가 없어요' : '아직 글이 없어요'}</div>`;
+    after = rows.length ? rows[rows.length - 1].id : after;
+    more.classList.toggle('hidden', rows.length < 20);
+    more.disabled = false;
+  };
+  more.addEventListener('click', load);
+  await load();
 }
 
-(async function start() {
-  await initBackend();
-  SITE = await getSite();
-  let ready = false;
-  onUser(() => { if (ready) render(); });
-  window.addEventListener('hashchange', () => { document.querySelectorAll('.modal').forEach((m) => m.remove()); render(); });
-  await render();
-  ready = true;
-})();
+/* ---------------- 검색 ---------------- */
+async function renderSearch(ctx) {
+  const { view, q } = ctx;
+  const word = (q.get('q') || '').trim();
+  view.innerHTML = `${backBar('검색')}<form class="search-box" id="sf"><input class="input" name="q" placeholder="제목·내용으로 찾기" value="${esc(word)}" autofocus>
+    <button class="btn small dark">검색</button></form><div class="post-list" id="res"></div>`;
+  $('#sf').addEventListener('submit', (e) => { e.preventDefault(); ctx.go(`#/search?q=${encodeURIComponent(e.target.q.value.trim())}`); });
+  if (!word) { $('#res').innerHTML = '<div class="empty">찾고 싶은 낱말을 넣어 주세요</div>'; return; }
+  const rows = await be.listPosts({ limit: 400 });
+  if (!ctx.alive()) return;
+  const k = word.toLowerCase();
+  const hits = rows.filter((p) => `${p.title} ${p.body}`.toLowerCase().includes(k));
+  $('#res').innerHTML = hits.length ? hits.map((p) => (p.board === 'qna' ? qcardHtml(p) : itemHtml(p))).join('')
+    : `<div class="empty">'${esc(word)}' 검색 결과가 없어요<br><small>최근 글 400개 안에서 찾았어요</small></div>`;
+}
 
-export const refreshSite = async () => { SITE = await getSite(); };
+/* ---------------- 알림 ---------------- */
+async function renderNotifications(ctx) {
+  const { view } = ctx;
+  view.innerHTML = `${backBar('알림')}<div id="nl"><div class="loading">불러오는 중…</div></div>`;
+  const list = await be.listNotifications();
+  if (!ctx.alive()) return;
+  const text = (n) => ({
+    comment: ['💬', `<b>${esc(n.fromName)}</b>님이 내 글에 댓글을 남겼어요: ${esc(n.text)}`],
+    accepted: ['✅', `<b>${esc(n.fromName)}</b>님이 내 답변을 채택했어요: ${esc(n.text)}`],
+    approved: ['📗', `자료가 승인되어 공개됐어요: ${esc(n.text)}`],
+    rejected: ['⚠️', `자료실 규칙에 맞지 않아 자료가 삭제됐어요: ${esc(n.text)}`],
+  }[n.type] || ['🔔', esc(n.text)]);
+  $('#nl').innerHTML = list.length ? list.map((n) => {
+    const [ic, t] = text(n);
+    return `<a class="notif ${n.read ? '' : 'unread'}" href="${n.type === 'rejected' ? '#/study' : `#/post/${esc(n.postId)}`}"><span class="ic">${ic}</span><div><p>${t}</p><small>${ago(n.createdAt)}</small></div></a>`;
+  }).join('') : '<div class="empty">새 알림이 없어요</div>';
+  be.markRead(list).catch(() => {});
+}
+
+/* ---------------- 전체 메뉴 ---------------- */
+function renderMenu({ view }) {
+  const me = be.currentUser();
+  view.innerHTML = `${topBar('전체 메뉴')}${topEnd}
+    <div class="card">${me
+      ? `<div class="profile"><span class="avatar">${esc(me.nickname[0])}</span><div><b>${esc(me.nickname)}</b><br><small style="color:var(--sub)">${esc(me.grade)} · @${esc(me.username)}${me.role === 'admin' ? ' · 관리자' : ''}</small></div></div>`
+      : '<h3>로그인하고 함께해요</h3><p>글·댓글·자료는 회원만 볼 수 있어요.</p><div style="display:flex;gap:8px;margin-top:12px"><a class="btn small" href="#/login" style="display:grid;place-items:center">로그인</a><a class="btn small gray" href="#/join" style="display:grid;place-items:center">회원가입</a></div>'}</div>
+    <div class="menu-list">
+      <div class="group">커뮤니티</div>
+      <a href="#/community/talk">소통해요</a><a href="#/community/study">공부해요</a><a href="#/community/qna">문제풀이</a><a href="#/study">스터디 자료실</a><a href="#/notices">공지사항</a>
+      ${me ? `<div class="group">내 활동</div><a href="#/me">내 정보·내가 쓴 글</a><a href="#/notifications">알림</a>` : ''}
+      ${me?.role === 'admin' ? '<div class="group">관리</div><a href="#/admin">관리자 화면</a><a href="#/write?board=notice">공지 쓰기</a>' : ''}
+      <div class="group">안내</div><a href="#/rules">커뮤니티 이용규칙</a><a href="#/data-rules">자료실 규칙</a><a href="#/privacy">개인정보 처리방침</a>
+      ${me ? '<button id="logout" style="color:var(--danger)">로그아웃</button>' : ''}
+    </div>`;
+  $('#logout')?.addEventListener('click', async () => { await be.signOut(); toast('로그아웃했어요'); location.hash = '#/'; });
+}
+
+/* ---------------- 시작 ---------------- */
+window.addEventListener('hashchange', route);
+be.init().then(() => {
+  route();
+  // 로그인·로그아웃하면 지금 화면을 다시 그립니다
+  be.onUser(() => { if (!be.currentUser() || ['login', 'join'].includes(parse().parts[0])) route(); });
+}).catch((e) => {
+  console.error(e);
+  view.innerHTML = `<div class="empty">사이트를 불러오지 못했습니다.<br>${esc(be.errorText(e))}</div>`;
+});
+if (be.DEMO) setTimeout(() => toast('체험 모드: 데이터가 이 브라우저에만 저장돼요'), 800);

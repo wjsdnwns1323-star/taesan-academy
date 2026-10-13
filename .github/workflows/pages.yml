@@ -1,7 +1,5 @@
-# main에 올리면 public 폴더를 GitHub Pages로 배포합니다. (Secret 필요 없음)
-# 저장소에 없는 사진(강사 누끼 PNG, 수업 이미지 카드, 밴드 이미지)은 배포 중에 채웁니다:
-#   1) 운영 중인 https://taesan-academy.web.app 에서 같은 파일을 받아오고
-#   2) 못 받으면 강사 사진은 assets/cutouts/, 밴드 이미지는 원본 주소에서 받습니다.
+# main에 올리면 public 폴더를 GitHub Pages로도 배포합니다. (Secret 필요 없음)
+# 실제 운영 주소는 Firebase Hosting(https://taesan-academy.web.app)입니다.
 name: Deploy to GitHub Pages
 on:
   push:
@@ -22,31 +20,6 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
-      - name: 저장소에 없는 사진 채우기
-        run: |
-          LIVE=https://taesan-academy.web.app
-          get() { [ -s "public/$1" ] || curl -fsSL -m 30 "$LIVE/$1" -o "public/$1" || { rm -f "public/$1"; return 1; }; }
-          mkdir -p public/images/people public/images/posters public/images/band/t
-          for f in assets/cutouts/*.png; do k=$(basename "$f"); get "images/people/$k" || cp "$f" "public/images/people/$k"; done
-          while IFS=$'\t' read -r key id title; do
-            case "$key" in P*) get "images/posters/$key.jpg" || true ;; esac
-          done < scripts/assets.tsv
-          while IFS=$'\t' read -r pid n path out; do
-            [ -z "$pid" ] && continue
-            get "$out" || curl -fsSL -m 30 "https://coresos-phinf.pstatic.net/$path" -o "public/$out" || rm -f "public/$out"
-            t="images/band/t/$(basename "${out%.*}").jpg"; get "$t" || true
-          done < scripts/band_images.tsv
-          pip3 install -q pillow
-          python3 - <<'PY'
-          from pathlib import Path
-          from PIL import Image
-          out = Path('public/images/band/t'); out.mkdir(parents=True, exist_ok=True)
-          for p in Path('public/images/band').glob('*.*'):
-              t = out / (p.stem + '.jpg')
-              if p.is_file() and not t.exists():
-                  im = Image.open(p).convert('RGB'); im.thumbnail((640, 640)); im.save(t, quality=82)
-          PY
-          echo "강사 사진 $(ls public/images/people/*.png | wc -l)장, 수업 카드 $(ls public/images/posters | wc -l)장, 밴드 $(ls public/images/band | wc -l)개"
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

@@ -1,104 +1,71 @@
-# 태산학원 홈페이지
+# 태산 커뮤니티
 
-대전 둔산 태산학원의 공식 홈페이지입니다. **사이트: https://taesan-academy.web.app**
-
- 학교별 내신반 시간표, 선생님, 시험 결과, 설명회 예약, 상담, 회원, 관리자 기능을 담고 있습니다.
+태산학원이 운영하는 회원 전용 학생 커뮤니티입니다. **사이트: https://taesan-academy.web.app**
 
 - 프레임워크·빌드 없이 동작하는 정적 사이트(HTML + ES 모듈)
-- 서버: Firebase (Authentication · Firestore · Storage · Hosting)
-- 내용 출처: 태산학원 네이버 밴드 캡처 정리본(Google Drive "태산학원 자료" 폴더). 데이터의 `src` 필드가 원본 캡처 번호(P01–P95)입니다.
+- 서버: Firebase **Authentication(아이디·비밀번호) + Firestore + Hosting**. 무료 요금제(Spark)로 동작합니다.
+- 사진·파일은 Storage 대신 Firestore에 약 600KB 조각으로 나눠 저장합니다(파일 1개 5MB, 글 하나에 사진 10장·파일 5개까지).
 
-## 화면 구성
+## 화면
 
-| 메뉴 | 경로 | 기능 |
+| 아래 메뉴 | 주소 | 내용 |
 | --- | --- | --- |
-| 홈 | `#/` | 학교·학년을 고르면 이번 기말대비 반이 바로 나오는 학교 찾기, 모집 과정, 2학기 중간 결과, 선생님, 공지·설명회 |
-| 시간표 | `#/timetable` | 기말대비 / 예비고1 / 지난 중간대비, 학교·학년·과목·선생님 필터, **강의계획 보기**(밴드 강좌 소개·교재 이미지), 수강·대기 신청 |
-| 선생님 | `#/teachers`, `#/teachers/:id` | 과목별 목록, 선생님 홈(약력, 시험 결과, 지금 열린 반, 수업 방식, 교재) |
-| 커리큘럼 | `#/curriculum` | 선생님별 수업 순서·교재 |
-| 시험 결과 | `#/results` | 시험·과목 필터, 가채점 표시 |
-| 설명회·특강 | `#/events`, `#/events/:id` | 예약, 진단고사 신청 |
-| 공지사항 | `#/notice` | 분류·검색·페이지 |
-| 상담 | `#/consult`, `#/visit`, `#/faq` | 온라인 상담(답변은 내 신청 내역에서 확인), 방문 상담 예약, FAQ |
-| 학원 소개·오시는 길 | `#/about`, `#/location` | 인사말, 대상 학교, 캠퍼스, 지도 |
-| 검색 | `#/search` | 강좌·선생님·설명회·공지 통합 검색 |
-| 회원 | `#/login`, `#/join`, `#/mypage` | **Google 로그인 전용**(처음 로그인하면 자동 가입), 내 신청·예약·상담·방문 내역, 예약 취소, 정보 수정 |
-| 관리자 | `#/admin` | 대시보드(새 접수·처리 대기·빠른 작업), 접수 관리(상태·메모·답변, CSV), 강좌·선생님·소장·강의계획 안내·설명회·결과·공지·FAQ·학교·홈 모집안내·홈 학습콘텐츠 편집(오른쪽 편집 패널, 일괄 마감·숨기기, 순서 ▲▼, 노출 스위치, 복제), 회원 권한, 사이트 정보, 백업 |
+| 홈 | `#/` | 공지 넘겨보기, 인기 글 TOP5, 답변 기다리는 질문, 새 자료, 말머리 바로가기 |
+| 스터디 | `#/study` | **자료실**: 규칙 강조 상자, 말머리·학년 필터, 관리자 승인 후 공개 |
+| 커뮤니티 | `#/community/rec·talk·study·qna` | 추천(공지·추천 게시글 카드·최신 글) / 소통해요(유머·일상대화·그림·썸·연애·고민상담·학교이야기) / 공부해요(공부법·인증·입시·진로·최신입시·문제집·인강) / 문제풀이(학년·과목·상태 필터, 사진 크게, 답변 채택) |
+| 전체 메뉴 | `#/menu` | 게시판 바로가기, 내 정보, 알림, 공지, 이용규칙·자료실 규칙·개인정보 처리방침, 관리자, 로그아웃 |
 
-## 체험 모드
+위쪽 아이콘: 검색(`#/search`), 내 정보(`#/me`, 정보 수정·내가 쓴 글·비밀번호 변경·탈퇴), 알림(`#/notifications`, 새 알림이 있으면 주황 점).
 
-`public/js/config.js`의 `apiKey`가 비어 있으면 **체험 모드**로 동작합니다. 모든 기능이 그대로 동작하지만 데이터는 그 브라우저(localStorage)에만 저장됩니다. `admin@`으로 시작하는 이메일로 가입하면 관리자 화면을 써 볼 수 있습니다.
+글 보기: 사진·파일 내려받기, 좋아요, 댓글(사진 1장 가능)·댓글 좋아요, 신고, 수정·삭제, 문제풀이 답변 채택.
 
-로컬에서 보기:
+## 회원·개인정보
 
-```bash
-npx http-server public -p 5173
-# 또는
-python3 -m http.server 5173 --directory public
-```
+- 가입 항목: 아이디, 비밀번호, 닉네임, 학년, **실명, 전화번호, 나이**. 이용규칙·개인정보 수집 동의 필수, 만 14세 미만은 보호자 동의 체크 필수.
+- 아이디는 내부적으로 `아이디@member.taesan-academy.app` 이메일로 Firebase에 저장됩니다(메일은 가지 않음).
+- 실명·전화번호·나이는 `users/{uid}/private/info`에 따로 저장되어 **본인과 관리자만** 읽을 수 있습니다. 다른 회원에게는 닉네임·학년만 보입니다.
+- 글·댓글·파일은 로그인한 회원만 볼 수 있습니다.
 
-## Firebase 연결
+## 관리자
 
-1. [Firebase 콘솔](https://console.firebase.google.com)에서 프로젝트를 만듭니다.
-2. **Authentication** → 로그인 방법 → Google 사용 설정
-3. **Firestore Database** 만들기(프로덕션 모드, 지역 `asia-northeast3` 서울 권장)
-4. **Storage** 시작하기
-5. 프로젝트 설정 → 내 앱 → 웹 앱 추가 → 나온 `firebaseConfig` 값을 `public/js/config.js`에 붙여넣기
-6. `.firebaserc`의 `YOUR_FIREBASE_PROJECT_ID`를 프로젝트 ID로 바꾸기
-7. 배포
+- `users/{uid}.role == 'admin'`인 계정이 관리자입니다. 첫 관리자는 `scripts/create_admin.py`로 만들고, 그 뒤에는 관리자 화면 → 회원에서 다른 회원을 관리자로 지정할 수 있습니다.
+- 관리자 화면(`#/admin`): **자료 승인**(자료실 글 승인/규칙 위반 삭제), **신고** 처리, **회원**(개인정보 보기, 이용 정지·해제, 관리자 지정·해제), 공지 쓰기.
+- 관리자는 모든 글·댓글을 지울 수 있습니다. 정지된 회원은 글·댓글·좋아요·업로드를 할 수 없습니다.
 
-```bash
-npm i -g firebase-tools
-firebase login
-firebase deploy --only hosting,firestore,storage
-```
-
-8. 사이트에서 관리자 Google 계정(`config.js`의 `adminEmails`)으로 로그인
-9. 관리자 화면에서 아무 메뉴나 처음 저장하면 그 메뉴의 기본 자료(밴드 정리본)가 Firestore로 자동으로 옮겨진 뒤 수정 내용이 저장됩니다.
-
-관리자 이메일을 바꾸려면 `public/js/config.js`, `firestore.rules`, `storage.rules` 세 곳을 같이 바꿉니다. 그 밖의 관리자는 관리자 → 회원에서 지정합니다.
-
-### 배포 (Cloud Shell, 지금 쓰는 방법)
+## 처음 설치 / 기존 데이터 지우고 새로 배포 (Cloud Shell)
 
 [Cloud Shell](https://shell.cloud.google.com/?project=taesan-academy)에서:
 
 ```bash
 git clone https://github.com/wjsdnwns1323-star/taesan-academy.git && cd taesan-academy
-bash scripts/build_assets.sh      # 드라이브 누끼 사진·밴드 이미지 받기 + 강사 얼굴 높이 맞추기
-python3 scripts/deploy_hosting.py # https://taesan-academy.web.app 에 배포
+python3 scripts/reset_firebase.py   # ⚠️ 기존 Firestore 데이터·로그인 계정 전부 삭제(프로젝트 ID를 입력해야 진행)
+python3 scripts/deploy_rules.py     # 보안 규칙 배포 + 아이디·비밀번호 로그인 켜기
+python3 scripts/deploy_hosting.py   # https://taesan-academy.web.app 에 사이트 배포(예전 사이트는 덮어써짐)
+python3 scripts/create_admin.py     # 관리자 아이디·비밀번호 만들기(비밀번호는 화면에 안 보이고 저장되지 않음)
 ```
 
-- 사진·이미지 파일은 저장소에 넣지 않고 배포할 때 받습니다(`scripts/assets.tsv`, `scripts/band_images.tsv`).
-- 강사 사진: 드라이브 `누끼_투명배경` 폴더의 PNG → `scripts/align_photos.py`가 600×800 캔버스에 얼굴 높이 200px·위치를 맞춥니다.
-- 밴드 강좌 소개: `scripts/band_posts.py`를 고친 뒤 `python3 scripts/band_posts.py`로 `public/js/data/band.js`와 이미지 목록을 다시 만듭니다.
+`deploy_rules.py`가 로그인 켜기에서 실패하면 Firebase 콘솔 → Authentication → 로그인 방법 → **이메일/비밀번호** 사용 설정을 직접 켭니다.
+
+## 체험 모드
+
+주소 뒤에 `?demo=1`을 붙이면(예: `http://localhost:5173/?demo=1`) Firebase 없이 그 브라우저에만 저장하는 체험 모드로 열립니다. 체험 모드에서는 아이디 `admin`으로 가입하면 관리자가 됩니다.
+
+```bash
+python3 -m http.server 5173 --directory public
+```
 
 ## 데이터 구조(Firestore)
 
-| 컬렉션 | 내용 | 읽기 | 쓰기 |
+| 경로 | 내용 | 읽기 | 쓰기 |
 | --- | --- | --- | --- |
-| `classes` | 강좌·시간표 | 누구나 | 관리자 |
-| `teachers`, `leaders` | 선생님, 설명회 연사 | 누구나 | 관리자 |
-| `results` | 시험 결과 | 누구나 | 관리자 |
-| `events` | 설명회·특강·진단고사 | 누구나 | 관리자 |
-| `notices`, `faqs`, `schools` | 공지, FAQ, 학교 | 누구나 | 관리자 |
-| `settings/site` | 전화, 운영시간, 인사말 등 | 누구나 | 관리자 |
-| `users` | 회원 정보 | 본인·관리자 | 본인(권한 제외)·관리자 |
-| `applications` | 수강·대기 신청 | 본인·관리자 | 누구나 접수, 관리자 처리 |
-| `reservations` | 설명회·진단고사 예약 | 본인·관리자 | 누구나 접수, 본인 취소, 관리자 처리 |
-| `consults` | 온라인 상담 | 본인·관리자 | 누구나 접수, 관리자 답변 |
-| `visits` | 방문 상담 예약 | 본인·관리자 | 누구나 접수, 관리자 처리 |
+| `users/{uid}` | 아이디·닉네임·학년·권한·정지 | 회원(목록은 관리자) | 본인(닉네임·학년), 관리자(권한·정지) |
+| `users/{uid}/private/info` | 실명·전화번호·나이·보호자 동의 | 본인·관리자 | 본인 |
+| `nicknames/{닉네임}` | 닉네임 중복 방지 | 누구나 | 본인 |
+| `posts/{id}` | 글(게시판·말머리·사진·파일·좋아요 수·댓글 수·채택) | 회원(자료실은 승인 후) | 작성자, 관리자(승인·삭제) |
+| `posts/{id}/comments/{id}` | 댓글 | 회원 | 작성자, 관리자 삭제 |
+| `posts/…/likes/{uid}` | 좋아요 | 본인 | 본인 |
+| `files/{id}`, `files/{id}/chunks/{n}` | 첨부 파일 정보와 조각 | 회원 | 올린 사람 |
+| `notifications/{id}` | 댓글·채택·자료 승인 알림 | 받는 사람 | 회원(댓글·채택), 관리자(승인) |
+| `reports/{id}` | 신고 | 관리자 | 회원 |
 
-Firestore가 비어 있는 공개 컬렉션은 `public/js/data/seed.js`의 기본 데이터를 보여줍니다.
-
-## 공개 전에 확인할 것
-
-자료에 없어서 비워 두었거나 확인이 필요한 항목입니다. 관리자 → 사이트 설정·선생님에서 채웁니다.
-
-- 원장 성함, 인사말(현재 문구는 임시 작성), 운영·상담 시간, 카카오톡 채널 주소
-- 2관 주소, 대표번호가 본관·2관 공용인지
-- '제서2783호'·'제서5484호'가 학원 등록번호인지
-- 선생님 사진: 원본 ZIP(`images/people/`)의 사진을 관리자 → 선생님 → 사진에서 올립니다. 사진이 없으면 이름 이니셜 카드가 나옵니다.
-- 김현·정정래 소장의 소속 표기, 김학수 소장(외부 초청) 사진·실명 사용 허락
-- 가채점 결과는 학교 발표 후 확정 수치로 바꾸고 "가채점(확정 전)" 체크를 해제
-- 이원형 선생님의 현재 담당 여부
-- 학생이 나온 포스터·사진은 쓰지 않았습니다. 쓰려면 블러 처리 후 사용
+목록은 정렬용 복합 색인 없이 동작하도록 글 ID를 '최신 글이 앞에 오는' 시간순 문자열로 만듭니다(`newId('desc')`).

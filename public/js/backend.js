@@ -1,342 +1,452 @@
-// 데이터·로그인·파일 저장을 한곳에서 처리합니다.
-// firebaseConfig.apiKey가 있으면 Firebase(Auth, Firestore, Storage)를, 없으면 브라우저 저장소(체험 모드)를 씁니다.
-import { firebaseConfig, adminEmails } from './config.js';
-import * as seed from './data/seed.js';
-import { BAND_POSTS } from './data/band.js';
+// 로그인·데이터·파일 저장을 한곳에서 처리합니다.
+// 보통은 Firebase(Authentication + Firestore)를 쓰고, 주소에 ?demo=1 이 있으면 이 브라우저에만 저장하는 체험 모드로 동작합니다.
+// 파일은 Storage 대신 Firestore 문서에 조각(약 600KB)으로 나눠 저장합니다. 무료 요금제(Spark)로 동작합니다.
+import { firebaseConfig, LOGIN_DOMAIN, LIMITS } from './config.js';
 
 const SDK = 'https://www.gstatic.com/firebasejs/10.12.2';
+export const DEMO = new URLSearchParams(location.search).has('demo') || !firebaseConfig.apiKey;
 
-// 공개 콘텐츠 컬렉션: Firestore가 비어 있으면 기본 데이터를 보여줍니다.
-export const CONTENT = {
-  teachers: seed.teachers,
-  leaders: seed.leaders,
-  classes: seed.classes,
-  results: seed.results,
-  events: seed.events,
-  notices: seed.notices,
-  faqs: seed.faqs,
-  schools: seed.schools.map((s) => ({ ...s })),
-  banners: seed.banners,
-  quicklinks: seed.quicklinks,
-  // 강의계획·설명회 안내(밴드 게시글 정리본)
-  bandPosts: BAND_POSTS.map((p) => ({ ...p, id: String(p.id), bandUrl: `https://band.us/band/61446116/post/${p.id}` })),
-};
+const inc = (n) => ({ __inc: n });
+const CHUNK = 600 * 1024;
 
-const listeners = new Set();
-let currentUser = null; // { uid, email, name, phone, role, school, grade, verified }
-const notify = () => listeners.forEach((fn) => fn(currentUser));
-
-const clone = (v) => JSON.parse(JSON.stringify(v));
-const now = () => new Date().toISOString();
-
-function applyQuery(rows, opts = {}) {
-  let out = rows;
-  for (const [f, op, v] of opts.where || []) {
-    out = out.filter((r) => {
-      const x = r[f];
-      if (op === '==') return x === v;
-      if (op === '!=') return x !== v;
-      if (op === 'in') return v.includes(x);
-      if (op === 'array-contains') return Array.isArray(x) && x.includes(v);
-      return true;
-    });
-  }
-  if (opts.orderBy) {
-    const [f, dir = 'asc'] = opts.orderBy;
-    out = [...out].sort((a, b) => {
-      const x = a[f] ?? '', y = b[f] ?? '';
-      const c = typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y), 'ko');
-      return dir === 'desc' ? -c : c;
-    });
-  }
-  return out;
+// 시간순 ID: 새 글이 먼저 나오도록(desc) 또는 오래된 것이 먼저(asc). 정렬용 복합 색인 없이 목록을 만들기 위해 씁니다.
+const rand = () => Math.random().toString(36).slice(2, 8).padEnd(6, '0');
+export function newId(order = 'desc') {
+  const t = order === 'desc' ? Number.MAX_SAFE_INTEGER - Date.now() : Date.now();
+  return t.toString(36).padStart(11, '0') + rand();
 }
 
-// Storage를 쓰지 않을 때: 이미지를 가로 600px JPEG로 줄여 문서에 바로 저장(약 100KB 이하)
-export function shrinkImage(file, max = 600) {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => {
-      const k = Math.min(1, max / img.width);
-      const c = document.createElement('canvas');
-      c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
-      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-      URL.revokeObjectURL(img.src);
-      resolve(c.toDataURL('image/jpeg', 0.82));
-    };
-    img.onerror = reject;
-    img.src = URL.createObjectURL(file);
+/* ---------------- 저장소 어댑터 ---------------- */
+// 공통 모양: get(path) / set(path, data) / update(path, data) / remove(path) / query(col, { eq, limit, after }) / batch(ops)
+// auth: onChange(fn) / signUp(email, pw) / signIn(email, pw) / signOut() / reauth(pw) / changePassword(oldPw, newPw) / deleteSelf()
+
+function localAdapter() {
+  const KEY = 'tsc:db', AKEY = 'tsc:auth';
+  const load = (k) => { try { return JSON.parse(localStorage.getItem(k)) || {}; } catch { return {}; } };
+  const save = (k, v) => localStorage.setItem(k, JSON.stringify(v));
+  const apply = (old, data) => {
+    const out = { ...(old || {}) };
+    for (const [k, v] of Object.entries(data)) out[k] = v && v.__inc !== undefined ? (out[k] || 0) + v.__inc : v;
+    return out;
+  };
+  const run = (store, { op, path, data }) => {
+    if (op === 'set') store[path] = apply(null, data);
+    else if (op === 'update') {
+      if (!store[path]) throw new Error('문서가 없습니다.');
+      store[path] = apply(store[path], data);
+    } else if (op === 'delete') delete store[path];
+  };
+  let uid = null;
+  const fns = new Set();
+  const auth = {
+    onChange(fn) { fns.add(fn); uid = localStorage.getItem('tsc:session'); setTimeout(() => fn(uid), 0); },
+    emit() { fns.forEach((fn) => fn(uid)); },
+    async signUp(email, pw) {
+      const a = load(AKEY);
+      if (a[email]) throw code('auth/email-already-in-use');
+      a[email] = { uid: newId('asc'), pw };
+      save(AKEY, a);
+      uid = a[email].uid; localStorage.setItem('tsc:session', uid);
+      this.emit();
+      return uid;
+    },
+    async signIn(email, pw) {
+      const u = load(AKEY)[email];
+      if (!u || u.pw !== pw) throw code('auth/invalid-credential');
+      uid = u.uid; localStorage.setItem('tsc:session', uid); this.emit();
+    },
+    async signOut() { uid = null; localStorage.removeItem('tsc:session'); this.emit(); },
+    async reauth(pw) {
+      const a = load(AKEY);
+      if (!Object.values(a).some((x) => x.uid === uid && x.pw === pw)) throw code('auth/invalid-credential');
+    },
+    async changePassword(oldPw, pw) {
+      const a = load(AKEY);
+      const e = Object.keys(a).find((k) => a[k].uid === uid);
+      if (a[e].pw !== oldPw) throw code('auth/invalid-credential');
+      a[e].pw = pw; save(AKEY, a);
+    },
+    async deleteSelf() {
+      const a = load(AKEY);
+      for (const k of Object.keys(a)) if (a[k].uid === uid) delete a[k];
+      save(AKEY, a); await this.signOut();
+    },
+  };
+  return {
+    auth,
+    async get(path) { const d = load(KEY)[path]; return d ? { id: path.split('/').pop(), ...d } : null; },
+    async set(path, data) { const s = load(KEY); run(s, { op: 'set', path, data }); save(KEY, s); },
+    async update(path, data) { const s = load(KEY); run(s, { op: 'update', path, data }); save(KEY, s); },
+    async remove(path) { const s = load(KEY); delete s[path]; save(KEY, s); },
+    async batch(ops) { const s = load(KEY); ops.forEach((o) => run(s, o)); save(KEY, s); },
+    async query(col, { eq = {}, limit = 30, after } = {}) {
+      const s = load(KEY), depth = col.split('/').length + 1;
+      return Object.keys(s)
+        .filter((p) => p.startsWith(col + '/') && p.split('/').length === depth)
+        .map((p) => ({ id: p.split('/').pop(), ...s[p] }))
+        .filter((d) => Object.entries(eq).every(([k, v]) => d[k] === v))
+        .sort((a, b) => (a.id < b.id ? -1 : 1))
+        .filter((d) => !after || d.id > after)
+        .slice(0, limit);
+    },
+  };
+}
+
+async function firebaseAdapter() {
+  const [{ initializeApp }, A, F] = await Promise.all([
+    import(`${SDK}/firebase-app.js`), import(`${SDK}/firebase-auth.js`), import(`${SDK}/firebase-firestore.js`),
+  ]);
+  const app = initializeApp(firebaseConfig);
+  const au = A.getAuth(app);
+  const fs = F.getFirestore(app);
+  const conv = (data) => {
+    const out = {};
+    for (const [k, v] of Object.entries(data)) out[k] = v && v.__inc !== undefined ? F.increment(v.__inc) : v;
+    return out;
+  };
+  const ref = (p) => F.doc(fs, p);
+  return {
+    auth: {
+      onChange(fn) { A.onAuthStateChanged(au, (u) => fn(u ? u.uid : null)); },
+      async signUp(email, pw) { return (await A.createUserWithEmailAndPassword(au, email, pw)).user.uid; },
+      async signIn(email, pw) { await A.signInWithEmailAndPassword(au, email, pw); },
+      async signOut() { await A.signOut(au); },
+      async reauth(pw) {
+        const u = au.currentUser;
+        await A.reauthenticateWithCredential(u, A.EmailAuthProvider.credential(u.email, pw));
+      },
+      async changePassword(oldPw, pw) {
+        const u = au.currentUser;
+        await A.reauthenticateWithCredential(u, A.EmailAuthProvider.credential(u.email, oldPw));
+        await A.updatePassword(u, pw);
+      },
+      async deleteSelf() { await A.deleteUser(au.currentUser); },
+    },
+    async get(path) { const s = await F.getDoc(ref(path)); return s.exists() ? { id: s.id, ...s.data() } : null; },
+    async set(path, data) { await F.setDoc(ref(path), conv(data)); },
+    async update(path, data) { await F.updateDoc(ref(path), conv(data)); },
+    async remove(path) { await F.deleteDoc(ref(path)); },
+    async batch(ops) {
+      const b = F.writeBatch(fs);
+      for (const o of ops) {
+        if (o.op === 'set') b.set(ref(o.path), conv(o.data));
+        else if (o.op === 'update') b.update(ref(o.path), conv(o.data));
+        else b.delete(ref(o.path));
+      }
+      await b.commit();
+    },
+    async query(col, { eq = {}, limit = 30, after } = {}) {
+      const parts = Object.entries(eq).map(([k, v]) => F.where(k, '==', v));
+      parts.push(F.orderBy(F.documentId()));
+      if (after) parts.push(F.startAfter(after));
+      parts.push(F.limit(limit));
+      const snap = await F.getDocs(F.query(F.collection(fs, col), ...parts));
+      return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    },
+  };
+}
+
+/* ---------------- 상태 ---------------- */
+let db = null;
+let me = null; // { uid, username, nickname, grade, role, banned }
+let signingUp = false; // 가입 중에는 회원 문서가 아직 없으므로 로그인 상태 변화를 잠시 무시
+const listeners = new Set();
+export const currentUser = () => me;
+export const isAdmin = () => me?.role === 'admin';
+export function onUser(fn) { listeners.add(fn); return () => listeners.delete(fn); }
+
+export async function init() {
+  db = DEMO ? localAdapter() : await firebaseAdapter();
+  return new Promise((resolve) => {
+    let first = true;
+    db.auth.onChange(async (uid) => {
+      if (signingUp) return;
+      me = uid ? await db.get(`users/${uid}`).catch(() => null) : null;
+      if (me) me.uid = uid;
+      listeners.forEach((fn) => fn(me));
+      if (first) { first = false; resolve(me); }
+    });
   });
 }
 
-/* ---------------- 체험 모드(브라우저 저장소) ---------------- */
-function localAdapter() {
-  const key = (c) => `taesan:${c}`;
-  const read = (c) => {
-    try {
-      const raw = localStorage.getItem(key(c));
-      if (raw) return JSON.parse(raw);
-    } catch (e) { /* 저장소 사용 불가 */ }
-    return CONTENT[c] ? clone(CONTENT[c]) : [];
-  };
-  const write = (c, rows) => {
-    try { localStorage.setItem(key(c), JSON.stringify(rows)); } catch (e) { /* 무시 */ }
-  };
-  const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+function code(c) { const e = new Error(c); e.code = c; return e; }
+export function errorText(e) {
+  const c = e?.code || '';
+  if (c.includes('email-already-in-use')) return '이미 쓰고 있는 아이디입니다.';
+  if (c.includes('invalid-credential') || c.includes('wrong-password') || c.includes('user-not-found') || c.includes('invalid-login')) return '아이디 또는 비밀번호가 맞지 않습니다.';
+  if (c.includes('too-many-requests')) return '잠시 후 다시 시도해 주세요(시도 횟수 초과).';
+  if (c.includes('weak-password')) return '비밀번호가 너무 쉽습니다.';
+  if (c.includes('network')) return '인터넷 연결을 확인해 주세요.';
+  if (c.includes('permission-denied')) return '권한이 없습니다. 이용이 정지되었거나 로그인이 필요할 수 있습니다.';
+  if (c.includes('operation-not-allowed')) return '아이디 로그인이 아직 켜지지 않았습니다. 관리자에게 알려 주세요.';
+  return e?.message || '오류가 생겼습니다.';
+}
+const need = () => { if (!me) throw new Error('로그인이 필요합니다.'); if (me.banned) throw new Error('이용이 정지된 계정입니다.'); };
+const needAdmin = () => { if (!isAdmin()) throw new Error('관리자만 할 수 있습니다.'); };
 
-  async function hash(s) {
-    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
-    return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
+/* ---------------- 회원 ---------------- */
+export const USERNAME_RE = /^[a-z0-9_]{4,20}$/;
+const emailOf = (username) => `${username.toLowerCase()}@${LOGIN_DOMAIN}`;
+
+export async function signUp(f) {
+  const username = f.username.trim().toLowerCase();
+  if (!USERNAME_RE.test(username)) throw new Error('아이디는 영문 소문자·숫자·_ 4~20자입니다.');
+  if (await db.get(`nicknames/${f.nickname}`).catch(() => null)) throw new Error('이미 있는 닉네임입니다.');
+  signingUp = true;
+  const t = Date.now();
+  let uid;
+  try {
+    uid = await db.auth.signUp(emailOf(username), f.password);
+    await db.batch([
+      // 체험 모드에서만 아이디 admin 이 관리자가 됩니다(실제 사이트 관리자는 scripts/create_admin.py로 만듭니다)
+      { op: 'set', path: `users/${uid}`, data: { username, nickname: f.nickname, grade: f.grade, role: DEMO && username === 'admin' ? 'admin' : 'member', banned: false, createdAt: t } },
+      { op: 'set', path: `users/${uid}/private/info`, data: { realName: f.realName, phone: f.phone, age: f.age, guardianConsent: !!f.guardianConsent, agreedAt: t } },
+      { op: 'set', path: `nicknames/${f.nickname}`, data: { uid } },
+    ]);
+  } catch (e) {
+    if (uid) await db.auth.deleteSelf().catch(() => {});
+    throw e.code?.includes('permission') ? new Error('이미 있는 닉네임이거나 입력값이 올바르지 않습니다.') : e;
+  } finally {
+    signingUp = false;
   }
-
-  const db = {
-    async list(c, opts) { return applyQuery(read(c), opts); },
-    async get(c, id) { return read(c).find((r) => r.id === id) || null; },
-    async add(c, data) {
-      const rows = read(c); const id = uid();
-      rows.push({ ...data, id, createdAt: now() }); write(c, rows); return id;
-    },
-    async set(c, id, data) {
-      const rows = read(c).filter((r) => r.id !== id);
-      rows.push({ ...data, id, updatedAt: now() }); write(c, rows);
-    },
-    async update(c, id, patch) {
-      write(c, read(c).map((r) => (r.id === id ? { ...r, ...patch, id, updatedAt: now() } : r)));
-    },
-    async remove(c, id) { write(c, read(c).filter((r) => r.id !== id)); },
-    async getDoc(path) {
-      try { return JSON.parse(localStorage.getItem(key(path)) || 'null'); } catch (e) { return null; }
-    },
-    async setDoc(path, data) { try { localStorage.setItem(key(path), JSON.stringify(data)); } catch (e) { /* 무시 */ } },
-    isSeeded: async () => true,
-  };
-
-  const auth = {
-    async init() {
-      try {
-        const s = JSON.parse(localStorage.getItem('taesan:_session') || 'null');
-        if (s) currentUser = (read('users').find((u) => u.uid === s) || null);
-      } catch (e) { currentUser = null; }
-      notify();
-    },
-    async signUp({ email, password, ...profile }) {
-      const users = read('users');
-      if (users.some((u) => u.email === email)) throw new Error('이미 가입된 이메일입니다.');
-      const u = {
-        id: uid(), uid: '', email, pw: await hash(password), ...profile,
-        role: email.startsWith('admin@') || adminEmails.includes(email) ? 'admin' : 'member',
-        verified: true, createdAt: now(),
-      };
-      u.uid = u.id; users.push(u); write('users', users);
-      localStorage.setItem('taesan:_session', JSON.stringify(u.uid));
-      currentUser = u; notify(); return u;
-    },
-    async signIn(email, password) {
-      const u = read('users').find((x) => x.email === email);
-      if (!u || u.pw !== (await hash(password))) throw new Error('이메일 또는 비밀번호가 맞지 않습니다.');
-      localStorage.setItem('taesan:_session', JSON.stringify(u.uid));
-      currentUser = u; notify(); return u;
-    },
-    async signInWithGoogle(email) {
-      if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new Error('체험용 이메일을 입력해 주세요.');
-      const users = read('users');
-      let u = users.find((x) => x.email === email); const isNew = !u;
-      if (!u) {
-        u = { id: uid(), email, name: email.split('@')[0], role: email.startsWith('admin@') || adminEmails.includes(email) ? 'admin' : 'member', verified: true, provider: 'google', createdAt: now() };
-        u.uid = u.id; users.push(u); write('users', users);
-      }
-      localStorage.setItem('taesan:_session', JSON.stringify(u.uid));
-      currentUser = u; notify(); return { user: u, isNew };
-    },
-    async signOut() { localStorage.removeItem('taesan:_session'); currentUser = null; notify(); },
-    async resetPassword() { throw new Error('체험 모드에서는 비밀번호 재설정 메일을 보낼 수 없습니다.'); },
-    async updateProfile(patch) {
-      await db.update('users', currentUser.uid, patch);
-      currentUser = { ...currentUser, ...patch }; notify();
-    },
-    async resendVerification() {},
-  };
-
-  const storage = { upload: (_path, file) => shrinkImage(file) };
-  return { mode: 'local', db, auth, storage };
+  me = await db.get(`users/${uid}`);
+  me.uid = uid;
+  listeners.forEach((fn) => fn(me));
 }
 
-/* ---------------- Firebase ---------------- */
-async function firebaseAdapter() {
-  const useStorage = !!firebaseConfig.storageBucket && firebaseConfig.useStorage !== false;
-  const [{ initializeApp }, A, F, S] = await Promise.all([
-    import(`${SDK}/firebase-app.js`),
-    import(`${SDK}/firebase-auth.js`),
-    import(`${SDK}/firebase-firestore.js`),
-    useStorage ? import(`${SDK}/firebase-storage.js`) : Promise.resolve(null),
+export async function signIn(username, pw) { await db.auth.signIn(emailOf(username.trim()), pw); }
+export async function signOut() { await db.auth.signOut(); }
+export async function changePassword(oldPw, pw) { await db.auth.changePassword(oldPw, pw); }
+export const getPrivate = (uid = me?.uid) => db.get(`users/${uid}/private/info`);
+export const getUser = (uid) => db.get(`users/${uid}`);
+
+export async function updateProfile({ nickname, grade, realName, phone, age }) {
+  need();
+  const ops = [];
+  const patch = { grade };
+  if (nickname !== me.nickname) {
+    if (await db.get(`nicknames/${nickname}`)) throw new Error('이미 있는 닉네임입니다.');
+    ops.push({ op: 'delete', path: `nicknames/${me.nickname}` }, { op: 'set', path: `nicknames/${nickname}`, data: { uid: me.uid } });
+    patch.nickname = nickname;
+  }
+  ops.push({ op: 'update', path: `users/${me.uid}`, data: patch });
+  ops.push({ op: 'update', path: `users/${me.uid}/private/info`, data: { realName, phone, age } });
+  await db.batch(ops);
+  Object.assign(me, patch);
+  listeners.forEach((fn) => fn(me));
+}
+
+export async function withdraw(pw) {
+  need();
+  await db.auth.reauth(pw);
+  await db.batch([
+    { op: 'delete', path: `users/${me.uid}/private/info` },
+    { op: 'delete', path: `nicknames/${me.nickname}` },
+    { op: 'delete', path: `users/${me.uid}` },
   ]);
-  const app = initializeApp(firebaseConfig);
-  const fa = A.getAuth(app);
-  const fs = F.getFirestore(app);
-  const st = useStorage ? S.getStorage(app) : null;
-  const seededCache = {};
+  await db.auth.deleteSelf();
+}
 
-  const toRows = (snap) => snap.docs.map((d) => ({ ...d.data(), id: d.id }));
+/* ---------------- 파일 ---------------- */
+const toB64 = (buf) => {
+  let s = '';
+  const b = new Uint8Array(buf);
+  for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000));
+  return btoa(s);
+};
 
-  async function isSeeded(c) {
-    if (c in seededCache) return seededCache[c];
-    const snap = await F.getDocs(F.query(F.collection(fs, c), F.limit(1)));
-    seededCache[c] = !snap.empty;
-    return seededCache[c];
+export async function uploadFile(blob, name, onProgress) {
+  need();
+  if (blob.size > LIMITS.fileMB * 1024 * 1024) throw new Error(`${name}: ${LIMITS.fileMB}MB보다 큰 파일은 올릴 수 없습니다.`);
+  const id = newId('asc');
+  const chunks = Math.max(1, Math.ceil(blob.size / CHUNK));
+  const meta = { uid: me.uid, name: name.slice(0, 200), type: (blob.type || 'application/octet-stream').slice(0, 100), size: blob.size, chunks, createdAt: Date.now() };
+  await db.set(`files/${id}`, meta);
+  for (let i = 0; i < chunks; i++) {
+    const part = await blob.slice(i * CHUNK, (i + 1) * CHUNK).arrayBuffer();
+    await db.set(`files/${id}/chunks/${i}`, { d: toB64(part) });
+    onProgress?.((i + 1) / chunks);
   }
+  return { id, name: meta.name, type: meta.type, size: meta.size };
+}
 
-  const db = {
-    async list(c, opts = {}) {
-      if (CONTENT[c] && !(await isSeeded(c))) return applyQuery(clone(CONTENT[c]), opts);
-      const cons = (opts.where || []).map(([f, op, v]) => F.where(f, op, v));
-      const snap = await F.getDocs(F.query(F.collection(fs, c), ...cons));
-      return applyQuery(toRows(snap), { orderBy: opts.orderBy });
-    },
-    async get(c, id) {
-      const d = await F.getDoc(F.doc(fs, c, id));
-      if (d.exists()) return { ...d.data(), id: d.id };
-      if (CONTENT[c] && !(await isSeeded(c))) return clone(CONTENT[c]).find((r) => r.id === id) || null;
-      return null;
-    },
-    async add(c, data) {
-      const ref = await F.addDoc(F.collection(fs, c), { ...data, createdAt: now() });
-      seededCache[c] = true; return ref.id;
-    },
-    async set(c, id, data) {
-      await F.setDoc(F.doc(fs, c, id), { ...data, updatedAt: now() }); seededCache[c] = true;
-    },
-    async update(c, id, patch) { await F.updateDoc(F.doc(fs, c, id), { ...patch, updatedAt: now() }); },
-    async remove(c, id) { await F.deleteDoc(F.doc(fs, c, id)); },
-    async getDoc(path) {
-      const d = await F.getDoc(F.doc(fs, ...path.split('/')));
-      return d.exists() ? d.data() : null;
-    },
-    async setDoc(path, data) { await F.setDoc(F.doc(fs, ...path.split('/')), data, { merge: true }); },
-    isSeeded,
-    async seedCollection(c, rows) {
-      // 500건 단위로 나눠서 일괄 저장
-      for (let i = 0; i < rows.length; i += 400) {
-        const batch = F.writeBatch(fs);
-        rows.slice(i, i + 400).forEach((r) => batch.set(F.doc(fs, c, r.id), { ...r, updatedAt: now() }));
-        await batch.commit();
-      }
-      seededCache[c] = true;
-    },
-  };
+const fileCache = new Map();
+export function fileUrl(id) {
+  if (!fileCache.has(id)) {
+    fileCache.set(id, (async () => {
+      const meta = await db.get(`files/${id}`);
+      if (!meta) throw new Error('파일을 찾을 수 없습니다.');
+      const parts = await Promise.all(Array.from({ length: meta.chunks }, (_, i) => db.get(`files/${id}/chunks/${i}`)));
+      const bytes = parts.map((p) => Uint8Array.from(atob(p.d), (c) => c.charCodeAt(0)));
+      // 같은 사이트 주소(blob:)에서 HTML 등이 실행되지 않도록 사진(JPEG) 외에는 내려받기 전용 형식으로 만듭니다.
+      const type = meta.type === 'image/jpeg' ? 'image/jpeg' : 'application/octet-stream';
+      return URL.createObjectURL(new Blob(bytes, { type }));
+    })().catch((e) => { fileCache.delete(id); throw e; }));
+  }
+  return fileCache.get(id);
+}
 
-  async function loadProfile(u) {
-    if (!u) return null;
-    const d = await F.getDoc(F.doc(fs, 'users', u.uid));
-    const p = d.exists() ? d.data() : {};
-    const isAdminEmail = u.emailVerified && adminEmails.includes(u.email);
-    return {
-      uid: u.uid, email: u.email, verified: u.emailVerified, ...p,
-      role: isAdminEmail ? 'admin' : p.role || 'member',
+async function deleteFile(id) {
+  const meta = await db.get(`files/${id}`).catch(() => null);
+  if (!meta) return;
+  const ops = Array.from({ length: meta.chunks }, (_, i) => ({ op: 'delete', path: `files/${id}/chunks/${i}` }));
+  ops.push({ op: 'delete', path: `files/${id}` });
+  await db.batch(ops).catch(() => {});
+}
+
+// 사진을 줄여서 JPEG로 (긴 변 max px)
+export function shrinkImage(file, max = LIMITS.imagePx, quality = 0.82) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const k = Math.min(1, max / Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+      const g = c.getContext('2d');
+      g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);
+      g.drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(img.src);
+      c.toBlob((b) => (b ? resolve(b) : reject(new Error('사진을 읽지 못했습니다.'))), 'image/jpeg', quality);
     };
-  }
+    img.onerror = () => reject(new Error(`${file.name}: 사진 파일이 아닙니다.`));
+    img.src = URL.createObjectURL(file);
+  });
+}
+export const blobToDataUrl = (b) => new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(b); });
 
-  const ERR = {
-    'auth/email-already-in-use': '이미 가입된 이메일입니다.',
-    'auth/invalid-email': '이메일 형식을 확인해 주세요.',
-    'auth/weak-password': '비밀번호는 6자 이상으로 입력해 주세요.',
-    'auth/invalid-credential': '이메일 또는 비밀번호가 맞지 않습니다.',
-    'auth/wrong-password': '이메일 또는 비밀번호가 맞지 않습니다.',
-    'auth/user-not-found': '가입되지 않은 이메일입니다.',
-    'auth/too-many-requests': '시도가 너무 많습니다. 잠시 후 다시 시도해 주세요.',
-  };
-  const wrap = (e) => new Error(ERR[e.code] || e.message);
+/* ---------------- 글 ---------------- */
+// 목록: 조건은 모두 '같음'(==)이고 정렬은 시간순 ID로 합니다.
+export async function listPosts({ board, category, grade, subject, status, limit = 20, after } = {}) {
+  const eq = { approved: true };
+  if (board) eq.board = board;
+  if (category) eq.category = category;
+  if (grade) eq.grade = grade;
+  if (subject) eq.category = subject;
+  if (status) eq.status = status;
+  return db.query('posts', { eq, limit, after });
+}
+export const listMyPosts = (uid = me?.uid, after) => db.query('posts', { eq: { uid }, limit: 30, after });
+export const listPending = () => db.query('posts', { eq: { board: 'data', approved: false }, limit: 100 });
+export const getPost = (id) => db.get(`posts/${id}`);
 
-  const auth = {
-    init() {
-      return new Promise((resolve) => {
-        let first = true;
-        A.onAuthStateChanged(fa, async (u) => {
-          currentUser = await loadProfile(u);
-          notify();
-          if (first) { first = false; resolve(); }
-        });
-      });
-    },
-    async signUp({ email, password, ...profile }) {
-      try {
-        const cred = await A.createUserWithEmailAndPassword(fa, email, password);
-        await F.setDoc(F.doc(fs, 'users', cred.user.uid), { ...profile, email, role: 'member', createdAt: now() });
-        await A.sendEmailVerification(cred.user).catch(() => {});
-        currentUser = await loadProfile(cred.user); notify(); return currentUser;
-      } catch (e) { throw wrap(e); }
-    },
-    async signIn(email, password) {
-      try {
-        const cred = await A.signInWithEmailAndPassword(fa, email, password);
-        currentUser = await loadProfile(cred.user); notify(); return currentUser;
-      } catch (e) { throw wrap(e); }
-    },
-    async signInWithGoogle() {
-      try {
-        const provider = new A.GoogleAuthProvider();
-        provider.setCustomParameters({ prompt: 'select_account' });
-        const cred = await A.signInWithPopup(fa, provider);
-        const ref = F.doc(fs, 'users', cred.user.uid);
-        const snap = await F.getDoc(ref);
-        if (!snap.exists()) {
-          await F.setDoc(ref, { name: cred.user.displayName || '', email: cred.user.email, role: 'member', provider: 'google', createdAt: now() });
-        }
-        currentUser = await loadProfile(cred.user); notify();
-        return { user: currentUser, isNew: !snap.exists() };
-      } catch (e) {
-        if (e.code === 'auth/popup-closed-by-user' || e.code === 'auth/cancelled-popup-request') throw new Error('Google 로그인 창이 닫혔습니다.');
-        if (e.code === 'auth/popup-blocked') throw new Error('팝업이 차단되었습니다. 브라우저에서 이 사이트의 팝업을 허용해 주세요.');
-        if (e.code === 'auth/account-exists-with-different-credential') throw new Error('같은 이메일로 이미 가입한 계정이 있습니다. 이메일·비밀번호로 로그인해 주세요.');
-        if (e.code === 'auth/unauthorized-domain') throw new Error('이 주소에서는 Google 로그인이 아직 허용되지 않았습니다. 관리자에게 알려주세요.');
-        throw wrap(e);
-      }
-    },
-    async signOut() { await A.signOut(fa); },
-    async resetPassword(email) {
-      try { await A.sendPasswordResetEmail(fa, email); } catch (e) { throw wrap(e); }
-    },
-    async updateProfile(patch) {
-      await F.setDoc(F.doc(fs, 'users', currentUser.uid), patch, { merge: true });
-      currentUser = { ...currentUser, ...patch }; notify();
-    },
-    async resendVerification() { if (fa.currentUser) await A.sendEmailVerification(fa.currentUser); },
+export async function createPost(input) {
+  need();
+  if (input.board === 'notice') needAdmin();
+  const id = newId('desc');
+  const post = {
+    board: input.board,
+    category: input.category,
+    title: input.title,
+    body: input.body,
+    uid: me.uid,
+    nickname: me.nickname,
+    grade: me.grade,
+    createdAt: Date.now(),
+    likeCount: 0,
+    commentCount: 0,
+    thumb: input.thumb || '',
+    images: input.images || [],
+    files: input.files || [],
+    approved: input.board !== 'data',
+    status: input.board === 'qna' ? 'open' : '',
+    acceptedCommentId: '',
+    source: input.source || '',
   };
-
-  const storage = {
-    async upload(path, file) {
-      if (!st) return shrinkImage(file);
-      const r = S.ref(st, path);
-      await S.uploadBytes(r, file, { contentType: file.type });
-      return S.getDownloadURL(r);
-    },
-  };
-  return { mode: 'firebase', db, auth, storage };
+  await db.set(`posts/${id}`, post);
+  return id;
 }
 
-/* ---------------- 시작 ---------------- */
-export const backend = {};
-export async function initBackend() {
-  let impl;
-  if (firebaseConfig.apiKey) {
-    try { impl = await firebaseAdapter(); } catch (e) {
-      console.error('Firebase 연결 실패, 체험 모드로 전환합니다.', e);
-      impl = localAdapter();
-    }
-  } else {
-    impl = localAdapter();
-  }
-  Object.assign(backend, impl);
-  await impl.auth.init();
-  return backend;
+export async function updatePost(id, patch) {
+  need();
+  await db.update(`posts/${id}`, { ...patch, updatedAt: Date.now() });
 }
 
-export const getUser = () => currentUser;
-export const isAdmin = () => currentUser?.role === 'admin';
-export const onUser = (fn) => { listeners.add(fn); return () => listeners.delete(fn); };
-
-// 사이트 설정(전화번호, 주소 등)은 settings/site 문서에서 읽고, 없으면 기본값을 씁니다.
-export async function getSite() {
-  const saved = await backend.db.getDoc('settings/site').catch(() => null);
-  return { ...seed.site, ...(saved || {}) };
+export async function deletePost(post) {
+  need();
+  await db.remove(`posts/${post.id}`);
+  if (post.uid === me.uid || isAdmin()) for (const f of [...(post.images || []), ...(post.files || [])]) await deleteFile(f.id);
 }
-export { seed };
+
+export async function approvePost(post, ok) {
+  needAdmin();
+  if (ok) await db.update(`posts/${post.id}`, { approved: true });
+  else await deletePost(post);
+  await notify(post.uid, ok ? 'approved' : 'rejected', post.id, post.title);
+}
+
+export async function liked(postId) { return !!(me && (await db.get(`posts/${postId}/likes/${me.uid}`))); }
+export async function toggleLike(postId, on) {
+  need();
+  await db.batch(on
+    ? [{ op: 'set', path: `posts/${postId}/likes/${me.uid}`, data: { at: Date.now() } }, { op: 'update', path: `posts/${postId}`, data: { likeCount: inc(1) } }]
+    : [{ op: 'delete', path: `posts/${postId}/likes/${me.uid}` }, { op: 'update', path: `posts/${postId}`, data: { likeCount: inc(-1) } }]);
+}
+
+/* ---------------- 댓글 ---------------- */
+export const listComments = (postId) => db.query(`posts/${postId}/comments`, { limit: 500 });
+
+export async function addComment(post, body, image = '') {
+  need();
+  const id = newId('asc');
+  await db.batch([
+    { op: 'set', path: `posts/${post.id}/comments/${id}`, data: { uid: me.uid, nickname: me.nickname, grade: me.grade, body, image, createdAt: Date.now(), likeCount: 0 } },
+    { op: 'update', path: `posts/${post.id}`, data: { commentCount: inc(1) } },
+  ]);
+  if (post.uid !== me.uid) await notify(post.uid, 'comment', post.id, body).catch(() => {});
+  return id;
+}
+
+export async function deleteComment(postId, cid) {
+  need();
+  await db.batch([
+    { op: 'delete', path: `posts/${postId}/comments/${cid}` },
+    { op: 'update', path: `posts/${postId}`, data: { commentCount: inc(-1) } },
+  ]);
+}
+
+export async function commentLiked(postId, cid) { return !!(me && (await db.get(`posts/${postId}/comments/${cid}/likes/${me.uid}`))); }
+export async function toggleCommentLike(postId, cid, on) {
+  need();
+  const base = `posts/${postId}/comments/${cid}`;
+  await db.batch(on
+    ? [{ op: 'set', path: `${base}/likes/${me.uid}`, data: { at: Date.now() } }, { op: 'update', path: base, data: { likeCount: inc(1) } }]
+    : [{ op: 'delete', path: `${base}/likes/${me.uid}` }, { op: 'update', path: base, data: { likeCount: inc(-1) } }]);
+}
+
+export async function acceptComment(post, comment) {
+  need();
+  await db.update(`posts/${post.id}`, { acceptedCommentId: comment.id, status: 'solved' });
+  if (comment.uid !== me.uid) await notify(comment.uid, 'accepted', post.id, post.title).catch(() => {});
+}
+
+/* ---------------- 알림 ---------------- */
+async function notify(to, type, postId, text) {
+  if (!me || to === me.uid) return;
+  await db.set(`notifications/${newId('desc')}`, {
+    to, from: me.uid, fromName: me.nickname, type, postId, text: String(text || '').slice(0, 80), read: false, createdAt: Date.now(),
+  });
+}
+export const listNotifications = () => (me ? db.query('notifications', { eq: { to: me.uid }, limit: 50 }) : []);
+export async function hasUnread() {
+  if (!me) return false;
+  return (await db.query('notifications', { eq: { to: me.uid, read: false }, limit: 1 })).length > 0;
+}
+export async function markRead(list) {
+  const ops = list.filter((n) => !n.read).map((n) => ({ op: 'update', path: `notifications/${n.id}`, data: { read: true } }));
+  if (ops.length) await db.batch(ops);
+}
+
+/* ---------------- 신고 ---------------- */
+export async function report({ post, comment, reason }) {
+  need();
+  await db.set(`reports/${newId('desc')}`, {
+    uid: me.uid, postId: post.id, postTitle: post.title.slice(0, 100), commentId: comment?.id || '',
+    target: (comment ? comment.body : post.title).slice(0, 200), reason, status: 'open', createdAt: Date.now(),
+  });
+}
+export const listReports = () => db.query('reports', { eq: { status: 'open' }, limit: 100 });
+export async function closeReport(id) { needAdmin(); await db.update(`reports/${id}`, { status: 'done' }); }
+
+/* ---------------- 관리자 ---------------- */
+export async function listUsers(after) { needAdmin(); return db.query('users', { limit: 200, after }); }
+export async function setUserFlags(uid, patch) { needAdmin(); await db.update(`users/${uid}`, patch); }

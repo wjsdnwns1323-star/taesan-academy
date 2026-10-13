@@ -1,73 +1,196 @@
 rules_version = '2';
-// 태산학원 Firestore 보안 규칙
-// ADMIN_EMAILS는 public/js/config.js의 adminEmails와 같게 유지하세요.
+// 태산 커뮤니티 Firestore 보안 규칙
+// - 모든 글·댓글·파일은 로그인한 회원만 볼 수 있습니다.
+// - 실명·전화번호·나이(users/{uid}/private)는 본인과 관리자만 볼 수 있습니다.
+// - 관리자는 users/{uid}.role == 'admin' 인 계정입니다(scripts/create_admin.py로 처음 만듭니다).
 service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() { return request.auth != null; }
-    function adminEmail() {
-      return signedIn() && request.auth.token.email_verified == true
-        && request.auth.token.email in ['wjsdnwns1323@uinone.net'];
+    function userDoc() { return get(/databases/$(database)/documents/users/$(request.auth.uid)).data; }
+    function isAdmin() {
+      return signedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && userDoc().role == 'admin';
     }
-    function adminRole() {
-      return signedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid))
-        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    // 정지되지 않은 회원
+    function active() {
+      return signedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && userDoc().banned == false;
     }
-    function isAdmin() { return adminEmail() || adminRole(); }
     function str(v, max) { return v is string && v.size() <= max; }
-    function ownerOk() {
-      return request.resource.data.uid == '' || (signedIn() && request.resource.data.uid == request.auth.uid);
-    }
-    function phoneOk() { return request.resource.data.phone is string && request.resource.data.phone.matches('^0[0-9]{1,2}-?[0-9]{3,4}-?[0-9]{4}$'); }
-    function mine() { return signedIn() && resource.data.uid == request.auth.uid; }
+    function jpeg(v, max) { return str(v, max) && (v == '' || v.matches('^data:image/jpeg;base64,[A-Za-z0-9+/=]+$')); }
+    function nonEmpty(v, max) { return v is string && v.size() > 0 && v.size() <= max; }
+    function recent(t) { return t is int && t > request.time.toMillis() - 86400000 && t < request.time.toMillis() + 86400000; }
+    function changed() { return request.resource.data.diff(resource.data).affectedKeys(); }
+    function grades() { return ['중1', '중2', '중3', '고1', '고2', '고3', 'N수', '학부모', '기타']; }
 
-    // 공개 콘텐츠
-    match /{col}/{id} {
-      allow read: if col in ['teachers', 'leaders', 'classes', 'results', 'events', 'notices', 'faqs', 'schools', 'settings', 'bandPosts', 'media', 'banners', 'quicklinks'];
-      allow write: if isAdmin() && col in ['teachers', 'leaders', 'classes', 'results', 'events', 'notices', 'faqs', 'schools', 'settings', 'bandPosts', 'media', 'banners', 'quicklinks'];
-    }
-
-    // 회원
+    // 회원 공개 정보(닉네임·학년·권한)
     match /users/{uid} {
-      allow read: if (signedIn() && request.auth.uid == uid) || isAdmin();
-      allow create: if signedIn() && request.auth.uid == uid && request.resource.data.role == 'member';
+      allow get: if signedIn();
+      allow list: if isAdmin();
+      allow create: if signedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['username', 'nickname', 'grade', 'role', 'banned', 'createdAt'])
+        && request.resource.data.role == 'member' && request.resource.data.banned == false
+        && request.resource.data.username.matches('^[a-z0-9_]{4,20}$')
+        && request.auth.token.email.split('@')[0] == request.resource.data.username
+        && nonEmpty(request.resource.data.nickname, 12) && request.resource.data.grade in grades()
+        && recent(request.resource.data.createdAt)
+        && getAfter(/databases/$(database)/documents/nicknames/$(request.resource.data.nickname)).data.uid == uid;
       allow update: if (signedIn() && request.auth.uid == uid
-                         && request.resource.data.role == resource.data.role) || isAdmin();
-      allow delete: if isAdmin();
+                         && changed().hasOnly(['nickname', 'grade'])
+                         && nonEmpty(request.resource.data.nickname, 12) && request.resource.data.grade in grades()
+                         && getAfter(/databases/$(database)/documents/nicknames/$(request.resource.data.nickname)).data.uid == uid)
+                    || (isAdmin() && changed().hasOnly(['role', 'banned'])
+                         && request.resource.data.role in ['member', 'admin'] && request.resource.data.banned is bool);
+      allow delete: if (signedIn() && request.auth.uid == uid) || isAdmin();
+
+      // 개인정보: 본인·관리자만
+      match /private/{doc} {
+        allow read: if (signedIn() && request.auth.uid == uid) || isAdmin();
+        allow create: if signedIn() && request.auth.uid == uid && doc == 'info'
+          && request.resource.data.keys().hasOnly(['realName', 'phone', 'age', 'guardianConsent', 'agreedAt'])
+          && nonEmpty(request.resource.data.realName, 20)
+          && request.resource.data.phone.matches('^01[0-9]-?[0-9]{3,4}-?[0-9]{4}$')
+          && request.resource.data.age is int && request.resource.data.age >= 8 && request.resource.data.age <= 99
+          && (request.resource.data.age >= 14 || request.resource.data.guardianConsent == true)
+          && recent(request.resource.data.agreedAt);
+        allow update: if signedIn() && request.auth.uid == uid
+          && changed().hasOnly(['realName', 'phone', 'age'])
+          && nonEmpty(request.resource.data.realName, 20)
+          && request.resource.data.phone.matches('^01[0-9]-?[0-9]{3,4}-?[0-9]{4}$')
+          && request.resource.data.age is int && request.resource.data.age >= 8 && request.resource.data.age <= 99;
+        allow delete: if (signedIn() && request.auth.uid == uid) || isAdmin();
+      }
     }
 
-    // 수강 신청
-    match /applications/{id} {
-      allow create: if ownerOk() && phoneOk() && request.resource.data.status == '접수'
-        && str(request.resource.data.studentName, 40) && str(request.resource.data.classId, 40)
-        && str(request.resource.data.memo, 1000) && !('adminNote' in request.resource.data);
-      allow read: if isAdmin() || mine();
-      allow update, delete: if isAdmin();
+    // 닉네임 중복 방지
+    match /nicknames/{nick} {
+      allow get: if true;
+      allow create: if signedIn() && request.resource.data.keys().hasOnly(['uid']) && request.resource.data.uid == request.auth.uid
+        && nonEmpty(nick, 12);
+      allow delete: if (signedIn() && resource.data.uid == request.auth.uid) || isAdmin();
     }
 
-    // 설명회·진단고사 예약 (본인은 취소만 가능)
-    match /reservations/{id} {
-      allow create: if ownerOk() && phoneOk() && request.resource.data.status == '접수'
-        && str(request.resource.data.name, 40) && str(request.resource.data.eventId, 60);
-      allow read: if isAdmin() || mine();
-      allow update: if isAdmin() || (mine() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
-                                      && request.resource.data.status == '취소');
-      allow delete: if isAdmin();
+    // 글
+    match /posts/{pid} {
+      function post() { return resource.data; }
+      function likePath() { return /databases/$(database)/documents/posts/$(pid)/likes/$(request.auth.uid); }
+
+      allow read: if signedIn() && (resource.data.approved == true || resource.data.uid == request.auth.uid || isAdmin());
+
+      allow create: if active() && request.resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['board', 'category', 'title', 'body', 'uid', 'nickname', 'grade', 'createdAt',
+             'likeCount', 'commentCount', 'thumb', 'images', 'files', 'approved', 'status', 'acceptedCommentId', 'source'])
+        && request.resource.data.board in ['talk', 'study', 'qna', 'data', 'notice']
+        && (request.resource.data.board != 'notice' || isAdmin())
+        && request.resource.data.approved == (request.resource.data.board != 'data')
+        && (request.resource.data.board != 'data' || nonEmpty(request.resource.data.source, 200))
+        && str(request.resource.data.source, 200)
+        && nonEmpty(request.resource.data.category, 20)
+        && nonEmpty(request.resource.data.title, 100) && str(request.resource.data.body, 10000)
+        && request.resource.data.nickname == userDoc().nickname && request.resource.data.grade == userDoc().grade
+        && recent(request.resource.data.createdAt)
+        && request.resource.data.likeCount == 0 && request.resource.data.commentCount == 0
+        && jpeg(request.resource.data.thumb, 80000)
+        && request.resource.data.images is list && request.resource.data.images.size() <= 10
+        && request.resource.data.files is list && request.resource.data.files.size() <= 5
+        && request.resource.data.status == (request.resource.data.board == 'qna' ? 'open' : '')
+        && request.resource.data.acceptedCommentId == '';
+
+      allow update: if
+        // 작성자: 내용 고치기(자료실 글은 다시 승인 대기)
+        (active() && post().uid == request.auth.uid
+          && changed().hasOnly(['title', 'body', 'category', 'thumb', 'images', 'files', 'source', 'updatedAt', 'approved'])
+          && nonEmpty(request.resource.data.title, 100) && str(request.resource.data.body, 10000)
+          && nonEmpty(request.resource.data.category, 20) && jpeg(request.resource.data.thumb, 80000)
+          && str(request.resource.data.source, 200)
+          && request.resource.data.images.size() <= 10 && request.resource.data.files.size() <= 5
+          && request.resource.data.approved == (post().board != 'data' || (isAdmin() && post().approved)))
+        // 작성자: 문제풀이 답변 채택(한 번만)
+        || (active() && post().uid == request.auth.uid && post().board == 'qna' && post().acceptedCommentId == ''
+          && changed().hasOnly(['acceptedCommentId', 'status']) && request.resource.data.status == 'solved'
+          && exists(/databases/$(database)/documents/posts/$(pid)/comments/$(request.resource.data.acceptedCommentId)))
+        // 좋아요 수: 좋아요 문서와 함께만 바뀜
+        || (active() && changed().hasOnly(['likeCount'])
+          && ((request.resource.data.likeCount == post().likeCount + 1 && !exists(likePath()) && existsAfter(likePath()))
+           || (request.resource.data.likeCount == post().likeCount - 1 && exists(likePath()) && !existsAfter(likePath()))))
+        // 댓글 수
+        || (active() && changed().hasOnly(['commentCount'])
+          && (request.resource.data.commentCount == post().commentCount + 1 || request.resource.data.commentCount == post().commentCount - 1))
+        // 관리자: 승인
+        || (isAdmin() && changed().hasOnly(['approved']));
+
+      allow delete: if (signedIn() && post().uid == request.auth.uid) || isAdmin();
+
+      match /likes/{uid} {
+        allow read: if signedIn() && uid == request.auth.uid;
+        allow create: if active() && uid == request.auth.uid && request.resource.data.keys().hasOnly(['at'])
+          && getAfter(/databases/$(database)/documents/posts/$(pid)).data.likeCount == get(/databases/$(database)/documents/posts/$(pid)).data.likeCount + 1;
+        allow delete: if signedIn() && uid == request.auth.uid
+          && getAfter(/databases/$(database)/documents/posts/$(pid)).data.likeCount == get(/databases/$(database)/documents/posts/$(pid)).data.likeCount - 1;
+      }
+
+      match /comments/{cid} {
+        function cpath() { return /databases/$(database)/documents/posts/$(pid)/comments/$(cid)/likes/$(request.auth.uid); }
+        allow read: if signedIn();
+        allow create: if active() && request.resource.data.uid == request.auth.uid
+          && request.resource.data.keys().hasOnly(['uid', 'nickname', 'grade', 'body', 'image', 'createdAt', 'likeCount'])
+          && nonEmpty(request.resource.data.body, 3000) && jpeg(request.resource.data.image, 400000)
+          && request.resource.data.nickname == userDoc().nickname && request.resource.data.grade == userDoc().grade
+          && recent(request.resource.data.createdAt) && request.resource.data.likeCount == 0
+          && getAfter(/databases/$(database)/documents/posts/$(pid)).data.commentCount
+             == get(/databases/$(database)/documents/posts/$(pid)).data.commentCount + 1;
+        allow update: if active() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likeCount'])
+          && ((request.resource.data.likeCount == resource.data.likeCount + 1 && !exists(cpath()) && existsAfter(cpath()))
+           || (request.resource.data.likeCount == resource.data.likeCount - 1 && exists(cpath()) && !existsAfter(cpath())));
+        allow delete: if (signedIn() && resource.data.uid == request.auth.uid) || isAdmin();
+
+        match /likes/{uid} {
+          allow read: if signedIn() && uid == request.auth.uid;
+          allow create: if active() && uid == request.auth.uid && request.resource.data.keys().hasOnly(['at']);
+          allow delete: if signedIn() && uid == request.auth.uid;
+        }
+      }
     }
 
-    // 온라인 상담
-    match /consults/{id} {
-      allow create: if ownerOk() && phoneOk() && request.resource.data.status == '접수'
-        && request.resource.data.answer == '' && str(request.resource.data.title, 80) && str(request.resource.data.body, 2000);
-      allow read: if isAdmin() || mine();
-      allow update, delete: if isAdmin();
+    // 첨부 파일(조각으로 나눠 저장)
+    match /files/{fid} {
+      allow read: if signedIn();
+      allow create: if active() && request.resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['uid', 'name', 'type', 'size', 'chunks', 'createdAt'])
+        && nonEmpty(request.resource.data.name, 200) && str(request.resource.data.type, 100)
+        && request.resource.data.size is int && request.resource.data.size <= 5 * 1024 * 1024
+        && request.resource.data.chunks is int && request.resource.data.chunks >= 1 && request.resource.data.chunks <= 9;
+      allow delete: if (signedIn() && resource.data.uid == request.auth.uid) || isAdmin();
+
+      match /chunks/{n} {
+        function owner() { return get(/databases/$(database)/documents/files/$(fid)).data.uid == request.auth.uid; }
+        allow read: if signedIn();
+        allow create: if active() && owner() && request.resource.data.keys().hasOnly(['d'])
+          && str(request.resource.data.d, 820000);
+        allow delete: if signedIn() && (owner() || isAdmin());
+      }
     }
 
-    // 방문 상담
-    match /visits/{id} {
-      allow create: if ownerOk() && phoneOk() && request.resource.data.status == '접수'
-        && str(request.resource.data.name, 40) && str(request.resource.data.memo, 1000);
-      allow read: if isAdmin() || mine();
-      allow update, delete: if isAdmin();
+    // 알림
+    match /notifications/{id} {
+      allow read: if signedIn() && resource.data.to == request.auth.uid;
+      allow create: if active() && request.resource.data.from == request.auth.uid && request.resource.data.to != request.auth.uid
+        && request.resource.data.keys().hasOnly(['to', 'from', 'fromName', 'type', 'postId', 'text', 'read', 'createdAt'])
+        && request.resource.data.type in ['comment', 'accepted', 'approved', 'rejected']
+        && (request.resource.data.type in ['comment', 'accepted'] || isAdmin())
+        && str(request.resource.data.to, 128) && str(request.resource.data.fromName, 12) && str(request.resource.data.postId, 40)
+        && str(request.resource.data.text, 80) && request.resource.data.read == false && recent(request.resource.data.createdAt);
+      allow update: if signedIn() && resource.data.to == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+      allow delete: if signedIn() && resource.data.to == request.auth.uid;
+    }
+
+    // 신고
+    match /reports/{id} {
+      allow create: if active() && request.resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['uid', 'postId', 'postTitle', 'commentId', 'target', 'reason', 'status', 'createdAt'])
+        && nonEmpty(request.resource.data.reason, 300) && str(request.resource.data.target, 200)
+        && str(request.resource.data.postTitle, 100) && request.resource.data.status == 'open' && recent(request.resource.data.createdAt);
+      allow read, delete: if isAdmin();
+      allow update: if isAdmin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']);
     }
   }
 }
