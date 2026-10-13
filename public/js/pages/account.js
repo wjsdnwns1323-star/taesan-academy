@@ -14,7 +14,7 @@ function authPage(el, go, query, mode) {
     ${join ? '<ol class="steps-mini"><li class="cur"><b>STEP 1</b>Google 로그인</li><li><b>STEP 2</b>내 정보 입력</li><li><b>STEP 3</b>가입 완료</li></ol>' : ''}
     <div class="panel">
       <img src="images/brand/logo-dark.png" alt="태산학원" class="gate-logo">
-      ${local ? '<div class="callout" style="text-align:left">체험 모드입니다. 아래 이메일로 Google 로그인을 흉내 냅니다. <b>admin@</b>으로 시작하면 관리자 화면을 볼 수 있습니다.</div><label class="field" style="text-align:left"><span>체험용 이메일</span><input class="input" id="demo-email" type="email" placeholder="you@gmail.com"></label>' : ''}
+      ${local ? '<div class="callout" style="text-align:left">체험 모드입니다. 아래 이메일로 Google 로그인을 흉내 냅니다. 관리자 화면은 <a class="link" href="#/admin">#/admin</a>에서 관리자 아이디로 로그인합니다.</div><label class="field" style="text-align:left"><span>체험용 이메일</span><input class="input" id="demo-email" type="email" placeholder="you@gmail.com"></label>' : ''}
       <label class="check gate-agree"><input type="checkbox" id="agree"> <span><a class="link" href="#/privacy">개인정보 수집·이용</a>에 동의합니다. (필수)</span></label>
       <button type="button" class="gbtn" data-google>${G_ICON} Google 계정으로 ${join ? '시작하기' : '로그인'}</button>
       <p class="form-error" aria-live="polite"></p>

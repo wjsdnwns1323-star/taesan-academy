@@ -1,5 +1,6 @@
 // 관리자 페이지 — 접수 관리, 사이트 모든 콘텐츠 편집, 사이트 정보, 회원, 백업
 import { backend, getUser, isAdmin, getSite, CONTENT, seed, shrinkImage } from '../backend.js';
+import { adminEmails } from '../config.js';
 import { esc, $, $$, toast, confirmBox, statusTag, fmtDate } from '../ui.js';
 import { clearCache } from './common.js';
 import { refreshSite } from '../app.js';
@@ -177,15 +178,8 @@ const NAV = [
 ];
 
 /* ───────────── 진입 ───────────── */
-export async function render({ el, params, query = {}, go }) {
-  const u = getUser();
-  if (!u) return go('#/login?next=/admin');
-  if (!isAdmin()) {
-    el.innerHTML = `<div class="wrap page"><div class="narrow card"><h2 style="font-size:20px;font-weight:900">관리자만 볼 수 있습니다.</h2>
-      <p style="margin-top:8px;color:var(--muted)">관리자 Google 계정으로 로그인했는지 확인해 주세요. 다른 관리자는 관리자 &gt; 회원에서 지정할 수 있습니다.</p>
-      <p style="margin-top:14px"><a class="btn" href="#/">홈으로</a></p></div></div>`;
-    return;
-  }
+export async function render({ el, params, query = {}, rerender }) {
+  if (!isAdmin()) return adminLogin(el, rerender);
   const tab = params.tab || '';
   const reqData = {};
   await Promise.all(Object.keys(REQ).map(async (c) => { reqData[c] = await backend.db.list(c).catch(() => []); }));
@@ -210,6 +204,37 @@ export async function render({ el, params, query = {}, go }) {
   } catch (e) {
     main.innerHTML = `<div class="callout seal">불러오지 못했습니다: ${esc(e.message)}<br>잠시 후 다시 열어 보세요. 계속되면 로그아웃 후 다시 로그인해 주세요.</div>`;
   }
+}
+
+/* ───────────── 관리자 로그인 (아이디·비밀번호) ───────────── */
+function adminLogin(el, rerender) {
+  const u = getUser();
+  const local = backend.mode === 'local';
+  el.innerHTML = `<div class="gate"><div class="gate-main"><div class="gate-card">
+    <h1 class="gate-h">관리자 로그인</h1>
+    <p class="gate-sub">학원 관리자 전용입니다. 관리자 아이디와 비밀번호로 로그인하세요.</p>
+    <form class="panel" id="alf" novalidate autocomplete="on">
+      <img src="images/brand/logo-dark.png" alt="태산학원" class="gate-logo">
+      ${u ? `<div class="callout" style="text-align:left">지금 <b>${esc(u.name || u.email || '회원')}</b> 계정으로 로그인되어 있습니다. 관리자로 로그인하면 이 계정은 로그아웃됩니다.</div>` : ''}
+      ${local ? `<div class="callout" style="text-align:left">체험 모드: 아이디 <b>${esc(adminEmails[0].split('@')[0])}</b>, 비밀번호는 처음 넣은 값(6자 이상)으로 정해집니다.</div>` : ''}
+      <label class="field" style="text-align:left"><span>아이디</span><input class="input" name="aid" autocomplete="username" autocapitalize="off" spellcheck="false" required></label>
+      <label class="field" style="text-align:left"><span>비밀번호</span><input class="input" name="pw" type="password" autocomplete="current-password" required></label>
+      <p class="form-error" aria-live="polite"></p>
+      <button class="btn block">관리자 로그인</button>
+    </form>
+    <p class="gate-note"><a class="link" href="#/">홈으로</a></p>
+  </div></div></div>`;
+  const f = $('#alf', el), err = f.querySelector('.form-error'), btn = f.querySelector('button');
+  f.onsubmit = async (e) => {
+    e.preventDefault(); err.textContent = '';
+    if (!f.elements.aid.value.trim() || !f.elements.pw.value) { err.textContent = '아이디와 비밀번호를 입력해 주세요.'; return; }
+    btn.disabled = true; btn.textContent = '확인 중…';
+    try {
+      await backend.auth.signInAdmin(f.elements.aid.value, f.elements.pw.value);
+      toast('관리자로 로그인했습니다.'); rerender();
+    } catch (ex) { err.textContent = ex.message; btn.disabled = false; btn.textContent = '관리자 로그인'; }
+  };
+  f.elements.aid.focus();
 }
 
 const head = (title, desc = '', actions = '') => `<header class="adm-head"><div><h1>${esc(title)}</h1>${desc ? `<p>${desc}</p>` : ''}</div><div class="adm-act">${actions}</div></header>`;
@@ -655,23 +680,18 @@ async function requests(main, col, rows0, query) {
 
 /* ───────────── 회원 ───────────── */
 async function users(main) {
-  let list = (await backend.db.list('users')).sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+  let list = (await backend.db.list('users')).filter((u) => !adminEmails.includes(u.email)).sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
   const st = { q: '' };
-  main.innerHTML = `${head('회원', 'Google로 로그인한 회원입니다. 관리자로 지정하면 이 화면을 쓸 수 있습니다.', '<button class="btn ghost" id="csv">엑셀(CSV) 받기</button>')}
+  main.innerHTML = `${head('회원', 'Google로 로그인한 회원입니다. 관리자 화면은 관리자 아이디로만 쓸 수 있습니다.', '<button class="btn ghost" id="csv">엑셀(CSV) 받기</button>')}
     <div class="adm-tools"><input class="input" type="search" id="fq" placeholder="이름·이메일·학교 검색"><span class="cnt-l" id="cnt"></span></div>
-    <div class="tbl-wrap"><table class="adm-tbl"><thead><tr><th>가입일</th><th>이름</th><th>이메일</th><th>구분</th><th>연락처</th><th>학교·학년</th><th>문자 수신</th><th>권한</th></tr></thead><tbody id="tb"></tbody></table></div>`;
+    <div class="tbl-wrap"><table class="adm-tbl"><thead><tr><th>가입일</th><th>이름</th><th>이메일</th><th>구분</th><th>연락처</th><th>학교·학년</th><th>문자 수신</th></tr></thead><tbody id="tb"></tbody></table></div>`;
   const filtered = () => list.filter((u) => !st.q || JSON.stringify(u).includes(st.q));
   const draw = () => {
     const l = filtered(); $('#cnt', main).textContent = `${l.length}명`;
-    $('#tb', main).innerHTML = l.map((u) => `<tr><td>${esc(fmtDate(u.createdAt))}</td><td><b>${esc(u.name)}</b></td><td>${esc(u.email)}</td><td>${esc(u.type || '')}</td><td>${u.phone ? `<a class="link" href="tel:${esc(u.phone)}">${esc(u.phone)}</a>` : ''}</td><td>${esc(u.school || '')} ${esc(u.grade || '')}</td><td>${u.marketing ? '동의' : ''}</td>
-      <td><select class="select sm" data-role="${esc(u.id)}" ${u.id === getUser().uid ? 'disabled' : ''}><option value="member" ${u.role !== 'admin' ? 'selected' : ''}>회원</option><option value="admin" ${u.role === 'admin' ? 'selected' : ''}>관리자</option></select></td></tr>`).join('') || '<tr><td colspan="8" class="empty">가입한 회원이 없습니다.</td></tr>';
-    $$('[data-role]', main).forEach((s) => (s.onchange = async () => {
-      if (s.value === 'admin' && !(await confirmBox('이 회원을 관리자로 지정할까요? 사이트의 모든 내용을 바꿀 수 있게 됩니다.'))) { s.value = 'member'; return; }
-      await backend.db.update('users', s.dataset.role, { role: s.value }); list.find((u) => u.id === s.dataset.role).role = s.value; toast('권한을 바꿨습니다.');
-    }));
+    $('#tb', main).innerHTML = l.map((u) => `<tr><td>${esc(fmtDate(u.createdAt))}</td><td><b>${esc(u.name)}</b></td><td>${esc(u.email)}</td><td>${esc(u.type || '')}</td><td>${u.phone ? `<a class="link" href="tel:${esc(u.phone)}">${esc(u.phone)}</a>` : ''}</td><td>${esc(u.school || '')} ${esc(u.grade || '')}</td><td>${u.marketing ? '동의' : ''}</td></tr>`).join('') || '<tr><td colspan="7" class="empty">가입한 회원이 없습니다.</td></tr>';
   };
   $('#fq', main).oninput = (e) => { st.q = e.target.value.trim(); draw(); };
-  $('#csv', main).onclick = () => download(`회원_${new Date().toISOString().slice(0, 10)}.csv`, toCSV(['가입일', '이름', '이메일', '구분', '연락처', '학교', '학년', '학생 이름', '문자 수신', '권한'], filtered().map((u) => [fmtDate(u.createdAt), u.name, u.email, u.type, u.phone, u.school, u.grade, u.studentName, u.marketing ? '동의' : '', u.role])));
+  $('#csv', main).onclick = () => download(`회원_${new Date().toISOString().slice(0, 10)}.csv`, toCSV(['가입일', '이름', '이메일', '구분', '연락처', '학교', '학년', '학생 이름', '문자 수신'], filtered().map((u) => [fmtDate(u.createdAt), u.name, u.email, u.type, u.phone, u.school, u.grade, u.studentName, u.marketing ? '동의' : ''])));
   draw();
 }
 

@@ -6,8 +6,8 @@ service firebase.storage {
       allow read: if true;
       allow write: if request.auth != null
         && (
-          (request.auth.token.email_verified == true && request.auth.token.email in ['wjsdnwns1323@uinone.net'])
-          || firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin'
+          request.auth.token.email in ['admin@taesan-academy.firebaseapp.com']
+          && request.auth.token.firebase.sign_in_provider == 'password'
         )
         && request.resource.size < 3 * 1024 * 1024
         && request.resource.contentType.matches('image/.*');

@@ -1,6 +1,6 @@
 // 데이터·로그인·파일 저장을 한곳에서 처리합니다.
 // firebaseConfig.apiKey가 있으면 Firebase(Auth, Firestore, Storage)를, 없으면 브라우저 저장소(체험 모드)를 씁니다.
-import { firebaseConfig, adminEmails } from './config.js';
+import { firebaseConfig, adminEmails, ADMIN_DOMAIN } from './config.js';
 import * as seed from './data/seed.js';
 import { BAND_POSTS } from './data/band.js';
 
@@ -124,7 +124,7 @@ function localAdapter() {
       if (users.some((u) => u.email === email)) throw new Error('이미 가입된 이메일입니다.');
       const u = {
         id: uid(), uid: '', email, pw: await hash(password), ...profile,
-        role: email.startsWith('admin@') || adminEmails.includes(email) ? 'admin' : 'member',
+        role: 'member',
         verified: true, createdAt: now(),
       };
       u.uid = u.id; users.push(u); write('users', users);
@@ -142,11 +142,24 @@ function localAdapter() {
       const users = read('users');
       let u = users.find((x) => x.email === email); const isNew = !u;
       if (!u) {
-        u = { id: uid(), email, name: email.split('@')[0], role: email.startsWith('admin@') || adminEmails.includes(email) ? 'admin' : 'member', verified: true, provider: 'google', createdAt: now() };
+        if (adminEmails.includes(email)) throw new Error('관리자 계정은 관리자 화면에서 아이디·비밀번호로 로그인합니다.');
+        u = { id: uid(), email, name: email.split('@')[0], role: 'member', verified: true, provider: 'google', createdAt: now() };
         u.uid = u.id; users.push(u); write('users', users);
       }
       localStorage.setItem('taesan:_session', JSON.stringify(u.uid));
       currentUser = u; notify(); return { user: u, isNew };
+    },
+    // 체험 모드: 관리자 아이디면 비밀번호를 처음 넣은 값으로 정하고, 이후에는 그 값으로 확인합니다.
+    async signInAdmin(id, password) {
+      const email = adminEmailOf(id);
+      if (!adminEmails.includes(email)) throw new Error('관리자 아이디 또는 비밀번호가 맞지 않습니다.');
+      if (!password || password.length < 6) throw new Error('비밀번호는 6자 이상입니다.');
+      const users = read('users');
+      let u = users.find((x) => x.email === email);
+      if (!u) { u = { id: uid(), email, name: '관리자', role: 'admin', provider: 'password', pw: await hash(password), verified: true, createdAt: now() }; u.uid = u.id; users.push(u); write('users', users); }
+      else if (u.pw !== (await hash(password))) throw new Error('관리자 아이디 또는 비밀번호가 맞지 않습니다.');
+      localStorage.setItem('taesan:_session', JSON.stringify(u.uid));
+      currentUser = u; notify(); return u;
     },
     async signOut() { localStorage.removeItem('taesan:_session'); currentUser = null; notify(); },
     async resetPassword() { throw new Error('체험 모드에서는 비밀번호 재설정 메일을 보낼 수 없습니다.'); },
@@ -228,10 +241,12 @@ async function firebaseAdapter() {
     if (!u) return null;
     const d = await F.getDoc(F.doc(fs, 'users', u.uid));
     const p = d.exists() ? d.data() : {};
-    const isAdminEmail = u.emailVerified && adminEmails.includes(u.email);
+    // 관리자는 관리자 이메일로 '아이디·비밀번호' 로그인한 경우만입니다(Google 로그인·회원 문서의 권한 값은 관리자 권한을 주지 않습니다).
+    const admin = adminEmails.includes(u.email) && u.providerData.some((x) => x.providerId === 'password');
     return {
       uid: u.uid, email: u.email, verified: u.emailVerified, ...p,
-      role: isAdminEmail ? 'admin' : p.role || 'member',
+      ...(admin ? { name: '관리자' } : {}),
+      role: admin ? 'admin' : 'member',
     };
   }
 
@@ -291,6 +306,18 @@ async function firebaseAdapter() {
         throw wrap(e);
       }
     },
+    async signInAdmin(id, password) {
+      const email = adminEmailOf(id);
+      if (!adminEmails.includes(email)) throw new Error('관리자 아이디 또는 비밀번호가 맞지 않습니다.');
+      try {
+        const cred = await A.signInWithEmailAndPassword(fa, email, password);
+        currentUser = await loadProfile(cred.user); notify(); return currentUser;
+      } catch (e) {
+        if (['auth/invalid-credential', 'auth/wrong-password', 'auth/user-not-found', 'auth/invalid-email'].includes(e.code)) throw new Error('관리자 아이디 또는 비밀번호가 맞지 않습니다.');
+        if (e.code === 'auth/operation-not-allowed') throw new Error('아이디·비밀번호 로그인이 아직 켜져 있지 않습니다. Firebase 콘솔에서 이메일/비밀번호 로그인을 사용 설정해 주세요.');
+        throw wrap(e);
+      }
+    },
     async signOut() { await A.signOut(fa); },
     async resetPassword(email) {
       try { await A.sendPasswordResetEmail(fa, email); } catch (e) { throw wrap(e); }
@@ -332,6 +359,8 @@ export async function initBackend() {
 
 export const getUser = () => currentUser;
 export const isAdmin = () => currentUser?.role === 'admin';
+// 'admin'처럼 아이디만 넣어도 관리자 이메일로 바꿉니다.
+export function adminEmailOf(id) { const v = String(id || '').trim().toLowerCase(); return v.includes('@') ? v : `${v}@${ADMIN_DOMAIN}`; }
 export const onUser = (fn) => { listeners.add(fn); return () => listeners.delete(fn); };
 
 // 사이트 설정(전화번호, 주소 등)은 settings/site 문서에서 읽고, 없으면 기본값을 씁니다.
