@@ -27,7 +27,7 @@ export async function renderPost(ctx) {
     <article class="post">
       ${labelHtml(post)}${status}
       <h1>${esc(post.title)}</h1>
-      <div class="author"><span class="avatar">${esc(post.nickname?.[0] || '?')}</span><div><b>${esc(post.nickname)}</b> · ${esc(post.grade)}<br>${ago(post.createdAt)}${post.updatedAt ? ' · 수정됨' : ''}</div></div>
+      <div class="author" data-uid="${admin ? esc(post.uid) : ''}"><span class="avatar">${esc(post.nickname?.[0] || '?')}</span><div><b>${esc(post.nickname)}</b> · ${esc(post.grade)}<br>${ago(post.createdAt)}${post.updatedAt ? ' · 수정됨' : ''}</div></div>
       ${pending}
       <div class="body">${linkify(post.body)}</div>
       ${post.images?.length ? `<div class="images">${post.images.map((im) => `<img data-file="${esc(im.id)}" alt="첨부 사진">`).join('')}</div>` : ''}
@@ -39,6 +39,7 @@ export async function renderPost(ctx) {
         <span class="react" style="border:0">${ICON.chat}<span>${comments.length}</span></span>
         <span class="sp"></span>
         ${mine ? `<a class="link-btn" href="#/edit/${post.id}">수정</a>` : ''}
+        ${admin ? `<button class="link-btn" id="hide">${post.hidden ? '다시 보이기' : '숨김'}</button>` : ''}
         ${mine || admin ? '<button class="link-btn danger" id="del">삭제</button>' : ''}
         ${mine ? '' : '<button class="link-btn" id="report">신고</button>'}
       </div>
@@ -61,7 +62,7 @@ export async function renderPost(ctx) {
   const sorted = [...comments].sort((a, b) => (b.id === post.acceptedCommentId) - (a.id === post.acceptedCommentId));
   $('#clist').innerHTML = sorted.map((c) => `<div class="comment ${c.id === post.acceptedCommentId ? 'accepted' : ''}" data-c="${esc(c.id)}">
       ${c.id === post.acceptedCommentId ? '<span class="badge solved">✓ 채택된 답변</span>' : ''}
-      <div class="author"><b>${esc(c.nickname)}</b> · ${esc(c.grade)}${c.uid === post.uid ? ' · <span style="color:var(--accent)">작성자</span>' : ''}</div>
+      <div class="author" data-uid="${admin ? esc(c.uid) : ''}"><b>${esc(c.nickname)}</b> · ${esc(c.grade)}${c.uid === post.uid ? ' · <span style="color:var(--accent)">작성자</span>' : ''}</div>
       <div class="body">${linkify(c.body)}</div>
       ${safeImg(c.image) ? `<img src="${safeImg(c.image)}" alt="댓글 사진">` : ''}
       <div class="tools"><span>${ago(c.createdAt)}</span>
@@ -101,6 +102,9 @@ export async function renderPost(ctx) {
     try { await be.deletePost(post); toast('삭제했어요'); history.back(); } catch (err) { toast(be.errorText(err)); }
   });
   $('#report')?.addEventListener('click', () => doReport(post));
+  $('#hide')?.addEventListener('click', async () => {
+    try { await be.setHidden(post, !post.hidden); toast(post.hidden ? '다시 보이게 했어요' : '숨겼어요'); ctx.go(`#/post/${post.id}?r=${Date.now()}`); } catch (err) { toast(be.errorText(err)); }
+  });
   $('#approve')?.addEventListener('click', async () => {
     try { await be.approvePost(post, true); toast('승인했어요'); ctx.go(`#/post/${post.id}?r=${Date.now()}`); } catch (err) { toast(be.errorText(err)); }
   });

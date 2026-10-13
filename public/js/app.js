@@ -247,8 +247,8 @@ async function renderBoardTable(ctx, board, filter, href) {
       <select id="per">${[15, 30, 50].map((n) => `<option value="${n}" ${n === per ? 'selected' : ''}>${n}개씩</option>`).join('')}</select></div></div>
     ${board === 'data' ? '<p class="bt-note">자료실에는 직접 만들었거나 배포 허락을 받은 자료만 올릴 수 있어요. 관리자 확인 후 공개돼요. <a href="#/data-rules">자료실 규칙 보기</a></p>' : ''}
     ${board === 'notice' || board === 'all' ? '' : `<div class="bt-cats"><a class="${filter.category ? '' : 'on'}" href="${href({ category: '' })}">전체</a>${b.categories.map((c) => `<a class="${c.id === filter.category ? 'on' : ''}" href="${href({ category: c.id })}">${esc(c.name)}</a>`).join('')}</div>`}
-    <table class="bt"><colgroup><col style="width:92px"><col><col style="width:150px"><col style="width:110px"><col style="width:70px"><col style="width:70px"></colgroup>
-      <thead><tr><th>말머리</th><th>제목</th><th>작성자</th><th>작성일</th><th>조회수</th><th>좋아요</th></tr></thead><tbody id="bt-body"><tr><td colspan="6" class="loading">불러오는 중…</td></tr></tbody></table>
+    <table class="bt"><colgroup><col style="width:92px"><col><col style="width:150px"><col style="width:110px"><col style="width:70px"><col style="width:70px">${be.isAdmin() ? '<col style="width:96px">' : ''}</colgroup>
+      <thead><tr><th>말머리</th><th>제목</th><th>작성자</th><th>작성일</th><th>조회수</th><th>좋아요</th>${be.isAdmin() ? '<th>관리</th>' : ''}</tr></thead><tbody id="bt-body"><tr><td colspan="6" class="loading">불러오는 중…</td></tr></tbody></table>
     <div class="bt-foot"><div class="pager" id="pager"></div>
       <form class="bt-search" id="bt-search"><select name="d"><option value="">전체기간</option><option value="7" ${period === '7' ? 'selected' : ''}>1주</option><option value="30" ${period === '30' ? 'selected' : ''}>1개월</option><option value="365" ${period === '365' ? 'selected' : ''}>1년</option></select>
         <select name="f"><option value="title">제목만</option><option value="all" ${field === 'all' ? 'selected' : ''}>제목+내용</option><option value="author" ${field === 'author' ? 'selected' : ''}>글작성자</option></select>
@@ -270,11 +270,24 @@ async function renderBoardTable(ctx, board, filter, href) {
     : (field === 'all' ? `${p.title} ${p.body}` : p.title).toLowerCase().includes(k))));
   const pages = Math.max(1, Math.ceil(hits.length / per));
   const list = hits.slice((page - 1) * per, page * per);
+  const admin = be.isAdmin();
   const tr = (p, pin) => `<tr class="${pin ? 'pin' : ''}"><td><span class="tag ${pin ? 't-notice fill' : `t-${p.board}`}">${pin ? '공지' : esc(category(p.board, p.category).name)}</span></td>
     <td class="tt"><a href="#/post/${p.id}">${esc(p.title)}${p.images?.length ? ' <i class="ico">🖼</i>' : ''}${p.files?.length ? ' <i class="ico">📎</i>' : ''}${p.commentCount ? ` <em>[${p.commentCount}]</em>` : ''}${p.board === 'data' && !p.approved ? ' <span class="badge pending">승인 대기</span>' : ''}</a></td>
-    <td class="au">${esc(p.nickname)} <small>${esc(p.grade)}</small></td><td data-au="${esc(p.nickname)} · ">${fmtDate(p.createdAt)}</td><td>${(p.viewCount || 0).toLocaleString()}</td><td>${(p.likeCount || 0).toLocaleString()}</td></tr>`;
+    <td class="au" data-uid="${esc(p.uid)}">${esc(p.nickname)} <small>${esc(p.grade)}</small></td><td data-au="${esc(p.nickname)} · ">${fmtDate(p.createdAt)}</td><td>${(p.viewCount || 0).toLocaleString()}</td><td>${(p.likeCount || 0).toLocaleString()}</td>${admin ? `<td class="adm" data-pid="${esc(p.id)}"><button data-hide>숨김</button><button data-del>삭제</button></td>` : ''}</tr>`;
   $('#bt-body').innerHTML = (page === 1 ? notices.map((p) => tr(p, true)).join('') : '') + list.map((p) => tr(p, board === 'notice')).join('')
-    || '<tr><td colspan="6" class="empty">올라온 글이 없어요</td></tr>';
+    || '<tr><td colspan="7" class="empty">올라온 글이 없어요</td></tr>';
+  if (admin) {
+    $('table.bt').classList.add('with-adm');
+    $('#bt-body').addEventListener('click', async (e) => {
+      const cell = e.target.closest('td.adm');
+      if (!cell) return;
+      const p = [...notices, ...rows].find((x) => x.id === cell.dataset.pid);
+      try {
+        if (e.target.closest('[data-hide]') && confirm(`'${p.title}' 글을 숨길까요? 관리자 → 글 관리에서 다시 보이게 할 수 있어요.`)) { await be.setHidden(p, true); cell.closest('tr').remove(); toast('숨겼어요'); }
+        if (e.target.closest('[data-del]') && confirm(`'${p.title}' 글을 삭제할까요? 되돌릴 수 없어요.`)) { await be.deletePost(p); cell.closest('tr').remove(); toast('삭제했어요'); }
+      } catch (err) { toast(be.errorText(err)); }
+    });
+  }
   $('#pager').innerHTML = Array.from({ length: Math.min(pages, 10) }, (_, i) => `<a class="${i + 1 === page ? 'on' : ''}" href="${qs({ p: String(i + 1) })}">${i + 1}</a>`).join('');
 }
 
@@ -338,6 +351,13 @@ function renderSide(hash) {
   const me = be.currentUser();
   const login = $('#u-login');
   if (login) { login.textContent = me ? '내 정보' : '로그인'; login.href = me ? '#/me' : '#/login'; }
+  // 관리자 전용 링크(위 줄)
+  $$('#u-links .u-adm').forEach((a) => a.remove());
+  if (be.isAdmin() && login) {
+    login.insertAdjacentHTML('beforebegin', '<a class="u-adm" href="#/admin?tab=users">회원 관리</a><a class="u-adm" href="#/admin?tab=posts">글 관리</a><a class="u-adm" href="#/admin?tab=cover">배너</a>');
+  }
+  $$('#m-tabs .u-adm').forEach((a) => a.remove());
+  if (be.isAdmin()) $('#m-tabs')?.insertAdjacentHTML('beforeend', '<a class="u-adm" href="#/admin?tab=users">회원 관리</a><a class="u-adm" href="#/admin?tab=posts">글 관리</a><a class="u-adm" href="#/admin?tab=cover">배너</a>');
   const cur = hash.split('&')[0];
   const link = (href, label, icon = '📄', sub = false) => `<a class="s-link${sub ? ' sub' : ''}${cur === href || cur.startsWith(`${href}?`) || cur === href.split('?')[0] + '?' + (href.split('?')[1] || '') ? ' on' : ''}" href="${href}"><i>${sub ? '└' : icon}</i>${esc(label)}</a>`;
   const board = (b, icon) => {
@@ -367,6 +387,36 @@ function renderSide(hash) {
   $('#s-search', side).addEventListener('submit', (e) => { e.preventDefault(); location.hash = `#/search?q=${encodeURIComponent(e.target.q.value.trim())}`; });
   $('#s-logout', side)?.addEventListener('click', async () => { await be.signOut(); location.hash = '#/'; });
 }
+
+/* ---------------- 관리자: 작성자 누르면 회원 정보 ---------------- */
+document.addEventListener('click', async (e) => {
+  const el = e.target.closest('[data-uid]');
+  if (!el || !be.isAdmin() || !el.dataset.uid) return;
+  e.preventDefault();
+  try {
+    const m = await be.getMember(el.dataset.uid);
+    if (!m) { toast('탈퇴했거나 없는 회원이에요'); return; }
+    const p = m.priv || {};
+    const rows = [['아이디', `@${m.username}`], ['닉네임', m.nickname], ['구분', p.memberType || m.grade], ['학년', p.childGrade ? `자녀 ${p.childGrade}` : m.grade],
+      ['실명', p.realName], ['휴대폰', p.phone], ['성별', p.gender], ['나이', p.age ? `${p.age}세` : ''], ['보호자 동의', p.guardianConsent ? '예' : ''],
+      ['가입일', m.createdAt ? new Date(m.createdAt).toLocaleDateString('ko-KR') : ''], ['권한', m.role === 'admin' ? '관리자' : '회원'], ['상태', m.banned ? '이용 정지' : '정상']];
+    const box = document.createElement('div');
+    box.className = 'modal';
+    box.innerHTML = `<div class="modal-card"><div class="modal-h"><b>회원 정보</b><button data-x aria-label="닫기">✕</button></div>
+      <div class="profile" style="margin-bottom:12px"><span class="avatar">${esc((m.nickname || '?')[0])}</span><div><b>${esc(m.nickname)}</b><br><small>@${esc(m.username)}</small></div></div>
+      <table class="table">${rows.filter((r) => r[1]).map(([k, v]) => `<tr><th>${k}</th><td>${esc(v)}</td></tr>`).join('')}</table>
+      <div class="btns" style="display:flex;gap:8px;margin-top:14px">${m.uid === be.currentUser().uid ? '' : `<button class="btn small gray" data-ban>${m.banned ? '정지 해제' : '이용 정지'}</button><button class="btn small gray" data-role>${m.role === 'admin' ? '관리자 해제' : '관리자 지정'}</button>`}
+      <a class="btn small" href="#/admin?tab=users" style="display:grid;place-items:center">회원 관리</a></div></div>`;
+    document.body.appendChild(box);
+    box.addEventListener('click', async (ev) => {
+      if (ev.target === box || ev.target.closest('[data-x]') || ev.target.closest('a')) { box.remove(); return; }
+      try {
+        if (ev.target.closest('[data-ban]') && confirm(`${m.nickname}님을 ${m.banned ? '정지 해제' : '이용 정지'}할까요?`)) { await be.setUserFlags(m.uid, { banned: !m.banned }); toast('바꿨어요'); box.remove(); }
+        if (ev.target.closest('[data-role]') && confirm(`${m.nickname}님을 ${m.role === 'admin' ? '일반 회원으로' : '관리자로'} 바꿀까요?`)) { await be.setUserFlags(m.uid, { role: m.role === 'admin' ? 'member' : 'admin' }); toast('바꿨어요'); box.remove(); }
+      } catch (err) { toast(be.errorText(err)); }
+    });
+  } catch (err) { toast(be.errorText(err)); }
+});
 
 /* ---------------- 상단 안내 띠·검색·맨위로 ---------------- */
 // 관리자가 정한 표지(제목·부제·배경 사진) 적용

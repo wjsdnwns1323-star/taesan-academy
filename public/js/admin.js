@@ -13,20 +13,21 @@ export async function renderAdmin(ctx) {
   const box = $('#ab');
 
   if (tab === 'posts') {
-    const [pending, reports, recent] = await Promise.all([be.listPending(), be.listReports(), be.listPosts({ limit: 100 })]);
+    const [pending, reports, recent, hidden] = await Promise.all([be.listPending(), be.listReports(), be.listPosts({ limit: 100 }), be.listHidden()]);
     if (!ctx.alive()) return;
     const row = (p) => `<div class="admin-item" data-p="${esc(p.id)}"><div><span class="tag t-${esc(p.board)}">${esc(p.board === 'notice' ? '공지' : p.board)}</span> <b>${esc(p.title)}</b></div>
       <div style="color:var(--muted);font-size:13px">${esc(p.nickname)} · ${ago(p.createdAt)} · 조회 ${p.viewCount || 0} · 댓글 ${p.commentCount || 0}</div>
       <div class="btns"><a class="btn small gray" href="#/post/${esc(p.id)}" style="display:grid;place-items:center">보기</a>
-      ${p.board === 'data' && !p.approved ? '<button class="btn small" data-ok>승인</button>' : ''}<button class="btn small dark" data-del>삭제</button></div></div>`;
+      ${p.board === 'data' && !p.approved && !p.hidden ? '<button class="btn small" data-ok>승인</button>' : ''}<button class="btn small dark" data-del>삭제</button></div></div>`;
     box.innerHTML = `<div class="admin-box">
       <h3 class="adm-h">승인 기다리는 자료 (${pending.length})</h3>${pending.map(row).join('') || '<div class="empty">올라온 글이 없어요</div>'}
       <h3 class="adm-h">신고 (${reports.length})</h3>${reports.map((r) => `<div class="admin-item" data-r="${esc(r.id)}">
         <div><b>${esc(r.reason)}</b> <small style="color:var(--muted)">· ${ago(r.createdAt)}</small></div>
         <div style="color:var(--sub);font-size:14px">${r.commentId ? '댓글' : '글'}: ${esc(r.target)} / 글 제목: ${esc(r.postTitle)}</div>
         <div class="btns"><a class="btn small gray" href="#/post/${esc(r.postId)}" style="display:grid;place-items:center">글 열기</a><button class="btn small dark" data-done>처리 완료</button></div></div>`).join('') || '<div class="empty">새 신고가 없어요</div>'}
+      <h3 class="adm-h">숨긴 글 (${hidden.length})</h3>${hidden.map((p) => row(p).replace('<button class="btn small dark" data-del>', '<button class="btn small" data-show>다시 보이기</button><button class="btn small dark" data-del>')).join('') || '<div class="empty">숨긴 글이 없어요</div>'}
       <h3 class="adm-h">최근 글 (${recent.length})</h3>${recent.map(row).join('') || '<div class="empty">올라온 글이 없어요</div>'}</div>`;
-    const all = [...pending, ...recent];
+    const all = [...pending, ...recent, ...hidden];
     box.addEventListener('click', async (e) => {
       try {
         const r = e.target.closest('[data-r]');
@@ -34,6 +35,8 @@ export async function renderAdmin(ctx) {
         const it = e.target.closest('[data-p]');
         if (!it) return;
         const p = all.find((x) => x.id === it.dataset.p);
+        if (e.target.closest('[data-show]')) { await be.setHidden(p, false); toast('다시 보이게 했어요'); ctx.go(`#/admin?tab=posts&r=${Date.now()}`); return; }
+        if (e.target.closest('[data-hide2]')) return;
         if (e.target.closest('[data-ok]')) { await be.approvePost(p, true); toast('승인했어요'); ctx.go(`#/admin?tab=posts&r=${Date.now()}`); }
         if (e.target.closest('[data-del]')) {
           if (!confirm(`'${p.title}' 글을 삭제할까요? 되돌릴 수 없어요.`)) return;
@@ -46,17 +49,23 @@ export async function renderAdmin(ctx) {
   if (tab === 'users') {
     const users = await be.listUsers();
     if (!ctx.alive()) return;
-    box.innerHTML = `<div class="card"><p>회원 ${users.length}명. 실명·전화번호는 <b>정보 보기</b>를 눌렀을 때만 불러와요. 개인정보는 학원 업무에만 쓰고 밖으로 옮기지 마세요.</p></div>
+    box.innerHTML = `<div class="card"><p>회원 ${users.length}명. 닉네임을 누르면 회원 정보 전체를 볼 수 있어요. 개인정보는 학원 업무에만 쓰고 밖으로 옮기지 마세요.</p></div>
       <div class="search-box"><input class="input" id="uf" placeholder="아이디·닉네임으로 찾기"></div>
       <div class="admin-box"><table class="table"><thead><tr><th>회원</th><th>상태</th><th></th></tr></thead><tbody id="ut">
       ${users.sort((a, b) => b.createdAt - a.createdAt).map((u) => `<tr data-u="${esc(u.id)}" data-k="${esc(`${u.username} ${u.nickname}`.toLowerCase())}">
-        <td><b>${esc(u.nickname)}</b> · ${esc(u.grade)}<br><small style="color:var(--muted)">@${esc(u.username)} · ${ago(u.createdAt)} 가입</small><div class="priv" style="font-size:13px;color:var(--sub)"></div></td>
+        <td><b data-uid="${esc(u.id)}" style="cursor:pointer;text-decoration:underline">${esc(u.nickname)}</b> · ${esc(u.grade)}<br><small style="color:var(--muted)">@${esc(u.username)} · ${ago(u.createdAt)} 가입</small><div class="priv" style="font-size:13px;color:var(--sub)"></div></td>
         <td>${u.role === 'admin' ? '<span class="badge open">관리자</span>' : '회원'}${u.banned ? '<br><span class="badge" style="color:var(--danger)">정지</span>' : ''}</td>
         <td><div class="btns" style="display:flex;flex-direction:column;gap:6px">
-          <button class="btn small gray" data-a="priv">정보 보기</button>
+          
           ${u.id === be.currentUser().uid ? '' : `<button class="btn small gray" data-a="ban">${u.banned ? '정지 해제' : '이용 정지'}</button>
           <button class="btn small gray" data-a="role">${u.role === 'admin' ? '관리자 해제' : '관리자 지정'}</button>`}
         </div></td></tr>`).join('')}</tbody></table></div>`;
+    // 회원 정보 전부 바로 불러오기
+    users.forEach(async (u) => {
+      const p = await be.getPrivate(u.id).catch(() => null);
+      const el = $(`tr[data-u="${u.id}"] .priv`);
+      if (el) el.innerHTML = p ? `실명 ${esc(p.realName)} · ${esc(p.phone)} · ${esc(p.gender || '')} · ${esc(p.age)}세 · ${esc(p.memberType || '')}${p.childGrade ? `(자녀 ${esc(p.childGrade)})` : ''}${p.guardianConsent ? ' · 보호자 동의' : ''}` : '개인정보 없음';
+    });
     $('#uf').addEventListener('input', (e) => {
       const k = e.target.value.trim().toLowerCase();
       $$('#ut tr').forEach((tr) => tr.classList.toggle('hidden', !!k && !tr.dataset.k.includes(k)));
