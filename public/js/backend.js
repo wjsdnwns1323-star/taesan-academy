@@ -41,6 +41,9 @@ function localAdapter() {
   const auth = {
     onChange(fn) { fns.add(fn); uid = localStorage.getItem('tsc:session'); setTimeout(() => fn(uid), 0); },
     emit() { fns.forEach((fn) => fn(uid)); },
+    // 체험 모드: 인증번호는 항상 123456
+    async sendCode() { return { confirm: async (c) => { if (c !== '123456') throw code('auth/invalid-verification-code'); } }; },
+    async signUpVerified(confirmation, codeValue, email, pw) { await confirmation.confirm(codeValue); return this.signUp(email, pw); },
     async signUp(email, pw) {
       const a = load(AKEY);
       if (a[email]) throw code('auth/email-already-in-use');
@@ -109,6 +112,23 @@ async function firebaseAdapter() {
     auth: {
       onChange(fn) { A.onAuthStateChanged(au, (u) => fn(u ? u.uid : null)); },
       async signUp(email, pw) { return (await A.createUserWithEmailAndPassword(au, email, pw)).user.uid; },
+      // 휴대폰 인증번호 보내기(보이지 않는 reCAPTCHA 사용)
+      async sendCode(phone, boxId) {
+        au.languageCode = 'ko';
+        if (!this.verifier) this.verifier = new A.RecaptchaVerifier(au, boxId, { size: 'invisible' });
+        return A.signInWithPhoneNumber(au, phone, this.verifier);
+      },
+      // 인증번호 확인 → 휴대폰 계정에 아이디(이메일)·비밀번호 연결
+      async signUpVerified(confirmation, codeValue, email, pw) {
+        const cred = await confirmation.confirm(codeValue);
+        const user = cred.user;
+        if (user.providerData.some((p) => p.providerId === 'password')) { await A.signOut(au); throw code('phone-already-used'); }
+        try {
+          await A.linkWithCredential(user, A.EmailAuthProvider.credential(email, pw));
+        } catch (e) { await A.deleteUser(user).catch(() => {}); throw e; }
+        await user.getIdToken(true);
+        return user.uid;
+      },
       async signIn(email, pw) { await A.signInWithEmailAndPassword(au, email, pw); },
       async signOut() { await A.signOut(au); },
       async reauth(pw) {
@@ -174,7 +194,12 @@ export async function init() {
 function code(c) { const e = new Error(c); e.code = c; return e; }
 export function errorText(e) {
   const c = e?.code || '';
-  if (c.includes('email-already-in-use')) return '이미 쓰고 있는 아이디입니다.';
+  if (c.includes('email-already-in-use') || c.includes('credential-already-in-use')) return '이미 쓰고 있는 아이디입니다.';
+  if (c.includes('phone-already-used')) return '이미 이 휴대폰 번호로 가입한 계정이 있어요.';
+  if (c.includes('invalid-verification-code') || c.includes('code-expired')) return '인증번호가 맞지 않거나 시간이 지났어요.';
+  if (c.includes('invalid-phone-number')) return '휴대폰 번호를 확인해 주세요.';
+  if (c.includes('quota-exceeded') || c.includes('too-many-requests')) return '인증 요청이 너무 많아요. 잠시 후 다시 시도해 주세요.';
+  if (c.includes('captcha') || c.includes('billing') || c.includes('operation-not-allowed')) return '휴대폰 인증이 아직 설정되지 않았어요. 관리자에게 알려 주세요.';
   if (c.includes('invalid-credential') || c.includes('wrong-password') || c.includes('user-not-found') || c.includes('invalid-login')) return '아이디 또는 비밀번호가 맞지 않습니다.';
   if (c.includes('too-many-requests')) return '잠시 후 다시 시도해 주세요(시도 횟수 초과).';
   if (c.includes('weak-password')) return '비밀번호가 너무 쉽습니다.';
@@ -190,6 +215,13 @@ const needAdmin = () => { if (!isAdmin()) throw new Error('관리자만 할 수 
 export const USERNAME_RE = /^[a-z0-9_]{4,20}$/;
 const emailOf = (username) => `${username.toLowerCase()}@${LOGIN_DOMAIN}`;
 
+// 회원가입 1단계: 휴대폰으로 인증번호 보내기
+let confirmation = null;
+export const toE164 = (phone) => `+82${phone.replace(/[^0-9]/g, '').replace(/^0/, '')}`;
+export async function sendPhoneCode(phone, boxId) {
+  confirmation = await db.auth.sendCode(toE164(phone), boxId);
+}
+
 export async function signUp(f) {
   const username = f.username.trim().toLowerCase();
   if (!USERNAME_RE.test(username)) throw new Error('아이디는 영문 소문자·숫자·_ 4~20자입니다.');
@@ -199,7 +231,8 @@ export async function signUp(f) {
   const t = Date.now();
   let uid;
   try {
-    uid = await db.auth.signUp(emailOf(username), f.password);
+    if (!confirmation) throw new Error('휴대폰 인증번호를 먼저 받아 주세요.');
+    uid = await db.auth.signUpVerified(confirmation, f.code, emailOf(username), f.password);
     await db.batch([
       // 체험 모드에서만 아이디 admin 이 관리자가 됩니다(실제 사이트 관리자는 scripts/create_admin.py로 만듭니다)
       { op: 'set', path: `users/${uid}`, data: { username, nickname: f.nickname, grade: f.grade, role: DEMO && username === 'admin' ? 'admin' : 'member', banned: false, createdAt: t } },
@@ -207,11 +240,12 @@ export async function signUp(f) {
       { op: 'set', path: `nicknames/${f.nickname}`, data: { uid } },
     ]);
   } catch (e) {
-    if (uid) await db.auth.deleteSelf().catch(() => {});
+    if (uid) { await db.auth.deleteSelf().catch(() => {}); confirmation = null; }
     throw e.code?.includes('permission') ? new Error('이미 있는 닉네임이거나 입력값이 올바르지 않습니다.') : e;
   } finally {
     signingUp = false;
   }
+  confirmation = null;
   me = await db.get(`users/${uid}`);
   me.uid = uid;
   listeners.forEach((fn) => fn(me));
@@ -482,6 +516,11 @@ export const listBanners = () => db.query('banners', { limit: 50 });
 export async function addBanner(b) {
   needAdmin();
   await db.set(`banners/${newId('desc')}`, { kind: b.kind, image: b.image || '', text: b.text || '', link: b.link || '', createdAt: Date.now() });
+}
+// 맨 위 표지(배경 사진·제목·부제): banners/cover 한 문서
+export async function saveCover(c) {
+  needAdmin();
+  await db.set('banners/cover', { kind: 'cover', image: c.image || '', text: c.text || '', sub: c.sub || '', link: '', createdAt: Date.now() });
 }
 export async function deleteBanner(id) { needAdmin(); await db.remove(`banners/${id}`); }
 

@@ -88,8 +88,7 @@ async function renderHome(ctx) {
   const box = (id, title, href) => `<section class="box"><header class="box-h"><h2>${title}</h2><a href="${href}">더 보기 ›</a></header><div class="rows" id="${id}"><div class="loading">불러오는 중…</div></div></section>`;
   view.innerHTML = `${topBar(SITE_NAME)}${topEnd}${bannerSlot()}
     ${me ? `<div class="home-head"><h1>${esc(me.nickname)}님, 반가워요</h1><p>${esc(me.grade)} · 대전 입시 소식을 한곳에서 확인하세요</p></div>`
-      : `<div class="home-head guest"><h1>대전 입시 정보, 태산입시에서</h1><p>글 제목은 누구나 볼 수 있어요. 내용을 보고 글을 쓰려면 가입해 주세요.</p>
-         <div class="g-btns"><a class="btn small" href="#/join">회원가입</a><a class="btn small gray" href="#/login">로그인</a></div></div>`}
+      : `<div class="home-head guest"><h1>대전 입시 정보, 태산입시에서</h1><p>글 제목은 누구나 볼 수 있어요. 내용을 보고 글을 쓰려면 가입해 주세요.</p></div>`}
     <section class="box"><div class="rows" id="h-notice"></div></section>
     ${box('h-hot', '지금 인기 있는 글', '#/community/rec')}
     <div class="box-grid">${boards.map((b) => box(`h-${b}`, `최신 ${BOARDS[b].name}`, `#/community/${b}`)).join('')}</div>
@@ -369,6 +368,20 @@ function renderSide(hash) {
 }
 
 /* ---------------- 상단 안내 띠·검색·맨위로 ---------------- */
+// 관리자가 정한 표지(제목·부제·배경 사진) 적용
+export async function applyCover() {
+  const c = (await getBanners(be.listBanners)).find((b) => b.id === 'cover');
+  const el = $('.cover');
+  if (!c || !el) return;
+  if (c.text) $('b', el).textContent = c.text;
+  if (c.sub) $('span', el).textContent = c.sub;
+  const img = safeImgUrl(c.image);
+  el.style.backgroundImage = img ? `linear-gradient(90deg, rgba(10,25,70,.55), rgba(10,25,70,.25)), url("${img}")` : '';
+  el.style.backgroundSize = img ? 'cover' : '';
+  el.style.backgroundPosition = img ? 'center' : '';
+}
+const safeImgUrl = (s) => (/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(s || '') ? s : '');
+
 async function startTopline() {
   const items = (await getBanners(be.listBanners)).filter((b) => b.kind === 'text' && b.text);
   if (!items.length) return;
@@ -388,6 +401,7 @@ window.addEventListener('hashchange', route);
 be.init().then(() => {
   route();
   startTopline().catch(() => {});
+  applyCover().catch(() => {});
   // 로그인·로그아웃하면 지금 화면을 다시 그립니다
   be.onUser(() => { if (!be.currentUser() || ['login', 'join'].includes(parse().parts[0])) route(); });
 }).catch((e) => {

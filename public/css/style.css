@@ -482,3 +482,9 @@ h1, h2, h3 { letter-spacing: -0.035em; }
 
 .g-btns { display: flex; gap: 8px; margin-top: 12px; }
 .g-btns .btn { display: grid; place-items: center; }
+
+.cover-prev { display: flex; align-items: center; justify-content: center; gap: 20px; height: 160px; border-radius: 6px; color: #fff; overflow: hidden;
+  background: linear-gradient(120deg, #0f2257, #1f3f91 55%, #3a64c8); background-size: cover !important; background-position: center !important; }
+.cover-prev img { height: 70px; }
+.cover-prev b { display: block; font-size: 30px; font-weight: 900; }
+.cover-prev span { font-size: 14px; opacity: .9; }

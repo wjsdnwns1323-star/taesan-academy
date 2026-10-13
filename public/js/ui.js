@@ -40,7 +40,7 @@ export const ICON = {
 
 // 큰 제목 + 검색·내 정보·알림
 export function topBar(title) {
-  const head = title === '태산입시' ? '<h1 class="logo-h"><img src="images/logo.webp" alt="태산학원"><span>입시</span></h1>' : `<h1>${esc(title)}</h1>`;
+  const head = title === '태산입시' ? '<h1 class="logo-h"><img src="images/logo.webp" alt="태산학원"></h1>' : `<h1>${esc(title)}</h1>`;
   return `<header class="top page-top"><div class="top-row">${head}
     <a class="icon-btn" href="#/search" aria-label="검색">${ICON.search}</a>
     <a class="icon-btn" href="#/me" aria-label="내 정보">${ICON.user}</a>

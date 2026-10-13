@@ -6,7 +6,7 @@ export async function renderAdmin(ctx) {
   const { view, q } = ctx;
   if (!be.isAdmin()) { view.innerHTML = `${backBar('관리자')}<div class="empty">관리자만 볼 수 있어요.</div>`; return; }
   const tab = q.get('tab') || 'users';
-  const tabs = [['users', '회원 관리'], ['posts', '글 관리']];
+  const tabs = [['users', '회원 관리'], ['posts', '글 관리'], ['cover', '배너']];
   view.innerHTML = `${backBar('관리자', '<a class="btn small" href="#/write?board=notice" style="display:grid;place-items:center">공지 쓰기</a>')}
     <nav class="tabs">${tabs.map(([id, n]) => `<a href="#/admin?tab=${id}" class="${id === tab ? 'on' : ''}">${n}</a>`).join('')}</nav>
     <div id="ab"><div class="loading">불러오는 중…</div></div>`;
@@ -79,6 +79,41 @@ export async function renderAdmin(ctx) {
           toast('바꿨어요'); ctx.go(`#/admin?tab=users&r=${Date.now()}`);
         }
       } catch (err) { toast(be.errorText(err)); }
+    });
+  }
+
+  if (tab === 'cover') {
+    const cur = (await be.listBanners()).find((b) => b.id === 'cover') || {};
+    if (!ctx.alive()) return;
+    box.innerHTML = `<form class="form" id="cf">
+      <div class="card" style="margin:0"><p>맨 위 큰 배너(표지)의 제목, 설명, 배경 사진을 바꿔요. 비워 두면 기본 디자인이 나와요. 저장한 뒤 새로고침하면 보여요.</p></div>
+      <div class="cover-prev" id="cprev"><img src="images/logo-white.webp" alt=""><div><b id="pv-t"></b><span id="pv-s"></span></div></div>
+      <label class="field"><span>제목</span><input class="input" name="text" maxlength="30" value="${esc(cur.text || '태산입시')}"></label>
+      <label class="field"><span>설명</span><input class="input" name="sub" maxlength="100" value="${esc(cur.sub || '대전 학생·학부모를 위한 입시 정보 · 고민 나눔 커뮤니티')}"></label>
+      <label class="field"><span>배경 사진 <small>(가로로 긴 사진, 자동으로 줄여요)</small></span><input type="file" accept="image/*" name="file"></label>
+      <label class="check"><input type="checkbox" name="noimg"> 배경 사진 빼고 기본 파란 배경 쓰기</label>
+      <p class="err" id="cerr"></p><button class="btn">저장</button></form>`;
+    const f = $('#cf');
+    let image = cur.image || '';
+    const pv = () => {
+      $('#pv-t').textContent = f.text.value; $('#pv-s').textContent = f.sub.value;
+      $('#cprev').style.backgroundImage = image && !f.noimg.checked ? `linear-gradient(90deg, rgba(10,25,70,.55), rgba(10,25,70,.25)), url("${safeImg(image)}")` : '';
+    };
+    pv();
+    f.addEventListener('input', pv);
+    f.file.addEventListener('change', async () => {
+      const file = f.file.files[0];
+      if (!file) return;
+      image = await be.blobToDataUrl(await be.shrinkImage(file, 1800, 0.8));
+      if (image.length > 900000) image = await be.blobToDataUrl(await be.shrinkImage(file, 1400, 0.7));
+      f.noimg.checked = false; pv();
+    });
+    f.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      try {
+        await be.saveCover({ text: f.text.value.trim(), sub: f.sub.value.trim(), image: f.noimg.checked ? '' : image });
+        toast('저장했어요'); setTimeout(() => location.reload(), 600);
+      } catch (err) { $('#cerr').textContent = be.errorText(err); }
     });
   }
 }
