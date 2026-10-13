@@ -13,6 +13,8 @@ export function shortName(full = '') {
   if (/대전외국어고/.test(full)) return '대전외고';
   if (/대전과학고/.test(full)) return '대전과고';
   if (/대전예술고/.test(full)) return '대전예고';
+  if (full === '대전대신고등학교') return '대신고';
+  if (full === '대전대신중학교') return '대신중';
   return full.replace(/여자고등학교$/, '여고').replace(/고등학교$/, '고').replace(/여자중학교$/, '여중').replace(/중학교$/, '중');
 }
 
@@ -46,7 +48,7 @@ export function schoolFields({ school = '', grade = '', label = '학교', gradeL
   const opts = gradesFor(kindOf(school));
   return `<div class="row2">
     <div class="field sp"><span>${esc(label)}${required ? ' *' : ''}</span>
-      <input class="input" name="school" value="${esc(school)}" placeholder="학교 이름을 입력하세요 (예: 대성)" autocomplete="off" data-school-pick role="combobox" aria-autocomplete="list" aria-expanded="false">
+      <input class="input" name="school" value="${esc(school)}" placeholder="학교 이름을 입력하세요 (예: 대성)" autocomplete="nope" data-school-pick role="combobox" aria-autocomplete="list" aria-expanded="false">
       <input type="hidden" name="schoolCode"><input type="hidden" name="schoolFull">
       <ul class="sp-list" role="listbox" hidden></ul>
       <small class="sp-hint">나이스 학교 정보에서 찾아요. 목록에 없으면 그대로 입력해도 됩니다.</small></div>
