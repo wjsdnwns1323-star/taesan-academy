@@ -111,6 +111,9 @@ service cloud.firestore {
         || (active() && changed().hasOnly(['likeCount'])
           && ((request.resource.data.likeCount == post().likeCount + 1 && !exists(likePath()) && existsAfter(likePath()))
            || (request.resource.data.likeCount == post().likeCount - 1 && exists(likePath()) && !existsAfter(likePath()))))
+        // 조회수: 1씩만
+        || (active() && changed().hasOnly(['viewCount'])
+          && request.resource.data.viewCount == (('viewCount' in resource.data) ? resource.data.viewCount : 0) + 1)
         // 댓글 수
         || (active() && changed().hasOnly(['commentCount'])
           && (request.resource.data.commentCount == post().commentCount + 1 || request.resource.data.commentCount == post().commentCount - 1))

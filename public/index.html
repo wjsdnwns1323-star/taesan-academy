@@ -10,24 +10,22 @@
   <meta property="og:description" content="대전 학생·학부모를 위한 최신 입시 자료와 고민 나눔 커뮤니티">
   <meta property="og:url" content="https://taesan.uinone.net/">
   <title>태산입시</title>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%233b5bdb'/%3E%3Cpath d='M18 22h28v6H35v20h-6V28H18z' fill='white'/%3E%3C/svg%3E">
+  <link rel="icon" href="images/logo.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
   <div class="topline hidden" id="topline"><button type="button" data-tl="-1" aria-label="이전 안내">‹</button><a id="tl-text" href="#/"></a><button type="button" data-tl="1" aria-label="다음 안내">›</button></div>
   <header class="site-head">
-    <div class="sh-row"><a href="#/" class="sh-logo"><b>태산</b>입시</a>
-      <span class="sh-icons"><a href="#/notifications" aria-label="알림">🔔</a><a href="#/me" aria-label="내 정보">내 정보</a><a href="#/menu" class="sh-menu" aria-label="전체 메뉴">☰</a></span></div>
-    <form class="sh-search" id="sh-search" role="search"><input name="q" placeholder="검색어를 입력해 주세요." aria-label="검색어"><button aria-label="검색"><svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.8-4.8"/></svg></button></form>
-    <nav class="sh-tabs" id="sh-tabs">
-      <a href="#/" data-t="home">홈</a><a href="#/community/news" data-t="news">소식</a><a href="#/community/talk" data-t="talk">수다</a><a href="#/community/school" data-t="school">학교</a><a href="#/community/admission" data-t="admission">입시</a><a href="#/study" data-t="study">자료실</a>
-    </nav>
+    <div class="util"><a href="#/" class="u-logo"><img src="images/logo.webp" alt="태산학원"><span>입시</span></a>
+      <nav class="u-links" id="u-links"><a href="#/">카페홈</a><a href="#/community/rec">새글</a><a href="#/notifications">내소식</a><a href="#/menu">전체메뉴</a><a href="#/login" class="u-login" id="u-login">로그인</a></nav></div>
+    <a href="#/" class="cover"><img src="images/logo-white.webp" alt="태산학원"><div><b>태산입시</b><span>대전 학생·학부모를 위한 입시 정보 · 고민 나눔 커뮤니티</span></div></a>
   </header>
   <button class="to-top" id="to-top" aria-label="맨 위로">↑<small>맨위로</small></button>
   <div class="app">
+    <aside class="side" id="side"></aside>
     <main id="view" aria-live="polite"><div class="loading">불러오는 중…</div></main>
     <nav class="bottom-nav" id="bottom-nav" aria-label="주 메뉴">
       <a href="#/" data-nav="home"><span class="ni">
@@ -40,6 +38,12 @@
         <svg viewBox="0 0 24 24"><path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z"/></svg></span>전체 메뉴</a>
     </nav>
   </div>
+  <footer class="site-foot">
+    <img src="images/logo.webp" alt="태산학원" class="sf-logo">
+    <p><b>태산입시</b> · 대전 학생·학부모를 위한 입시 정보 커뮤니티 · 운영 태산학원</p>
+    <p>대전광역시 서구 둔산남로 96 E.플러스빌딩 2층 · 042-321-5788</p>
+    <p><a href="#/rules">이용규칙</a> · <a href="#/data-rules">자료실 규칙</a> · <a href="#/privacy"><b>개인정보 처리방침</b></a></p>
+  </footer>
   <div id="toast" role="status"></div>
   <script type="module" src="js/app.js"></script>
 </body>
