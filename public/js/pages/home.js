@@ -1,17 +1,7 @@
 import { seed, getSite } from '../backend.js';
 import { esc, $, $$, isPast, WEEK } from '../ui.js';
-import { load, visible, byOrder, teacherCard, gradeTags, photoOf } from './common.js';
+import { load, visible, byOrder, teacherCard } from './common.js';
 import { prefetchWorld } from './world.js';
-
-// 강사소개 바로가기 카드 묶음: [필터 키, 버튼 이름, 해당 과목]
-const T_FILTERS = [
-  ['all', '전체', null],
-  ['kor', '국어', ['국어']],
-  ['eng', '영어', ['영어']],
-  ['math', '수학', ['수학']],
-  ['etc', '과학·사회', ['물리', '통합사회·한국사', '과학', '화학']],
-  ['lead', '입시전략', []],
-];
 
 const I = {
   prev: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 6-6 6 6 6"/></svg>',
@@ -49,11 +39,11 @@ export async function render({ el }) {
   <section class="h-sec" aria-labelledby="rc-t">
     <div class="recruit">
       <div>
-        <div class="h-head"><h2 id="rc-t">강사소개 바로가기</h2>
-          <div class="seg" role="group" aria-label="과목 선택">
-            ${T_FILTERS.map(([k, label], i) => `<button data-rf="${k}" aria-pressed="${i === 0}">${label}</button>`).join('')}
+        <div class="h-head"><h2 id="rc-t">모집안내</h2>
+          <div class="seg" role="group" aria-label="대상 선택">
+            <button data-rf="all" aria-pressed="true">전체</button><button data-rf="grade" aria-pressed="false">고1·고2</button><button data-rf="pre" aria-pressed="false">예비고1</button>
           </div></div>
-        <div class="r-viewport"><div class="r-track" id="r-track"></div></div>
+        <div class="r-viewport"><div class="r-track r-small" id="r-track"></div></div>
       </div>
       <div>
         <div class="h-head"><h2>학원소식</h2></div>
@@ -64,30 +54,15 @@ export async function render({ el }) {
       <div class="r-bar">
         <div class="progress" aria-hidden="true"><i id="r-prog"></i></div>
         <div class="ctrl-btns">
-          <div class="ctrl-grp"><button data-r="prev" aria-label="이전 선생님">${I.prev}</button><button data-r="next" aria-label="다음 선생님">${I.next}</button></div>
+          <div class="ctrl-grp"><button data-r="prev" aria-label="이전 배너">${I.prev}</button><button data-r="next" aria-label="다음 배너">${I.next}</button></div>
           <button class="ctrl-one" data-r="pause" aria-label="자동 넘김 멈춤">${I.pause}</button>
-          <a class="ctrl-one" href="#/teachers" aria-label="선생님 전체 보기">${I.grid}</a>
+          <a class="ctrl-one" href="#/timetable" aria-label="전체 과정 보기">${I.grid}</a>
         </div>
       </div>
       <div class="dots" id="n-dots"></div>
     </div>
   </section>
 
-  <section class="h-sec" aria-labelledby="rc2-t">
-    <div class="h-head"><h2 id="rc2-t">모집안내</h2>
-      <div class="seg" role="group" aria-label="대상 선택">
-        <button data-rf2="all" aria-pressed="true">전체</button><button data-rf2="grade" aria-pressed="false">고1·고2</button><button data-rf2="pre" aria-pressed="false">예비고1</button>
-      </div>
-      <a class="plus" href="#/timetable" aria-label="전체 과정 보기">+</a></div>
-    <div class="r-viewport"><div class="r-track recruit-full" id="rc2-track"></div></div>
-    <div class="r-bar rc2-bar">
-      <div class="progress" aria-hidden="true"><i id="rc2-prog"></i></div>
-      <div class="ctrl-btns">
-        <div class="ctrl-grp"><button data-r2="prev" aria-label="이전 모집안내">${I.prev}</button><button data-r2="next" aria-label="다음 모집안내">${I.next}</button></div>
-        <button class="ctrl-one" data-r2="pause" aria-label="자동 넘김 멈춤">${I.pause}</button>
-      </div>
-    </div>
-  </section>
 
   <section class="h-sec">
     <div class="result-band">
@@ -143,30 +118,15 @@ export async function render({ el }) {
   if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) mini.play().catch(() => {});
   setTimeout(() => { if (location.hash === '' || location.hash === '#/') prefetchWorld(); }, 1500);
 
-  // ---- 강사소개 바로가기 캐러셀 (모집안내 카드 디자인 그대로) ----
+  // ---- 모집안내 캐러셀 (관리자 > 홈 모집안내에서 편집) ----
   const st = { filter: 'all', i: 0, playing: !window.matchMedia('(prefers-reduced-motion: reduce)').matches, timer: null };
   const track = $('#r-track', el);
-  const people = [...vt, ...visible(leaders).map((l) => ({ ...l, subject: '입시 전략', lead: true }))];
-  const cards = () => {
-    const f = T_FILTERS.find(([k]) => k === st.filter);
-    if (!f || !f[2]) return people;
-    return f[0] === 'lead' ? people.filter((p) => p.lead) : people.filter((p) => !p.lead && f[2].includes(p.subject));
-  };
+  const cards = () => RECRUIT.filter((c) => st.filter === 'all' || c.for === st.filter);
   const perView = () => (window.innerWidth <= 640 ? 1 : window.innerWidth <= 1280 ? 2 : 3);
-  const schoolLine = (p) => {
-    const s = (p.schools || []).map((x) => x.replace(/(고)[123]$/, '$1')).filter((x, i, a) => a.indexOf(x) === i);
-    return s.length ? (s.length > 3 ? `${s.slice(0, 3).join(' · ')} 외 ${s.length - 3}` : s.join(' · ')) : '';
-  };
   function drawCards() {
-    track.innerHTML = cards().map((p, k) => {
-      const tag = p.lead ? (p.title || '소장') : [p.subject, gradeTags(p).join('·')].filter(Boolean).join(' · ');
-      const copy = p.lead ? (p.role || '') : ((p.highlights || [])[0] || (p.bio || [])[0] || '');
-      const when = p.lead ? '설명회·입시 상담' : (schoolLine(p) || '연합반');
-      const photo = p.photo ? `<span class="r-ph"><img src="${esc(photoOf(p))}" alt="" loading="lazy" onerror="this.onerror=null;this.src=this.src.replace(/\\.png$/,'.jpg')"></span>` : '';
-      return `<a class="r-card t-short${k % 2 ? ' alt' : ''}" href="#/world?t=${esc(p.id)}" aria-label="${esc(p.name)} ${p.lead ? esc(p.title || '') : '선생님'} 소개로 이동">
-        <span class="tag">${esc(tag)}</span><p class="copy">${esc(copy)}</p>
-        <p class="t1">${esc(p.lead ? '입시 전략' : p.subject)}</p><p class="t2">${esc(p.name)}${p.lead ? ` ${esc(p.title || '')}` : ''}</p><p class="when">${esc(when)}</p>${photo}</a>`;
-    }).join('');
+    track.innerHTML = cards().map((c) => `<a class="r-card${c.alt ? ' alt' : ''}" href="${esc(c.href || '#/timetable')}">
+      <span class="tag">${esc(c.tag)}</span><p class="copy">${esc(c.copy)}</p>
+      <p class="t1">${esc(c.t1)}</p><p class="t2${c.violet ? ' violet' : ''}">${esc(c.t2)}</p><p class="when">${esc(c.when)}</p></a>`).join('');
     st.i = 0; move();
   }
   function move() {
@@ -193,40 +153,6 @@ export async function render({ el }) {
   window.addEventListener('resize', onResize);
   window.addEventListener('hashchange', () => { clearInterval(st.timer); window.removeEventListener('resize', onResize); }, { once: true });
   drawCards(); play();
-
-  // ---- 모집안내 캐러셀(강사소개·학원소식 아래) ----
-  const rc = { filter: 'all', i: 0, playing: !window.matchMedia('(prefers-reduced-motion: reduce)').matches, timer: null };
-  const rcTrack = $('#rc2-track', el);
-  const rcCards = () => RECRUIT.filter((c) => rc.filter === 'all' || c.for === rc.filter);
-  const rcPer = () => (window.innerWidth <= 640 ? 1 : window.innerWidth <= 1000 ? 2 : window.innerWidth <= 1280 ? 3 : 4);
-  function rcMove() {
-    const n = rcCards().length, pv = rcPer(), max = Math.max(0, n - pv);
-    if (rc.i > max) rc.i = 0; if (rc.i < 0) rc.i = max;
-    const card = rcTrack.firstElementChild;
-    const step = card ? card.getBoundingClientRect().width + 24 : 0;
-    rcTrack.style.transform = `translateX(${-rc.i * step}px)`;
-    $('#rc2-prog', el).style.width = `${n ? Math.min(100, ((rc.i + pv) / n) * 100) : 0}%`;
-  }
-  function rcDraw() {
-    rcTrack.innerHTML = rcCards().map((c) => `<a class="r-card${c.alt ? ' alt' : ''}" href="${c.href}">
-      <span class="tag">${esc(c.tag)}</span><p class="copy">${esc(c.copy)}</p>
-      <p class="t1">${esc(c.t1)}</p><p class="t2${c.violet ? ' violet' : ''}">${esc(c.t2)}</p><p class="when">${esc(c.when)}</p></a>`).join('');
-    rc.i = 0; rcMove();
-  }
-  const rcPlay = () => { clearInterval(rc.timer); if (rc.playing) rc.timer = setInterval(() => { rc.i += 1; rcMove(); }, 5500); };
-  $$('[data-r2]', el).forEach((b) => (b.onclick = () => {
-    const a = b.dataset.r2;
-    if (a === 'prev') { rc.i -= 1; rcMove(); }
-    if (a === 'next') { rc.i += 1; rcMove(); }
-    if (a === 'pause') { rc.playing = !rc.playing; b.innerHTML = rc.playing ? I.pause : I.play; b.setAttribute('aria-label', rc.playing ? '자동 넘김 멈춤' : '자동 넘김 시작'); }
-    rcPlay();
-  }));
-  $$('[data-rf2]', el).forEach((b) => (b.onclick = () => {
-    rc.filter = b.dataset.rf2; $$('[data-rf2]', el).forEach((x) => x.setAttribute('aria-pressed', x === b)); rcDraw(); rcPlay();
-  }));
-  window.addEventListener('resize', rcMove);
-  window.addEventListener('hashchange', () => { clearInterval(rc.timer); window.removeEventListener('resize', rcMove); }, { once: true });
-  rcDraw(); rcPlay();
 
   // ---- 학원소식 ----
   const newsList = upcoming.slice(0, 3);
