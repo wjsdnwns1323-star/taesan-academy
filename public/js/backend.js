@@ -327,6 +327,8 @@ export async function listPosts({ board, category, grade, subject, status, pinne
   if (subject) eq.category = subject;
   if (status) eq.status = status;
   if (pinned) eq.pinned = true;
+  // 로그인 안 한 사람은 제목만 있는 목록(postIndex)을 봅니다
+  if (!me) return db.query('postIndex', { eq, limit, after }).catch(() => []);
   return db.query('posts', { eq, limit, after });
 }
 export const listMyPosts = (uid = me?.uid, after) => db.query('posts', { eq: { uid }, limit: 30, after });
@@ -370,23 +372,33 @@ export async function createPost(input) {
     source: input.source || '',
   };
   await db.set(`posts/${id}`, post);
+  // 비회원용 제목 목록(보안 규칙이 아직 반영 전이어도 글쓰기는 되도록 따로 저장)
+  await db.set(`postIndex/${id}`, indexOf(post)).catch((e) => console.warn('제목 목록 저장 실패', e));
   return id;
 }
 
 export async function updatePost(id, patch) {
   need();
+  const ix = {};
+  for (const k of ['title', 'category', 'approved']) if (k in patch) ix[k] = patch[k];
   await db.update(`posts/${id}`, { ...patch, updatedAt: Date.now() });
+  if (Object.keys(ix).length) await db.update(`postIndex/${id}`, ix).catch(() => {});
+}
+// 비회원용 제목 목록에 넣는 항목(본문·사진·파일 없음)
+function indexOf(p) {
+  return { board: p.board, category: p.category, title: p.title, uid: p.uid, nickname: p.nickname, grade: p.grade, createdAt: p.createdAt, approved: p.approved, pinned: !!p.pinned };
 }
 
 export async function deletePost(post) {
   need();
   await db.remove(`posts/${post.id}`);
+  await db.remove(`postIndex/${post.id}`).catch(() => {});
   if (post.uid === me.uid || isAdmin()) for (const f of [...(post.images || []), ...(post.files || [])]) await deleteFile(f.id);
 }
 
 export async function approvePost(post, ok) {
   needAdmin();
-  if (ok) await db.update(`posts/${post.id}`, { approved: true });
+  if (ok) { await db.update(`posts/${post.id}`, { approved: true }); await db.update(`postIndex/${post.id}`, { approved: true }).catch(() => {}); }
   else await deletePost(post);
   await notify(post.uid, ok ? 'approved' : 'rejected', post.id, post.title);
 }

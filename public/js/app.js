@@ -31,7 +31,9 @@ async function route() {
   try { renderSide(location.hash || '#/'); } catch (e) { console.error(e); }
   window.scrollTo(0, 0);
   const user = be.currentUser();
-  if (!user && !PUBLIC.has(page) && page !== 'home' && page !== 'menu') {
+  // 비회원: 홈·게시판 목록(제목)은 볼 수 있고, 글 내용·글쓰기 등은 로그인 필요
+  if (!user && !PUBLIC.has(page) && !['home', 'menu', 'community', 'study', 'notices', 'search'].includes(page)) {
+    if (page === 'post') toast('로그인하면 글 내용을 볼 수 있어요');
     location.hash = `#/login?next=${encodeURIComponent(location.hash)}`;
     return;
   }
@@ -39,7 +41,7 @@ async function route() {
   const ctx = { view, q, arg, alive: () => my === seq, go: (h) => { location.hash = h; } };
   try {
     switch (page) {
-      case 'home': await (user ? renderHome(ctx) : renderWelcome(ctx)); break;
+      case 'home': await renderHome(ctx); break;
       case 'community': await renderCommunity(ctx, arg || 'rec'); break;
       case 'study': await renderBoard(ctx, 'data'); break;
       case 'notices': await renderBoard(ctx, 'notice'); break;
@@ -85,7 +87,9 @@ async function renderHome(ctx) {
   const boards = ['news', 'talk', 'school', 'admission'];
   const box = (id, title, href) => `<section class="box"><header class="box-h"><h2>${title}</h2><a href="${href}">더 보기 ›</a></header><div class="rows" id="${id}"><div class="loading">불러오는 중…</div></div></section>`;
   view.innerHTML = `${topBar(SITE_NAME)}${topEnd}${bannerSlot()}
-    <div class="home-head"><h1>${esc(me.nickname)}님, 반가워요</h1><p>${esc(me.grade)} · 대전 입시 소식을 한곳에서 확인하세요</p></div>
+    ${me ? `<div class="home-head"><h1>${esc(me.nickname)}님, 반가워요</h1><p>${esc(me.grade)} · 대전 입시 소식을 한곳에서 확인하세요</p></div>`
+      : `<div class="home-head guest"><h1>대전 입시 정보, 태산입시에서</h1><p>글 제목은 누구나 볼 수 있어요. 내용을 보고 글을 쓰려면 가입해 주세요.</p>
+         <div class="g-btns"><a class="btn small" href="#/join">회원가입</a><a class="btn small gray" href="#/login">로그인</a></div></div>`}
     <section class="box"><div class="rows" id="h-notice"></div></section>
     ${box('h-hot', '지금 인기 있는 글', '#/community/rec')}
     <div class="box-grid">${boards.map((b) => box(`h-${b}`, `최신 ${BOARDS[b].name}`, `#/community/${b}`)).join('')}</div>
