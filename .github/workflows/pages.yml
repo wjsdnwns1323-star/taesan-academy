@@ -27,7 +27,11 @@ jobs:
           LIVE=https://taesan-academy.web.app
           get() { [ -s "public/$1" ] || curl -fsSL -m 30 "$LIVE/$1" -o "public/$1" || { rm -f "public/$1"; return 1; }; }
           mkdir -p public/images/people public/images/posters public/images/band/t
-          for f in assets/cutouts/*.png; do k=$(basename "$f"); get "images/people/$k" || cp "$f" "public/images/people/$k"; done
+          # 강사 사진: 운영 중인 사진(누끼·얼굴 맞춤)을 받아옴. 데이터에 있는 모든 선생님 사진 + 예전 원본 폴더
+          for k in $( (grep -o "images/people/[a-z-]*\.png" public/js/data/seed.js | xargs -n1 basename; ls assets/cutouts) | sort -u ); do
+            rm -f "public/images/people/$k"
+            get "images/people/$k" || { [ -f "assets/cutouts/$k" ] && cp "assets/cutouts/$k" "public/images/people/$k"; } || true
+          done
           while IFS=$'\t' read -r key id title; do
             case "$key" in P*) get "images/posters/$key.jpg" || true ;; esac
           done < scripts/assets.tsv

@@ -133,7 +133,7 @@ export const teachers = [
   {
     id: 'song-kanghoon', name: '송강훈', subject: '수학',
     bio: [], schools: ['연합반 고1', '고3 수능수학'],
-    prehigh: [], method: [], highlights: [], roles: [], materials: [], photo: '', order: 8,
+    prehigh: [], method: [], highlights: [], roles: [], materials: [], photo: 'images/people/song-kanghoon.png', order: 8,
   },
   {
     id: 'lee-wonhyung', name: '이원형', subject: '수학', grades: ['고1'],
