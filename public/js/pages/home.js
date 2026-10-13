@@ -119,6 +119,9 @@ export async function render({ el, go }) {
   box.onclick = goWorld;
   box.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); goWorld(); } };
   ['pointerenter', 'touchstart', 'focus'].forEach((ev) => box.addEventListener(ev, () => prefetchWorld(), { once: true, passive: true }));
+  // 첫 화면 이미지가 다 뜬 뒤 잠깐 쉬었다가 스크롤월드 사진을 미리 받아 둠(누르면 바로 열리게)
+  const later = () => setTimeout(() => { if (location.hash === '' || location.hash === '#/') prefetchWorld(); }, 1200);
+  if (document.readyState === 'complete') later(); else window.addEventListener('load', later, { once: true });
 
   // ---- 모집안내 캐러셀 (관리자 > 홈 모집안내에서 편집) ----
   const st = { filter: 'all', i: 0, playing: !window.matchMedia('(prefers-reduced-motion: reduce)').matches, timer: null };

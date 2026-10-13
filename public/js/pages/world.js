@@ -36,7 +36,7 @@ export function prefetchWorld(m = modeNow()) {
   let firstCount = 0;
   for (const step of [8, 4, 2, 1]) {
     for (let i = 0; i < n; i += step) if (!seen.has(i)) { seen.add(i); order.push(i); }
-    if (step === 4) firstCount = order.length;
+    if (step === 8) firstCount = order.length;   // 8장마다 1장이 모이면 바로 화면 표시
   }
   if (!seen.has(n - 1)) order.push(n - 1);
   let resolveReady; let next = 0;
@@ -49,7 +49,7 @@ export function prefetchWorld(m = modeNow()) {
       if (S.done >= firstCount) resolveReady();
     }
   };
-  for (let k = 0; k < 6; k += 1) worker();
+  for (let k = 0; k < 8; k += 1) worker();
   STORE[m] = S;
   return S;
 }
@@ -163,7 +163,7 @@ export function mountWorld(el, { teachers, leaders, classes }) {
     if (!alive) return;
     if (ready) {
       const tgt = Math.min(dur, target());
-      cur += reduce ? tgt - cur : (tgt - cur) * 0.25;
+      cur += reduce ? tgt - cur : (tgt - cur) * 0.4;
       draw(Math.max(0, Math.min(S.n - 1, Math.round(cur * FPS))));
     }
     root.classList.toggle('sw-moved', window.scrollY > 40);
