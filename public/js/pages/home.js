@@ -29,16 +29,12 @@ export async function render({ el }) {
   const highlights = visible(results).filter((r) => r.featured).slice(0, 2);
   const vt = visible(teachers).sort(byOrder);
 
-  el.innerHTML = `<section class="sw-mini" aria-labelledby="swm-t">
+  el.innerHTML = `<section class="sw-mini" role="button" tabindex="0" aria-label="태산학원 소개 영상 보기">
     <img class="sw-mini-bg" src="media/hall-silhouette.webp" alt="" aria-hidden="true" fetchpriority="high" decoding="async">
     <video class="sw-mini-v" playsinline preload="none" aria-label="태산학원 소개 영상"></video>
     <div class="wrap sw-mini-in">
       <h1 id="swm-t"><img class="sw-mini-logo" src="images/brand/logo-dark.png" alt="태산학원 TAESANEDU"></h1>
       <p class="sw-mini-copy">큰 산처럼 흔들림 없이, 학생들의 곁을 지킵니다</p>
-      <div class="sw-mini-act">
-        <button class="btn dark sw-mini-play" type="button" data-play><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg>영상 보기</button>
-        <a class="btn ghost sw-mini-go" href="#/world">선생님 소개 보러가기</a>
-      </div>
     </div>
     <button class="sw-mini-x" type="button" data-stop aria-label="영상 닫기">✕</button>
   </section><div class="home wrap">
@@ -123,10 +119,11 @@ export async function render({ el }) {
   // 평소에는 로고 + 학원 실루엣, "영상 보기"를 눌렀을 때만 영상 재생
   const box = $('.sw-mini', el), mini = $('.sw-mini-v', el);
   const stopMini = () => { mini.pause(); box.classList.remove('playing'); };
-  $('[data-play]', el).onclick = () => {
-    if (!mini.getAttribute('src')) mini.src = window.matchMedia('(max-width: 900px)').matches ? 'media/teaser-720.mp4' : 'media/teaser-hd.mp4';
+  box.onclick = (e) => {
+    if (box.classList.contains('playing') || e.target.closest('[data-stop]')) return;
+    if (!mini.getAttribute('src')) mini.src = 'media/teaser.mp4';
     box.classList.add('playing'); mini.currentTime = 0; mini.muted = true; mini.play().catch(() => {}); };
-  $('[data-stop]', el).onclick = stopMini;
+  $('[data-stop]', el).onclick = (e) => { e.stopPropagation(); stopMini(); };
   mini.onended = stopMini;
   mini.onclick = () => (mini.paused ? mini.play() : mini.pause());
   // 스크롤월드 사진(약 14MB)은 '보러가기'에 손이 갈 때만 미리 받기 — 첫 화면 이미지 로딩을 방해하지 않게

@@ -1078,3 +1078,9 @@ body.sw-on .quick { opacity: 0; pointer-events: none; }
 @media (min-width: 1001px) { .header .logo .logo-img { height: 72px; } }
 .tag.lead { background: var(--violet); color: #fff; border-color: var(--violet); }
 .t-title { font-size: .6em; font-weight: 700; color: var(--blue); margin-left: 4px; vertical-align: middle; }
+/* 배너: 로고만 정가운데, 배너를 누르면 영상 */
+.sw-mini { cursor: pointer; }
+.sw-mini-in { position: absolute; inset: 0; justify-content: center; }
+.sw-mini-copy { position: absolute; left: 0; right: 0; top: calc(50% + clamp(48px, 5.4vw, 70px)); margin: 0; }
+.sw-mini:not(.playing):hover .sw-mini-logo { transform: scale(1.03); }
+.sw-mini-logo { transition: transform .25s; }
