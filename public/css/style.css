@@ -1088,3 +1088,9 @@ body.sw-on .quick { opacity: 0; pointer-events: none; }
 @media (min-width: 1001px) {
   .header .searchbox, .header .gnb > li > a, .header .menu-btn { transform: translateY(12px); }
 }
+/* 스크롤월드: 같은 스크롤에 영상이 더 많이 움직이도록 구간 길이 줄임 */
+.sw-dissolve { min-height: 80svh; }
+.sw-reveal { min-height: 100svh; }
+.sw-settle { min-height: 40svh; }
+.sw-t { min-height: 100svh; }
+@media (max-width: 760px) { .sw-t { min-height: 125svh; padding-top: 62svh; } .sw-reveal { min-height: 120svh; } }
