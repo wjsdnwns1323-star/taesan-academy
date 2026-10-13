@@ -97,11 +97,17 @@ def align(src: Path, dst: Path):
     x0, y0 = round(W / 2 - cx), round(FACE_TOP - top)
     canvas = Image.new('RGBA', (W, H), (0, 0, 0, 0))
     canvas.paste(img, (x0, y0), img)
-    # 원본 아래쪽이 잘린 상반신 사진이면, 줄인 뒤 생긴 아래 빈 곳을 마지막 줄로 이어 붙여 몸이 떠 보이지 않게 합니다
+    # 원본 아래쪽이 잘린 사진이면 늘려 붙이지 않고(줄무늬가 생김) 아래 끝을 부드럽게 흐리게 처리합니다
     gap = H - (y0 + img.height)
     if gap > 0:
-        strip = img.crop((0, img.height - 2, img.width, img.height - 1)).resize((img.width, gap))
-        canvas.paste(strip, (x0, y0 + img.height), strip)
+        fade = min(110, img.height // 5)
+        a = canvas.split()[3].load()
+        bottom = y0 + img.height
+        for y in range(max(0, bottom - fade), min(H, bottom)):
+            k = (bottom - y) / fade
+            for x in range(W):
+                if a[x, y]:
+                    a[x, y] = int(a[x, y] * k)
     canvas.save(dst, optimize=True)
     return '얼굴 인식' if found else '윤곽 추정'
 
