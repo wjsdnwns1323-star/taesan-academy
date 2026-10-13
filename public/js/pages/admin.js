@@ -108,6 +108,17 @@ const SCHEMA = {
     cols: [['category', '분류'], ['q', '질문']],
     sections: [['질문', [F('category', '분류', 'select', { opts: () => S(['수강', '수업', '설명회', '기타']) }), F('q', '질문', 'text', { req: true }), F('a', '답변', 'textarea', { req: true }), F('order', '정렬 순서', 'number'), F('hidden', '사이트에서 숨기기', 'bool')]]],
   },
+  banners: {
+    title: '홈 모집안내', one: '모집 카드', view: '#/', sortable: true,
+    desc: '홈 "강사소개 바로가기" 아래 "모집안내" 줄에 넘어가는 카드입니다. 순서대로 보여주며 "대상"으로 탭(고1·고2 / 예비고1)이 나뉩니다.',
+    cols: [['tag', '태그'], ['t1', '제목'], ['t2', '강조 제목'], ['when', '일정'], ['for', '대상']],
+    preview: 'banner',
+    sections: [['카드', [
+      F('for', '대상 탭', 'select', { opts: () => [['grade', '고1·고2'], ['pre', '예비고1']] }), F('tag', '태그', 'text', { ph: '예: 고1·고2' }),
+      F('copy', '설명 문구', 'textarea', { rows: 3, hint: '줄바꿈이 그대로 보입니다.' }), F('t1', '제목', 'text', { req: true }), F('t2', '강조 제목', 'text'), F('when', '일정', 'text', { ph: '예: 10월 순차 개강' }),
+      F('href', '누르면 갈 곳', 'link'), F('alt', '연한 배경', 'bool'), F('violet', '강조 제목 진하게', 'bool'), F('order', '순서', 'number'), F('hidden', '숨기기', 'bool'),
+    ]]],
+  },
   quicklinks: {
     title: '홈 학습콘텐츠', one: '바로가기', view: '#/', sortable: true,
     desc: '홈 "학습콘텐츠"의 바로가기 칸입니다. "크게"를 켠 칸은 두 칸 너비로 나옵니다.',
@@ -160,7 +171,7 @@ const NAV = [
   ['접수 관리', [['applications', '수강 신청'], ['reservations', '설명회 예약'], ['consults', '온라인 상담'], ['visits', '방문 상담']]],
   ['수업·선생님', [['classes', '강좌·시간표'], ['teachers', '선생님'], ['leaders', '소장·연사'], ['bandPosts', '강의계획·설명회 안내']]],
   ['소식·결과', [['events', '설명회·특강'], ['results', '시험 결과'], ['notices', '공지사항'], ['faqs', '자주 묻는 질문']]],
-  ['홈 화면·사이트', [['quicklinks', '홈 학습콘텐츠'], ['settings', '사이트 정보'], ['schools', '학교']]],
+  ['홈 화면·사이트', [['banners', '홈 모집안내'], ['quicklinks', '홈 학습콘텐츠'], ['settings', '사이트 정보'], ['schools', '학교']]],
   ['관리', [['users', '회원'], ['data', '데이터 백업']]],
 ];
 
@@ -234,7 +245,7 @@ async function dashboard(main, reqData, pending) {
       <section class="adm-card"><h2>빠른 작업</h2>
         <div class="qa-grid">
           <a href="#/admin/notices?new=1">＋ 공지 쓰기</a><a href="#/admin/classes?new=1">＋ 강좌 추가</a><a href="#/admin/events?new=1">＋ 설명회 추가</a>
-          <a href="#/admin/results?new=1">＋ 시험 결과 추가</a><a href="#/admin/bandPosts?new=1">＋ 강의계획 안내</a><a href="#/admin/quicklinks">홈 바로가기 바꾸기</a>
+          <a href="#/admin/results?new=1">＋ 시험 결과 추가</a><a href="#/admin/bandPosts?new=1">＋ 강의계획 안내</a><a href="#/admin/banners">홈 모집안내 바꾸기</a>
         </div></section>
       <section class="adm-card"><h2>사이트 현황</h2>
         <dl class="mini">

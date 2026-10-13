@@ -3,16 +3,6 @@ import { esc, $, $$, isPast, WEEK } from '../ui.js';
 import { load, visible, byOrder, teacherCard, gradeTags, photoOf } from './common.js';
 import { mountWorld } from './world.js';
 
-// 모집안내 카드 (관리자에서 바꾸려면 공지·강좌를 수정하세요. 카드 문구는 여기서 관리)
-const RECRUIT = [
-  { for: 'grade', tag: '고1·고2', copy: '학교마다 시험 범위가 다르니까\n반도 학교별로', t1: '2학기', t2: '기말대비 내신반', when: '10월 순차 개강', href: '#/timetable?term=final' },
-  { for: 'pre', tag: '예비고1', copy: '수능까지 이어지는 국어 공부법,\n중3부터 시작', t1: '올인원 국어', t2: 'SEASON 3 문법', when: '10. 25(일) 개강', href: '#/timetable?term=pre&subject=국어', alt: true },
-  { for: 'pre', tag: '예비고1', copy: 'PRE 대성 · PRE 대신 · PRE 대전외고\n원하는 고등학교에 맞춘 실전반', t1: '영어', t2: '고등 내신 실전반', when: '11. 20(금)부터 순차 개강', href: '#/timetable?term=pre&subject=영어' },
-  { for: 'grade', tag: '고1 연합반', copy: '학교 무관,\n진도에 맞춰 신청', t1: '통합사회', t2: '경제단원 집중특강', when: '11. 15(일)·22(일)', href: '#/timetable?term=final&school=연합반', alt: true, violet: true },
-  { for: 'pre', tag: '예비고1', copy: '16주 완성\n모의고사 + 핵심개념', t1: '국어', t2: '1% 완성반', when: '11. 21(토) 개강', href: '#/timetable?term=pre&subject=국어' },
-  { for: 'grade', tag: '대성고·대신고', copy: '원하는 날짜·시간에 응시,\n개별 성적표 발송', t1: '대성대신', t2: '진단고사', when: '상시 신청', href: '#/events/e-diag', alt: true, violet: true },
-];
-
 // 강사소개 바로가기 카드 묶음: [필터 키, 버튼 이름, 해당 과목]
 const T_FILTERS = [
   ['all', '전체', null],
@@ -39,7 +29,8 @@ const fmtDay = (iso) => {
 const shortDay = (iso) => { const d = new Date(`${iso}T00:00:00`); return `${d.getMonth() + 1}. ${d.getDate()}(${WEEK[d.getDay()]})`; };
 
 export async function render({ el }) {
-  const [teachers, results, events, notices, leaders, classes, links0, site] = await Promise.all([load('teachers'), load('results'), load('events'), load('notices'), load('leaders'), load('classes'), load('quicklinks').catch(() => seed.quicklinks), getSite()]);
+  const [teachers, results, events, notices, leaders, classes, links0, site, banners0] = await Promise.all([load('teachers'), load('results'), load('events'), load('notices'), load('leaders'), load('classes'), load('quicklinks').catch(() => seed.quicklinks), getSite(), load('banners').catch(() => seed.banners)]);
+  const RECRUIT = visible(banners0).sort(byOrder);
   const LINKS = visible(links0).sort(byOrder);
   const upcoming = visible(events).filter((e) => e.status !== '종료' && !isPast(e.date)).sort((a, b) => (a.date || '9').localeCompare(b.date || '9'));
   const dated = upcoming.filter((e) => e.date);
