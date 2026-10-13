@@ -1,31 +1,46 @@
 <!doctype html>
 <html lang="ko">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>태산학원 | 대전 둔산 학교별 내신</title>
-  <meta name="description" content="대전 둔산 태산학원. 대성고·대신고·대전외고·공주사대부고 등 학교별 내신반 시간표, 강사진, 시험 결과, 설명회 예약." />
-  <meta property="og:title" content="태산학원 | 큰 산처럼 흔들림 없이 학생들의 곁을 지키는 교육의 버팀목이 되겠습니다." />
-  <meta property="og:type" content="website" />
-  <meta property="og:url" content="https://taesan.uinone.net/" />
-  <meta property="og:site_name" content="태산학원" />
-  <meta property="og:description" content="학교별 기말대비 시간표와 설명회 예약을 한곳에서." />
-  <meta name="theme-color" content="#142a30" />
-  <link rel="icon" href="images/brand/logo-dark.png" />
-  <meta property="og:image" content="https://taesan.uinone.net/images/brand/logo.jpg" />
-  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
-  <!-- Firebase는 처음부터 같이 받기(순서대로 기다리지 않게) -->
-  <link rel="preconnect" href="https://www.gstatic.com" crossorigin />
-  <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin />
-  <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js" crossorigin />
-  <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js" crossorigin />
-  <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js" crossorigin />
-  <link rel="stylesheet" href="css/style.css" />
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#ffffff">
+  <meta name="description" content="대전 학생·학부모를 위한 최신 입시 자료와 고민 나눔 커뮤니티">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="태산입시">
+  <meta property="og:description" content="대전 학생·학부모를 위한 최신 입시 자료와 고민 나눔 커뮤니티">
+  <meta property="og:url" content="https://taesan.uinone.net/">
+  <title>태산입시</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%233b5bdb'/%3E%3Cpath d='M18 22h28v6H35v20h-6V28H18z' fill='white'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800&display=swap">
+  <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-  <a class="skip" href="#main">본문 바로가기</a>
-  <div id="app"><p style="padding:40px;text-align:center;color:#5e6778">불러오는 중…</p></div>
+  <div class="topline hidden" id="topline"><button type="button" data-tl="-1" aria-label="이전 안내">‹</button><a id="tl-text" href="#/"></a><button type="button" data-tl="1" aria-label="다음 안내">›</button></div>
+  <header class="site-head">
+    <div class="sh-row"><a href="#/" class="sh-logo"><b>태산</b>입시</a>
+      <span class="sh-icons"><a href="#/notifications" aria-label="알림">🔔</a><a href="#/me" aria-label="내 정보">내 정보</a><a href="#/menu" class="sh-menu" aria-label="전체 메뉴">☰</a></span></div>
+    <form class="sh-search" id="sh-search" role="search"><input name="q" placeholder="검색어를 입력해 주세요." aria-label="검색어"><button aria-label="검색"><svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.8-4.8"/></svg></button></form>
+    <nav class="sh-tabs" id="sh-tabs">
+      <a href="#/" data-t="home">홈</a><a href="#/community/news" data-t="news">소식</a><a href="#/community/talk" data-t="talk">수다</a><a href="#/community/school" data-t="school">학교</a><a href="#/community/admission" data-t="admission">입시</a><a href="#/study" data-t="study">자료실</a>
+    </nav>
+  </header>
+  <button class="to-top" id="to-top" aria-label="맨 위로">↑<small>맨위로</small></button>
+  <div class="app">
+    <main id="view" aria-live="polite"><div class="loading">불러오는 중…</div></main>
+    <nav class="bottom-nav" id="bottom-nav" aria-label="주 메뉴">
+      <a href="#/" data-nav="home"><span class="ni">
+        <svg viewBox="0 0 24 24"><path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-4.5v-6h-5v6H5a1 1 0 0 1-1-1z"/></svg></span>홈</a>
+      <a href="#/study" data-nav="study"><span class="ni">
+        <svg viewBox="0 0 24 24"><path d="M7 3h11a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zm-3 4v13a1 1 0 0 0 1 1h12v-1.5H5.5V7zm8.5 1.2-1 2.1-2.3.3 1.7 1.6-.4 2.3 2-1.1 2 1.1-.4-2.3 1.7-1.6-2.3-.3z"/></svg></span>자료실</a>
+      <a href="#/community/rec" data-nav="community"><span class="ni">
+        <svg viewBox="0 0 24 24"><path d="M12 3C6.5 3 2 6.9 2 11.6c0 2.6 1.4 5 3.6 6.5L5 21.5l4-2.1c.9.2 1.9.3 3 .3 5.5 0 10-3.9 10-8.6S17.5 3 12 3zm-4.5 10a1.4 1.4 0 1 1 0-2.8 1.4 1.4 0 0 1 0 2.8zm4.5 0a1.4 1.4 0 1 1 0-2.8 1.4 1.4 0 0 1 0 2.8zm4.5 0a1.4 1.4 0 1 1 0-2.8 1.4 1.4 0 0 1 0 2.8z"/></svg></span>커뮤니티</a>
+      <a href="#/menu" data-nav="menu"><span class="ni">
+        <svg viewBox="0 0 24 24"><path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z"/></svg></span>전체 메뉴</a>
+    </nav>
+  </div>
+  <div id="toast" role="status"></div>
   <script type="module" src="js/app.js"></script>
 </body>
 </html>

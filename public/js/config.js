@@ -1,6 +1,5 @@
-// Firebase 웹 앱 설정
-// Firebase 콘솔 > 프로젝트 설정 > 내 앱 > SDK 설정 및 구성 에서 나온 값을 그대로 붙여넣으세요.
-// apiKey가 비어 있으면 사이트는 '체험 모드'로 동작합니다(데이터가 이 브라우저에만 저장됨).
+// Firebase 웹 앱 설정 (Firebase 콘솔 > 프로젝트 설정 > 내 앱 에서 나온 값)
+// 주소 뒤에 ?demo=1 을 붙이면 '체험 모드'로 열립니다(데이터가 그 브라우저에만 저장됨).
 export const firebaseConfig = {
   apiKey: 'AIzaSyD7Vksh-2PgYa02WoNZCrI5RorrBw7Zf3U',
   authDomain: 'taesan-academy.firebaseapp.com',
@@ -8,14 +7,21 @@ export const firebaseConfig = {
   storageBucket: 'taesan-academy.firebasestorage.app',
   messagingSenderId: '148663191557',
   appId: '1:148663191557:web:5ad98379a6fdef62de346c',
-  // Storage(유료 Blaze 요금제 필요)를 쓰지 않으면 false. 사진은 줄여서 Firestore에 저장합니다.
-  useStorage: false,
 };
 
-// 관리자 Google 계정. 이 계정으로 Google 로그인하면 관리자 화면이 열립니다.
-// firestore.rules / storage.rules 의 ADMIN_EMAILS 목록과 같게 유지하세요.
-export const adminEmails = ['wjsdnwns1323@uinone.net'];
+export const SITE_NAME = '태산입시';
+export const SITE_DESC = '대전 학생·학부모를 위한 입시 정보와 고민 나눔 커뮤니티';
+// 문제풀이 게시판: 학생 회원이 어느 정도 모이면 true 로 바꿔 엽니다
+export const QNA_OPEN = false;
+export const ACADEMY_NAME = '태산학원';
 
-// 나이스 교육정보 개방 포털(open.neis.go.kr) 인증키. 학교 검색에 씁니다.
-// 비어 있어도 동작하지만 한 번에 5개까지만 찾아집니다. 키를 넣으면 더 많이 찾습니다.
-export const neisKey = '';
+// 아이디 로그인용 내부 이메일 도메인(실제로 메일이 가지 않습니다). 바꾸면 기존 회원이 로그인할 수 없습니다.
+export const LOGIN_DOMAIN = 'member.taesan-academy.app';
+
+// 업로드 제한(가벼운 커뮤니티용). 파일은 Firestore에 나눠 저장합니다(Storage·유료 요금제 불필요).
+export const LIMITS = {
+  fileMB: 5,          // 파일 1개 최대 크기
+  files: 5,           // 글 하나에 첨부 파일 수
+  images: 10,         // 글 하나에 사진 수
+  imagePx: 1600,      // 사진은 이 크기로 줄여서 저장
+};

@@ -1,7 +1,5 @@
-# main에 올리면 public 폴더를 GitHub Pages로 배포합니다. (Secret 필요 없음)
-# 저장소에 없는 사진(강사 누끼 PNG, 수업 이미지 카드, 밴드 이미지)은 배포 중에 채웁니다:
-#   1) 운영 중인 https://taesan-academy.web.app 에서 같은 파일을 받아오고
-#   2) 못 받으면 강사 사진은 assets/cutouts/, 밴드 이미지는 원본 주소에서 받습니다.
+# main에 올리면 public 폴더를 GitHub Pages(https://taesan.uinone.net)로 배포합니다. (Secret 필요 없음)
+# 예비 주소 https://taesan-academy.web.app 은 scripts/deploy_hosting.py로 따로 배포합니다.
 name: Deploy to GitHub Pages
 on:
   push:
@@ -22,41 +20,6 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
-      - name: 저장소에 없는 사진 채우기
-        run: |
-          LIVE=https://taesan-academy.web.app
-          get() { [ -s "public/$1" ] || curl -fsSL -m 30 "$LIVE/$1" -o "public/$1" || { rm -f "public/$1"; return 1; }; }
-          mkdir -p public/images/people public/images/posters public/images/band/t
-          # 강사 사진: 운영 중인 사진(누끼·얼굴 맞춤)을 받아옴. 데이터에 있는 모든 선생님 사진 + 예전 원본 폴더
-          for k in $( (grep -o "images/people/[a-z-]*\.png" public/js/data/seed.js | xargs -n1 basename; ls assets/cutouts assets/people) | sort -u ); do
-            rm -f "public/images/people/$k"
-            if [ -f "assets/people/$k" ]; then cp "assets/people/$k" "public/images/people/$k"; continue; fi   # 저장소에 직접 맞춘 사진이 있으면 그것을 씀
-            get "images/people/$k" || { [ -f "assets/cutouts/$k" ] && cp "assets/cutouts/$k" "public/images/people/$k"; } || true
-          done
-          while IFS=$'\t' read -r key id title; do
-            case "$key" in P*) get "images/posters/$key.jpg" || true ;; esac
-          done < scripts/assets.tsv
-          while IFS=$'\t' read -r pid n path out; do
-            [ -z "$pid" ] && continue
-            get "$out" || curl -fsSL -m 30 "https://coresos-phinf.pstatic.net/$path" -o "public/$out" || rm -f "public/$out"
-            t="images/band/t/$(basename "${out%.*}").jpg"; get "$t" || true
-          done < scripts/band_images.tsv
-          pip3 install -q pillow numpy
-          python3 - <<'PY'
-          from pathlib import Path
-          from PIL import Image
-          out = Path('public/images/band/t'); out.mkdir(parents=True, exist_ok=True)
-          for p in Path('public/images/band').glob('*.*'):
-              t = out / (p.stem + '.jpg')
-              if p.is_file() and not t.exists():
-                  im = Image.open(p).convert('RGB'); im.thumbnail((640, 640)); im.save(t, quality=82)
-          # 강사 누끼 사진: PNG(100~270KB) → WebP(투명 유지, 450x600, 20~40KB)
-          for p in Path('public/images/people').glob('*.png'):
-              im = Image.open(p).convert('RGBA'); im.thumbnail((450, 600), Image.LANCZOS)
-              im.save(p.with_suffix('.webp'), 'WEBP', quality=82, method=6)
-          PY
-          python3 scripts/face_crops.py public/images/people   # 동그란 프로필용(얼굴 가운데·어깨 대칭)
-          echo "강사 사진 $(ls public/images/people/*.png | wc -l)장, 수업 카드 $(ls public/images/posters | wc -l)장, 밴드 $(ls public/images/band | wc -l)개"
       - name: 파일마다 버전 붙이기(새로 올리면 브라우저가 옛 파일과 섞어 쓰지 않게)
         run: |
           V=${GITHUB_SHA::8}
@@ -66,8 +29,8 @@ jobs:
           v = sys.argv[1]
           idx = Path('public/index.html'); h = idx.read_text()
           h = h.replace('href="css/style.css"', f'href="css/style.css?v={v}"').replace('src="js/app.js"', f'src="js/app.js?v={v}"')
-          # 모든 화면 코드를 처음에 한꺼번에 받기(하나 받고 다음 것 받는 대기 없애기). 관리자 화면 코드는 제외
-          pre = ''.join(f'  <link rel="modulepreload" href="{p.as_posix()[7:]}?v={v}" />\n' for p in sorted(Path('public/js').rglob('*.js')) if p.name != 'admin.js')
+          # 화면 코드를 처음에 한꺼번에 받기(하나 받고 다음 것 받는 대기 없애기)
+          pre = ''.join(f'  <link rel="modulepreload" href="{p.as_posix()[7:]}?v={v}">\n' for p in sorted(Path('public/js').rglob('*.js')))
           h = h.replace('</head>', pre + '</head>')
           idx.write_text(h)
           pat = re.compile(r"""((?:from\s*|import\(\s*)['"])(\.{1,2}/[^'"?]+\.js)(['"])""")
