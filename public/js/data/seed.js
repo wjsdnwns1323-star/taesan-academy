@@ -39,6 +39,8 @@ export const site = {
   ],
   timetableNotice: '※ 개강일 및 수업시간은 여건 상 달라질 수 있습니다. 수강등록 시 학원으로 확인 부탁드립니다.',
   examDday: { label: '기말고사', date: '' },
+  resultBandTitle: '2학기 중간고사 결과',
+  resultBandNote: '가채점 포함',
 };
 
 export const schools = [
@@ -381,4 +383,23 @@ export const faqs = [
   { id: 'f5', category: '수업', q: '결석하면 보강이 있나요?', a: '반마다 운영이 다릅니다. 담당 선생님 또는 학원으로 문의해 주세요.' },
   { id: 'f6', category: '설명회', q: '설명회는 학생도 참석할 수 있나요?', a: '설명회마다 대상이 다릅니다. 각 설명회 상세 페이지의 "대상"을 확인해 주세요.' },
   { id: 'f7', category: '기타', q: '본관과 2관은 어떻게 다른가요?', a: '본관은 둔산남로 96 E.플러스빌딩 2층이며 진단고사와 설명회가 열립니다. 2관은 공주사대부고 내신반을 중심으로 운영합니다. 수업 장소는 등록 시 안내드립니다.' },
+];
+
+// 홈 모집안내 배너 (관리자 > 홈 모집 배너에서 수정)
+export const banners = [
+  { id: 'b1', order: 1, for: 'grade', tag: '고1·고2', copy: '학교마다 시험 범위가 다르니까\n반도 학교별로', t1: '2학기', t2: '기말대비 내신반', when: '10월 순차 개강', href: '#/timetable?term=final' },
+  { id: 'b2', order: 2, for: 'pre', tag: '예비고1', copy: '수능까지 이어지는 국어 공부법,\n중3부터 시작', t1: '올인원 국어', t2: 'SEASON 3 문법', when: '10. 25(일) 개강', href: '#/timetable?term=pre&subject=국어', alt: true },
+  { id: 'b3', order: 3, for: 'pre', tag: '예비고1', copy: 'PRE 대성 · PRE 대신 · PRE 대전외고\n원하는 고등학교에 맞춘 실전반', t1: '영어', t2: '고등 내신 실전반', when: '11. 20(금)부터 순차 개강', href: '#/timetable?term=pre&subject=영어' },
+  { id: 'b4', order: 4, for: 'grade', tag: '고1 연합반', copy: '학교 무관,\n진도에 맞춰 신청', t1: '통합사회', t2: '경제단원 집중특강', when: '11. 15(일)·22(일)', href: '#/timetable?term=final&school=연합반', alt: true, violet: true },
+  { id: 'b5', order: 5, for: 'pre', tag: '예비고1', copy: '16주 완성\n모의고사 + 핵심개념', t1: '국어', t2: '1% 완성반', when: '11. 21(토) 개강', href: '#/timetable?term=pre&subject=국어' },
+  { id: 'b6', order: 6, for: 'grade', tag: '대성고·대신고', copy: '원하는 날짜·시간에 응시,\n개별 성적표 발송', t1: '대성대신', t2: '진단고사', when: '상시 신청', href: '#/events/e-diag', alt: true, violet: true },
+];
+
+// 홈 학습콘텐츠 바로가기 (관리자 > 홈 바로가기에서 수정)
+export const quicklinks = [
+  { id: 'q1', order: 1, title: '대성대신\n진단고사', sub: '', href: '#/events/e-diag', big: false },
+  { id: 'q2', order: 2, title: '2학기 기말대비\n학교별 시간표', sub: '우리 학교·학년 반을\n한 번에 찾기', href: '#/timetable?term=final', big: true },
+  { id: 'q3', order: 3, title: '선생님\n커리큘럼·교재', sub: '', href: '#/curriculum', big: false },
+  { id: 'q4', order: 4, title: '2학기 중간\n시험 결과', sub: '', href: '#/results', big: false },
+  { id: 'q5', order: 5, title: '예비고1\n고교 선택 설명회', sub: '', href: '#/events', big: false },
 ];

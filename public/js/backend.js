@@ -16,6 +16,8 @@ export const CONTENT = {
   notices: seed.notices,
   faqs: seed.faqs,
   schools: seed.schools.map((s) => ({ ...s })),
+  banners: seed.banners,
+  quicklinks: seed.quicklinks,
   // 강의계획·설명회 안내(밴드 게시글 정리본)
   bandPosts: BAND_POSTS.map((p) => ({ ...p, id: String(p.id), bandUrl: `https://band.us/band/61446116/post/${p.id}` })),
 };

@@ -1,4 +1,4 @@
-import { seed } from '../backend.js';
+import { seed, getSite } from '../backend.js';
 import { esc, $, $$, isPast, WEEK } from '../ui.js';
 import { load, visible, byOrder, teacherCard, gradeTags, photoOf } from './common.js';
 import { mountWorld } from './world.js';
@@ -39,7 +39,8 @@ const fmtDay = (iso) => {
 const shortDay = (iso) => { const d = new Date(`${iso}T00:00:00`); return `${d.getMonth() + 1}. ${d.getDate()}(${WEEK[d.getDay()]})`; };
 
 export async function render({ el }) {
-  const [teachers, results, events, notices, leaders, classes] = await Promise.all([load('teachers'), load('results'), load('events'), load('notices'), load('leaders'), load('classes')]);
+  const [teachers, results, events, notices, leaders, classes, links0, site] = await Promise.all([load('teachers'), load('results'), load('events'), load('notices'), load('leaders'), load('classes'), load('quicklinks').catch(() => seed.quicklinks), getSite()]);
+  const LINKS = visible(links0).sort(byOrder);
   const upcoming = visible(events).filter((e) => e.status !== '종료' && !isPast(e.date)).sort((a, b) => (a.date || '9').localeCompare(b.date || '9'));
   const dated = upcoming.filter((e) => e.date);
   const recent = [...visible(notices)].sort((a, b) => (Number(!!b.pinned) - Number(!!a.pinned)) || b.date.localeCompare(a.date)).slice(0, 5);
@@ -93,7 +94,7 @@ export async function render({ el }) {
 
   <section class="h-sec">
     <div class="result-band">
-      <p class="rb-title">태산학원<br><b>2학기 중간고사 결과</b><small title="학교 성적 발표 전 학원 집계(가채점)가 포함되어 있습니다. 확정되면 업데이트합니다.">ⓘ 가채점 포함</small></p>
+      <p class="rb-title">태산학원<br><b>${esc(site.resultBandTitle || '시험 결과')}</b>${site.resultBandNote ? `<small title="학교 성적 발표 전 학원 집계(가채점)가 포함되어 있습니다. 확정되면 업데이트합니다.">ⓘ ${esc(site.resultBandNote)}</small>` : ''}</p>
       ${band.map((r) => `<a class="rb-item" href="#/results"><span>${esc(r.bandLabel)}</span><b class="num">${esc(r.bandValue)}<small>${esc(r.bandUnit)}</small></b></a>`).join('')}
     </div>
   </section>
@@ -122,11 +123,7 @@ export async function render({ el }) {
   <section class="h-sec">
     <div class="h-head"><h2>학습콘텐츠</h2></div>
     <div class="contents">
-      <a href="#/events/e-diag">대성대신\n진단고사</a>
-      <a class="big" href="#/timetable?term=final"><b>2학기 기말대비\n학교별 시간표</b><span>우리 학교·학년 반을\n한 번에 찾기</span></a>
-      <a href="#/curriculum">선생님\n커리큘럼·교재</a>
-      <a href="#/results">2학기 중간\n시험 결과</a>
-      <a href="#/events">예비고1\n고교 선택 설명회</a>
+      ${LINKS.map((q) => q.big ? `<a class="big" href="${esc(q.href)}"><b>${esc(q.title)}</b>${q.sub ? `<span>${esc(q.sub)}</span>` : ''}</a>` : `<a href="${esc(q.href)}">${esc(q.title)}</a>`).join('')}
     </div>
   </section>
 
@@ -137,7 +134,7 @@ export async function render({ el }) {
         <h4>${esc(r.school || '')} ${esc(r.grade || '')}<br>${esc(r.subject)}</h4><p>${esc(r.teacherName)} 선생님</p><span class="big">${esc(r.headline)}</span></a>`).join('')}</div>
     </div>
     <div>
-      <div class="h-head"><h2>학원 이야기</h2><div class="seg"><a href="#/notice" aria-selected="true">공지</a>${seed.site.blogUrl ? `<a href="${esc(seed.site.blogUrl)}" target="_blank" rel="noopener">밴드</a>` : ''}</div></div>
+      <div class="h-head"><h2>학원 이야기</h2><div class="seg"><a href="#/notice" aria-selected="true">공지</a>${site.blogUrl ? `<a href="${esc(site.blogUrl)}" target="_blank" rel="noopener">밴드</a>` : ''}</div></div>
       ${recent[0] ? `<div class="story-side"><a class="story v" href="#/notice/${esc(recent[0].id)}"><span class="k">태산학원 소식</span><h4>${esc(recent[0].title)}</h4></a>
         <div><p>${esc((recent[0].body || '').split('\n')[0])}</p><small class="num">${esc(fmtDay(recent[0].date))}</small></div></div>` : ''}
     </div>
