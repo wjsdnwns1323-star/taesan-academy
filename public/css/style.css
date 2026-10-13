@@ -978,3 +978,4 @@ body.sw-on .quick { opacity: 0; pointer-events: none; }
 .sw-moved .sw-hint { opacity: 0; }
 @keyframes sw-bob { 0%, 100% { translate: 0 0; } 50% { translate: 0 6px; } }
 @media (prefers-reduced-motion: reduce) { .sw-hint::after { animation: none; } }
+.sw-hint { display: inline-block; width: 24px; height: 34px; padding: 0; }

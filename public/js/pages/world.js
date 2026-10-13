@@ -88,7 +88,7 @@ export function mountWorld(el, { teachers, leaders, classes }) {
   el.innerHTML = `<section class="sw" aria-label="태산학원 선생님 소개">
     <div class="sw-stage" aria-hidden="true"><img class="sw-poster" alt=""><video muted playsinline preload="none"></video><span class="sw-load">영상 불러오는 중</span></div>
     <div class="sw-steps">
-      <div class="sw-step sw-hero" data-seg="hero"><p class="sw-hint" aria-hidden="true">아래로 내려 보세요</p></div>
+      <div class="sw-step sw-hero" data-seg="hero"><span class="sw-hint" aria-hidden="true"></span></div>
       <div class="sw-step sw-dissolve" data-seg="dissolve" aria-hidden="true"></div>
       <div class="sw-step sw-reveal" data-seg="reveal" aria-hidden="true"></div>
       <div class="sw-step sw-settle" data-seg="settle" aria-hidden="true"></div>
