@@ -40,7 +40,8 @@ export const ICON = {
 
 // 큰 제목 + 검색·내 정보·알림
 export function topBar(title) {
-  return `<header class="top page-top"><div class="top-row"><h1>${esc(title)}</h1>
+  const head = title === '태산입시' ? '<h1 class="logo-h"><img src="images/logo.webp" alt="태산학원"><span>입시</span></h1>' : `<h1>${esc(title)}</h1>`;
+  return `<header class="top page-top"><div class="top-row">${head}
     <a class="icon-btn" href="#/search" aria-label="검색">${ICON.search}</a>
     <a class="icon-btn" href="#/me" aria-label="내 정보">${ICON.user}</a>
     <a class="icon-btn" href="#/notifications" aria-label="알림">${ICON.bell}<i class="dot hidden" id="bell-dot"></i></a>
@@ -75,7 +76,7 @@ function metaHtml(p, { when = true } = {}) {
 export function itemHtml(p) {
   const badge = p.board === 'data' && !p.approved ? ' <span class="badge pending">승인 대기</span>' : '';
   const files = p.files?.length ? ` · 📎${p.files.length}` : '';
-  return `<a class="item${p.board === 'notice' ? ' pinned' : ''}" href="#/post/${p.id}" data-date="${ago(p.createdAt)}">
+  return `<a class="item b-${p.board}${p.board === 'notice' ? ' pinned' : ''}" href="#/post/${p.id}" data-date="${ago(p.createdAt)}">
     <div class="txt">${labelHtml(p)}<h3>${esc(p.title)}${badge}</h3><p>${preview(p.body)}${files}</p>${metaHtml(p)}</div>
     ${safeImg(p.thumb) ? `<div class="th"><img src="${safeImg(p.thumb)}" alt="" loading="lazy"></div>` : ''}</a>`;
 }

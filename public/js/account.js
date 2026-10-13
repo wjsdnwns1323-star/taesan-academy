@@ -13,7 +13,7 @@ export function renderLogin(ctx) {
   const { view, q } = ctx;
   if (be.currentUser()) { location.replace(nextOf(q)); return; }
   view.innerHTML = `${backBar('로그인')}
-    <div class="hero" style="padding-bottom:6px"><div class="logo">태</div><h1>${esc(SITE_NAME)}</h1><p>아이디와 비밀번호로 로그인하세요</p></div>
+    <div class="hero" style="padding-bottom:6px"><img class="hero-logo" src="images/logo.webp" alt="태산학원"><h1>${esc(SITE_NAME)}</h1><p>아이디와 비밀번호로 로그인하세요</p></div>
     <form class="form" id="lf">
       <label class="field"><span>아이디</span><input class="input" name="username" autocomplete="username" autocapitalize="off" required></label>
       <label class="field"><span>비밀번호</span><input class="input" type="password" name="password" autocomplete="current-password" required></label>

@@ -327,7 +327,19 @@ export async function listPosts({ board, category, grade, subject, status, limit
 }
 export const listMyPosts = (uid = me?.uid, after) => db.query('posts', { eq: { uid }, limit: 30, after });
 export const listPending = () => db.query('posts', { eq: { board: 'data', approved: false }, limit: 100 });
-export const getPost = (id) => db.get(`posts/${id}`);
+export async function getPost(id) {
+  const p = await db.get(`posts/${id}`);
+  // 조회수: 이 브라우저에서 처음 열 때 1 올림(실패해도 무시)
+  try {
+    const key = `tsc:v:${id}`;
+    if (p && me && !sessionStorage.getItem(key)) {
+      sessionStorage.setItem(key, '1');
+      db.update(`posts/${id}`, { viewCount: inc(1) }).catch(() => {});
+      p.viewCount = (p.viewCount || 0) + 1;
+    }
+  } catch { /* 저장소 사용 불가 */ }
+  return p;
+}
 
 export async function createPost(input) {
   need();
