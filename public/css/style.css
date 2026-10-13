@@ -1014,3 +1014,24 @@ body.sw-on .quick { opacity: 0; pointer-events: none; }
   .recruit .news { min-height: 0; padding: 26px 22px; }
   .recruit .news h3 { font-size: 22px; }
 }
+
+/* ═════════ 상단: 얇은 계정줄 + [로고 | 검색 | 메뉴] 한 줄 ═════════ */
+.util { height: 36px; padding: 0; border-bottom: 1px solid var(--line-2); }
+.util .wrap { height: 100%; }
+.util-right { flex-direction: row; align-items: center; gap: 0; }
+.util-links > *:last-child { padding-right: 0; }
+.header > .wrap { gap: 20px; height: 100px; }
+.header .menu-btn { margin-right: -8px; }
+.header .searchbox { width: auto; flex: 0 1 300px; min-width: 190px; height: 44px; margin-left: 8px; padding: 0 5px 0 18px; border: 1.5px solid var(--line); background: #f7f6f2; transition: border-color .15s, background .15s, box-shadow .15s; }
+.header .searchbox:hover { border-color: #b9c2c2; }
+.header .searchbox:focus-within { border-color: var(--blue); background: #fff; box-shadow: 0 0 0 3px rgba(27, 107, 123, .12); }
+.header .searchbox input { font-size: 15px; }
+.header .searchbox button { width: 34px; height: 34px; border-radius: 50%; background: var(--violet); color: #fff; }
+.header .searchbox button svg { width: 17px; height: 17px; }
+.header .searchbox button:hover { background: var(--blue); }
+@media (max-width: 1280px) {
+  .header .searchbox { flex-basis: 220px; min-width: 160px; }
+  .gnb > li > a { padding: 0 11px; }
+}
+@media (max-width: 1100px) { .header .searchbox { min-width: 180px; padding-left: 14px; } .header .searchbox input { font-size: 14px; } .gnb > li > a { font-size: 17px; padding: 0 9px; } }
+@media (max-width: 1000px) { .header > .wrap { height: 76px; } }
