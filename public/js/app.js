@@ -245,7 +245,7 @@ async function renderBoardTable(ctx, board, filter, href) {
   view.innerHTML = `<div class="bt-head"><h1>${ICONS[board] || '📋'} ${esc(b.name)}${board === 'all' ? '보기' : ' 게시판'}${esc(catName)}</h1>
       <div class="bt-tools"><label><input type="checkbox" id="hide-n" ${q.get('hn') ? 'checked' : ''}> 공지 숨기기</label>
       <select id="per">${[15, 30, 50].map((n) => `<option value="${n}" ${n === per ? 'selected' : ''}>${n}개씩</option>`).join('')}</select></div></div>
-    ${board === 'data' ? `<div class="rules compact"><h3>⚠️ 자료실 규칙 — 꼭 지켜 주세요</h3><ol>${DATA_RULES.slice(0, 3).map((r) => `<li>${esc(r)}</li>`).join('')}</ol><p style="margin:8px 0 0;font-size:14px"><a href="#/data-rules" style="color:var(--warn);font-weight:700">자료실 규칙 전체 보기 ›</a></p></div>` : ''}
+    ${board === 'data' ? '<p class="bt-note">자료실에는 직접 만들었거나 배포 허락을 받은 자료만 올릴 수 있어요. 관리자 확인 후 공개돼요. <a href="#/data-rules">자료실 규칙 보기</a></p>' : ''}
     ${board === 'notice' || board === 'all' ? '' : `<div class="bt-cats"><a class="${filter.category ? '' : 'on'}" href="${href({ category: '' })}">전체</a>${b.categories.map((c) => `<a class="${c.id === filter.category ? 'on' : ''}" href="${href({ category: c.id })}">${esc(c.name)}</a>`).join('')}</div>`}
     <table class="bt"><colgroup><col style="width:92px"><col><col style="width:150px"><col style="width:110px"><col style="width:70px"><col style="width:70px"></colgroup>
       <thead><tr><th>말머리</th><th>제목</th><th>작성자</th><th>작성일</th><th>조회수</th><th>좋아요</th></tr></thead><tbody id="bt-body"><tr><td colspan="6" class="loading">불러오는 중…</td></tr></tbody></table>
