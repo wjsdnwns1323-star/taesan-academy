@@ -1035,3 +1035,11 @@ body.sw-on .quick { opacity: 0; pointer-events: none; }
 }
 @media (max-width: 1100px) { .header .searchbox { min-width: 180px; padding-left: 14px; } .header .searchbox input { font-size: 14px; } .gnb > li > a { font-size: 17px; padding: 0 9px; } }
 @media (max-width: 1000px) { .header > .wrap { height: 76px; } }
+/* 검색창을 로고와 메뉴 사이 가운데로 */
+.header > .wrap > nav { flex: 0 0 auto !important; }
+.header .searchbox { margin: 0 auto; flex: 0 1 340px; }
+@media (max-width: 1280px) { .header .searchbox { flex-basis: 240px; } }
+/* 메뉴 첫 글자 기준으로 좌우 간격이 같게(메뉴 안쪽 여백만큼 보정) */
+.header > .wrap > nav { margin-left: -22px; }
+@media (max-width: 1280px) { .header > .wrap > nav { margin-left: -11px; } }
+@media (max-width: 1100px) { .header > .wrap > nav { margin-left: -9px; } }
