@@ -44,7 +44,7 @@ export async function render({ el }) {
     <div class="wrap sw-mini-in">
       <h1 id="swm-t">태산학원 선생님들을<br>만나보세요</h1>
       <p>스크롤을 내리면 선생님 열한 분이 한 분씩 나옵니다.</p>
-      <a class="btn sw-mini-btn" href="#/world">스크롤월드 보러가기</a>
+      <a class="btn sw-mini-btn" href="#/world">강사소개 바로가기</a>
     </div>
   </section><div class="home wrap">
   <section class="h-sec" aria-labelledby="rc-t">
