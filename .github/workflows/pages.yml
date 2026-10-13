@@ -51,6 +51,22 @@ jobs:
               im.save(p.with_suffix('.webp'), 'WEBP', quality=82, method=6)
           PY
           echo "강사 사진 $(ls public/images/people/*.png | wc -l)장, 수업 카드 $(ls public/images/posters | wc -l)장, 밴드 $(ls public/images/band | wc -l)개"
+      - name: 파일마다 버전 붙이기(새로 올리면 브라우저가 옛 파일과 섞어 쓰지 않게)
+        run: |
+          V=${GITHUB_SHA::8}
+          python3 - "$V" <<'PY'
+          import re, sys
+          from pathlib import Path
+          v = sys.argv[1]
+          idx = Path('public/index.html'); h = idx.read_text()
+          h = h.replace('href="css/style.css"', f'href="css/style.css?v={v}"').replace('src="js/app.js"', f'src="js/app.js?v={v}"')
+          idx.write_text(h)
+          pat = re.compile(r"""((?:from\s*|import\(\s*)['"])(\.{1,2}/[^'"?]+\.js)(['"])""")
+          for p in Path('public/js').rglob('*.js'):
+              t = p.read_text(); n = pat.sub(lambda m: f"{m.group(1)}{m.group(2)}?v={v}{m.group(3)}", t)
+              if n != t: p.write_text(n)
+          PY
+          grep -c "?v=$V" public/index.html
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
