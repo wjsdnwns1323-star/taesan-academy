@@ -5,9 +5,11 @@ import { esc, statusTag } from '../ui.js';
 import { photoOf, gradeTags, load as loadCol, visible } from './common.js';
 
 // 영상 구간(초). desktop = 가로 영상, mobile = 세로 영상. 영상을 바꾸면 이 숫자만 맞추면 됩니다.
+// 영상은 초당 12장 WebP 사진으로 쪼개 두었습니다(media/frames/d: 가로 960x540, m: 세로 540x960).
+const FPS = 12;
 const VIDEO = {
-  desktop: { src: 'media/scroll-desktop.mp4', poster: 'media/poster-desktop.jpg', hero: [0, 2.5], dissolve: [2.5, 6], reveal: [6, 9.5], settle: [9.5, 10] },
-  mobile: { src: 'media/scroll-mobile.mp4', poster: 'media/poster-mobile.jpg', hero: [0, 3], dissolve: [3, 7], reveal: [7, 10.4], settle: [10.4, 10.8] },
+  desktop: { frames: 'media/frames/d/', count: 361, poster: 'media/poster-desktop.jpg', hero: [0, 2.5], dissolve: [2.5, 6], reveal: [6, 9.5], settle: [9.5, 10] },
+  mobile: { frames: 'media/frames/m/', count: 361, poster: 'media/poster-mobile.jpg', hero: [0, 3], dissolve: [3, 7], reveal: [7, 10.4], settle: [10.4, 10.8] },
 };
 // 카메라가 지나가는 순서와 각 선생님 카드가 떠 있는 영상 구간
 const TOUR = [
@@ -23,15 +25,33 @@ const TOUR = [
   ['jeong-jeongrae', [25.9, 28.45], [25.85, 28.15]],
   ['kim-hyun', [28.45, 30], [28.15, 30]],
 ];
-// 영상 미리 받기: 홈에서 미리 받아 두면 '보러가기'를 눌렀을 때 바로 부드럽게 탐색됩니다.
-const CACHE = {};
+// 사진 미리 받기: 8장마다 1장 → 4장마다 → 2장마다 → 전부 순서로 받습니다.
+// 4장마다 1장꼴로 모이면 화면을 띄우고, 나머지는 보는 동안 채웁니다. 홈에서 미리 불러 두면 바로 열립니다.
+const STORE = {};
 const modeNow = () => (window.innerWidth / window.innerHeight < 0.9 ? 'mobile' : 'desktop');
+const frameUrl = (m, i) => `${VIDEO[m].frames}${String(i + 1).padStart(3, '0')}.webp`;
 export function prefetchWorld(m = modeNow()) {
-  if (!CACHE[m]) {
-    CACHE[m] = fetch(VIDEO[m].src).then((r) => { if (!r.ok) throw new Error(r.status); return r.blob(); })
-      .then((b) => URL.createObjectURL(b)).catch(() => { delete CACHE[m]; return null; });
+  if (STORE[m]) return STORE[m];
+  const n = VIDEO[m].count, seen = new Set(), order = [];
+  let firstCount = 0;
+  for (const step of [8, 4, 2, 1]) {
+    for (let i = 0; i < n; i += step) if (!seen.has(i)) { seen.add(i); order.push(i); }
+    if (step === 4) firstCount = order.length;
   }
-  return CACHE[m];
+  if (!seen.has(n - 1)) order.push(n - 1);
+  let resolveReady; let next = 0;
+  const S = { imgs: new Array(n), n, done: 0, firstCount, listeners: new Set(), ready: new Promise((r) => (resolveReady = r)) };
+  const worker = async () => {
+    while (next < order.length) {
+      const i = order[next++];
+      try { const img = new Image(); img.decoding = 'async'; img.src = frameUrl(m, i); await img.decode(); S.imgs[i] = img; } catch (e) { /* 한 장 실패는 이웃 장면으로 대신 */ }
+      S.done += 1; S.listeners.forEach((f) => f());
+      if (S.done >= firstCount) resolveReady();
+    }
+  };
+  for (let k = 0; k < 6; k += 1) worker();
+  STORE[m] = S;
+  return S;
 }
 
 const FALLBACK = `onerror="this.onerror=null;this.src=this.src.replace(/\\.png$/,'.jpg')"`;
@@ -86,7 +106,7 @@ export function mountWorld(el, { teachers, leaders, classes }) {
   });
 
   el.innerHTML = `<section class="sw" aria-label="태산학원 선생님 소개">
-    <div class="sw-stage" aria-hidden="true"><img class="sw-poster" alt=""><video muted playsinline preload="none"></video><span class="sw-load">영상 불러오는 중</span></div>
+    <div class="sw-stage" aria-hidden="true"><img class="sw-poster" alt=""><canvas class="sw-canvas"></canvas><span class="sw-load">불러오는 중</span></div>
     <div class="sw-steps">
       <div class="sw-step sw-hero" data-seg="hero"><span class="sw-hint" aria-hidden="true"></span></div>
       <div class="sw-step sw-dissolve" data-seg="dissolve" aria-hidden="true"></div>
@@ -97,12 +117,12 @@ export function mountWorld(el, { teachers, leaders, classes }) {
   </section>`;
 
   const root = el.querySelector('.sw');
-  const stage = root.querySelector('.sw-stage'), vid = stage.querySelector('video'), poster = stage.querySelector('.sw-poster'), loadEl = stage.querySelector('.sw-load');
+  const stage = root.querySelector('.sw-stage'), canvas = stage.querySelector('canvas'), ctx = canvas.getContext('2d'), poster = stage.querySelector('.sw-poster'), loadEl = stage.querySelector('.sw-load');
   const steps = root.querySelector('.sw-steps');
   const wide = window.matchMedia('(min-width: 761px)');
   steps.querySelectorAll('.sw-tt').forEach((d) => { if (wide.matches && d.querySelectorAll('tr').length <= 4) d.open = true; });
 
-  let mode = null, V = null, map = [], cur = 0, ready = false, dur = 30, raf = 0, alive = true;
+  let mode = null, V = null, S = null, map = [], cur = 0, ready = false, dur = 30, raf = 0, alive = true, drawn = -1, onProg = null;
   const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const portrait = () => modeNow() === 'mobile';
 
@@ -124,38 +144,48 @@ export function mountWorld(el, { teachers, leaders, classes }) {
     for (const m of map.slice(1)) if (c < m.top + m.h) return m.t0 + (m.t1 - m.t0) * Math.min(1, Math.max(0, (c - m.top) / m.h));
     return map[map.length - 1].t1;
   }
+  function sizeCanvas() {
+    const r = stage.getBoundingClientRect(), d = Math.min(2, window.devicePixelRatio || 1);
+    canvas.width = Math.max(1, Math.round(r.width * d)); canvas.height = Math.max(1, Math.round(r.height * d)); drawn = -1;
+  }
+  function nearest(i) {
+    if (S.imgs[i]) return i;
+    for (let k = 1; k < S.n; k += 1) { if (S.imgs[i - k]) return i - k; if (S.imgs[i + k]) return i + k; }
+    return -1;
+  }
+  function draw(i) {
+    const j = nearest(i); if (j < 0 || j === drawn) return;
+    const img = S.imgs[j], cw = canvas.width, ch = canvas.height;
+    const k = Math.max(cw / img.naturalWidth, ch / img.naturalHeight), w = img.naturalWidth * k, h = img.naturalHeight * k;
+    ctx.drawImage(img, (cw - w) / 2, (ch - h) / 2, w, h); drawn = j;
+  }
   function tick() {
     if (!alive) return;
     if (ready) {
-      const tgt = Math.min(dur - 0.05, target());
-      cur += reduce ? tgt - cur : (tgt - cur) * 0.2;
-      if (Math.abs(vid.currentTime - cur) > 0.02 && !vid.seeking) vid.currentTime = cur;
+      const tgt = Math.min(dur, target());
+      cur += reduce ? tgt - cur : (tgt - cur) * 0.25;
+      draw(Math.max(0, Math.min(S.n - 1, Math.round(cur * FPS))));
     }
     root.classList.toggle('sw-moved', window.scrollY > 40);
     document.body.classList.toggle('sw-on', root.getBoundingClientRect().bottom > window.innerHeight * 0.6);
     raf = requestAnimationFrame(tick);
   }
-  async function load() {
+  function load() {
     const m = portrait() ? 'mobile' : 'desktop';
     if (m === mode) return;
-    mode = m; V = VIDEO[m]; ready = false; stage.classList.remove('ready'); layout();
-    poster.src = V.poster; loadEl.textContent = '영상 불러오는 중';
-    const use = (url) => {
+    if (S && onProg) S.listeners.delete(onProg);
+    mode = m; V = VIDEO[m]; ready = false; root.classList.remove('ready'); stage.classList.remove('ready'); layout();
+    poster.src = V.poster; S = prefetchWorld(m); dur = (S.n - 1) / FPS;
+    onProg = () => { loadEl.textContent = `불러오는 중 ${Math.min(100, Math.round((S.done / S.firstCount) * 100))}%`; };
+    S.listeners.add(onProg); onProg();
+    S.ready.then(() => {
       if (!alive || m !== mode) return;
-      const t = cur;
-      vid.addEventListener('loadeddata', () => { dur = vid.duration || 30; ready = true; stage.classList.add('ready'); vid.currentTime = cur = t || target(); }, { once: true });
-      vid.src = url; vid.load();
-    };
-    const pending = prefetchWorld(m);
-    let done = false;
-    pending.then((url) => { done = true; if (url && alive && m === mode) { loadEl.hidden = true; use(url); } });
-    await new Promise((r) => setTimeout(r, 120));   // 이미 받아 둔 영상이면 바로 씀
-    if (!done) use(V.src);                         // 아직이면 스트리밍으로 먼저 시작
+      sizeCanvas(); cur = target(); ready = true; root.classList.add('ready'); stage.classList.add('ready');
+    });
   }
   const setHdr = () => { const h = document.querySelector('.header'); document.documentElement.style.setProperty('--hdr', `${h ? Math.round(h.getBoundingClientRect().height) : 0}px`); };
   setHdr();
-  const onResize = () => { setHdr(); layout(); load(); };
-  const prime = () => { vid.play().then(() => vid.pause()).catch(() => {}); };   // iOS: 한 번 재생해야 탐색이 안정적
+  const onResize = () => { setHdr(); layout(); sizeCanvas(); load(); };
   const ro = new ResizeObserver(layout); ro.observe(steps);
   steps.addEventListener('toggle', layout, true);
   root.addEventListener('click', (e) => {
@@ -165,14 +195,12 @@ export function mountWorld(el, { teachers, leaders, classes }) {
     window.scrollTo({ top: r.top + window.scrollY + r.height / 2 - window.innerHeight / 2, behavior: reduce ? 'auto' : 'smooth' });
   });
   window.addEventListener('resize', onResize);
-  window.addEventListener('touchstart', prime, { once: true, passive: true });
   load(); raf = requestAnimationFrame(tick);
 
   const cleanup = () => {
     if (!alive) return;
     alive = false; cancelAnimationFrame(raf); ro.disconnect(); document.body.classList.remove('sw-on');
-    window.removeEventListener('resize', onResize); window.removeEventListener('touchstart', prime);
-    if (vid.src.startsWith('blob:')) URL.revokeObjectURL(vid.src);
+    window.removeEventListener('resize', onResize); if (S && onProg) S.listeners.delete(onProg);
     if (window.__swCleanup === cleanup) window.__swCleanup = null;
   };
   window.__swCleanup = cleanup;
