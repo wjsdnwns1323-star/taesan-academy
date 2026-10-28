@@ -21,24 +21,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: 파일마다 버전 붙이기(새로 올리면 브라우저가 옛 파일과 섞어 쓰지 않게)
-        run: |
-          V=${GITHUB_SHA::8}
-          python3 - "$V" <<'PY'
-          import re, sys
-          from pathlib import Path
-          v = sys.argv[1]
-          idx = Path('public/index.html'); h = idx.read_text()
-          h = h.replace('href="css/style.css"', f'href="css/style.css?v={v}"').replace('src="js/app.js"', f'src="js/app.js?v={v}"')
-          # 화면 코드를 처음에 한꺼번에 받기(하나 받고 다음 것 받는 대기 없애기)
-          pre = ''.join(f'  <link rel="modulepreload" href="{p.as_posix()[7:]}?v={v}">\n' for p in sorted(Path('public/js').rglob('*.js')))
-          h = h.replace('</head>', pre + '</head>')
-          idx.write_text(h)
-          pat = re.compile(r"""((?:from\s*|import\(\s*)['"])(\.{1,2}/[^'"?]+\.js)(['"])""")
-          for p in Path('public/js').rglob('*.js'):
-              t = p.read_text(); n = pat.sub(lambda m: f"{m.group(1)}{m.group(2)}?v={v}{m.group(3)}", t)
-              if n != t: p.write_text(n)
-          PY
-          grep -c "?v=$V" public/index.html
+        run: python3 scripts/version_assets.py public "${GITHUB_SHA::8}"
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

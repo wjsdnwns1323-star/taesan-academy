@@ -3,49 +3,55 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#ffffff">
-  <meta name="description" content="대전 학생·학부모를 위한 최신 입시 자료와 고민 나눔 커뮤니티">
+  <meta name="theme-color" content="#f3f5f8">
+  <meta name="description" content="대전 학생과 학부모가 입시 정보와 고민을 나누는 곳">
   <meta property="og:type" content="website">
   <meta property="og:title" content="태산입시">
-  <meta property="og:description" content="대전 학생·학부모를 위한 최신 입시 자료와 고민 나눔 커뮤니티">
+  <meta property="og:description" content="대전 학생과 학부모가 입시 정보와 고민을 나누는 곳">
   <meta property="og:url" content="https://taesan.uinone.net/">
   <title>태산입시</title>
   <link rel="icon" href="images/logo.png">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap">
+  <link rel="preload" href="fonts/wanted-sans/wanted-sans.css" as="style">
+  <link rel="stylesheet" href="fonts/wanted-sans/wanted-sans.css">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-  <div class="topline hidden" id="topline"><button type="button" data-tl="-1" aria-label="이전 안내">‹</button><a id="tl-text" href="#/"></a><button type="button" data-tl="1" aria-label="다음 안내">›</button></div>
-  <header class="site-head">
-    <div class="util"><a href="#/" class="u-logo"><img src="images/logo.webp" alt="태산학원"></a>
-      <nav class="u-links" id="u-links"><a href="#/">카페홈</a><a href="#/community/rec">새글</a><a href="#/notifications">내소식</a><a href="#/menu">전체메뉴</a><a href="#/login" class="u-login" id="u-login">로그인</a></nav></div>
-    <a href="#/" class="cover"><img src="images/logo-white.webp" alt="태산학원"><div><b>태산입시</b><span>대전 학생·학부모를 위한 입시 정보 · 고민 나눔 커뮤니티</span></div></a>
-    <nav class="m-tabs" id="m-tabs"><a href="#/" data-t="home">홈</a><a href="#/community/all" data-t="all">전체글</a><a href="#/community/news" data-t="news">소식</a><a href="#/community/talk" data-t="talk">수다</a><a href="#/community/school" data-t="school">학교</a><a href="#/community/admission" data-t="admission">입시</a><a href="#/study" data-t="study">자료실</a><a href="#/notices" data-t="notices">공지</a></nav>
-  </header>
-  <button class="to-top" id="to-top" aria-label="맨 위로">↑<small>맨위로</small></button>
-  <div class="app">
-    <aside class="side" id="side"></aside>
-    <main id="view" aria-live="polite"><div class="loading">불러오는 중…</div></main>
-    <nav class="bottom-nav" id="bottom-nav" aria-label="주 메뉴">
-      <a href="#/" data-nav="home"><span class="ni">
-        <svg viewBox="0 0 24 24"><path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-4.5v-6h-5v6H5a1 1 0 0 1-1-1z"/></svg></span>홈</a>
-      <a href="#/study" data-nav="study"><span class="ni">
-        <svg viewBox="0 0 24 24"><path d="M7 3h11a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zm-3 4v13a1 1 0 0 0 1 1h12v-1.5H5.5V7zm8.5 1.2-1 2.1-2.3.3 1.7 1.6-.4 2.3 2-1.1 2 1.1-.4-2.3 1.7-1.6-2.3-.3z"/></svg></span>자료실</a>
-      <a href="#/community/rec" data-nav="community"><span class="ni">
-        <svg viewBox="0 0 24 24"><path d="M12 3C6.5 3 2 6.9 2 11.6c0 2.6 1.4 5 3.6 6.5L5 21.5l4-2.1c.9.2 1.9.3 3 .3 5.5 0 10-3.9 10-8.6S17.5 3 12 3zm-4.5 10a1.4 1.4 0 1 1 0-2.8 1.4 1.4 0 0 1 0 2.8zm4.5 0a1.4 1.4 0 1 1 0-2.8 1.4 1.4 0 0 1 0 2.8zm4.5 0a1.4 1.4 0 1 1 0-2.8 1.4 1.4 0 0 1 0 2.8z"/></svg></span>커뮤니티</a>
-      <a href="#/menu" data-nav="menu"><span class="ni">
-        <svg viewBox="0 0 24 24"><path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z"/></svg></span>전체 메뉴</a>
-    </nav>
+  <a class="skip" href="#view">본문 바로가기</a>
+  <div class="app" id="app">
+    <header class="topbar">
+      <a href="#/" class="site-logo" aria-label="태산입시 홈"><img src="images/logo.webp" alt="태산학원" width="72" height="36"><span>입시 커뮤니티</span></a>
+      <form class="search" id="gnb-search" role="search">
+        <svg class="icon sm" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input name="q" placeholder="게시글 검색" aria-label="게시글 검색" autocomplete="off">
+      </form>
+      <nav class="top-actions" id="gnb-nav" aria-label="내 메뉴"></nav>
+      <div class="top-m" id="gnb-m"></div>
+    </header>
+
+    <aside class="side" id="side" aria-label="게시판 메뉴"></aside>
+
+    <nav class="tabs-m" aria-label="게시판"><div class="tabs-m-in" id="lnb"></div></nav>
+
+    <main class="sheet" id="sheet">
+      <div class="notice-line hidden" id="topline">
+        <svg class="icon sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1Z"/><path d="M15 9a3 3 0 0 1 0 6"/></svg>
+        <a id="tl-text" href="#/"></a>
+        <button type="button" data-tl="-1" aria-label="이전 안내"><svg class="icon sm" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button>
+        <button type="button" data-tl="1" aria-label="다음 안내"><svg class="icon sm" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></button>
+      </div>
+      <div id="view" tabindex="-1"><div class="loading">불러오는 중</div></div>
+      <footer class="footer">
+        <div class="footer-name">태산입시</div>
+        <div class="footer-cols">
+          <p>운영 태산학원 · 대전광역시 서구 둔산남로 96 E.플러스빌딩 2층 · 042-321-5788</p>
+          <nav aria-label="안내"><a href="#/rules">이용규칙</a><a href="#/data-rules">자료실 규칙</a><a href="#/privacy"><b>개인정보 처리방침</b></a></nav>
+        </div>
+      </footer>
+    </main>
   </div>
-  <footer class="site-foot">
-    <img src="images/logo.webp" alt="태산학원" class="sf-logo">
-    <p><b>태산입시</b> · 대전 학생·학부모를 위한 입시 정보 커뮤니티 · 운영 태산학원</p>
-    <p>대전광역시 서구 둔산남로 96 E.플러스빌딩 2층 · 042-321-5788</p>
-    <p><a href="#/rules">이용규칙</a> · <a href="#/data-rules">자료실 규칙</a> · <a href="#/privacy"><b>개인정보 처리방침</b></a></p>
-  </footer>
-  <div id="toast" role="status"></div>
+
+  <button class="to-top" id="to-top" aria-label="맨 위로"><svg class="icon" viewBox="0 0 24 24"><path d="m18 15-6-6-6 6"/></svg></button>
+  <div id="toast" role="status" aria-live="polite"></div>
   <script type="module" src="js/app.js"></script>
 </body>
 </html>
