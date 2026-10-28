@@ -14,6 +14,14 @@ export const {
   report, listReports, closeReport, listBanners, addBanner, saveCover, deleteBanner, setHidden, listHidden, getMember, listUsers, setUserFlags,
 } = impl;
 
+// AWS로 옮긴 뒤 생긴 기능(예전 Firebase 서버에서는 화면에서 숨깁니다)
+const NEW = ['guardianStart', 'forgotPassword', 'resetPassword', 'findIdStart', 'findIdConfirm', 'editComment', 'toggleBookmark', 'listBookmarks', 'listMyComments', 'listBlocks', 'setBlock', 'listAudit'];
+export const has = (feature) => SERVER === 'aws' && (feature === 'events' || NEW.includes(feature));
+const off = async () => { throw new Error('서버를 옮긴 뒤 쓸 수 있는 기능입니다.'); };
+export const {
+  guardianStart, forgotPassword, resetPassword, findIdStart, findIdConfirm, editComment, toggleBookmark, listBookmarks, listMyComments, listBlocks, setBlock, listAudit,
+} = Object.fromEntries(NEW.map((n) => [n, SERVER === 'aws' ? aws[n] : off]));
+
 // 인증번호 보내기: AWS는 아이디·비밀번호·휴대폰을 함께, Firebase는 휴대폰과 보이지 않는 reCAPTCHA 자리만
 export const sendPhoneCode = (o) => (SERVER === 'aws' ? aws.sendPhoneCode(o) : fb.sendPhoneCode(o.phone, o.boxId));
 export { shrinkImage, blobToDataUrl, imageDataUrl } from './media.js';

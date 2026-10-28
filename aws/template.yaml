@@ -217,6 +217,9 @@ Resources:
               Action: [s3:PutObject, s3:GetObject, s3:DeleteObject]
               Resource: !Sub '${FilesBucket.Arn}/*'
             - Effect: Allow
+              Action: sns:Publish  # 아이디 찾기 인증 문자(휴대폰 번호로 바로 보내는 문자는 자원을 지정할 수 없음)
+              Resource: '*'
+            - Effect: Allow
               Action:
                 - cognito-idp:AdminGetUser
                 - cognito-idp:AdminDeleteUser
@@ -307,7 +310,7 @@ Resources:
           ViewerProtocolPolicy: redirect-to-https
           Compress: true
           CachePolicyId: !Ref SiteCachePolicy
-          ResponseHeadersPolicyId: 67f7725c-6f97-4210-82d7-5512b31e9d03 # Managed-SecurityHeadersPolicy
+          ResponseHeadersPolicyId: !Ref SiteHeaders
         CacheBehaviors:
           - PathPattern: /api/*
             TargetOriginId: api
@@ -316,6 +319,24 @@ Resources:
             AllowedMethods: [GET, HEAD, OPTIONS, PUT, PATCH, POST, DELETE]
             CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad # Managed-CachingDisabled
             OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac # Managed-AllViewerExceptHostHeader
+
+  # 보안 머리말: 다른 곳의 스크립트 실행 금지(CSP), HTTPS 강제, 다른 사이트 안에 넣기 금지
+  SiteHeaders:
+    Type: AWS::CloudFront::ResponseHeadersPolicy
+    Properties:
+      ResponseHeadersPolicyConfig:
+        Name: !Sub '${AWS::StackName}-site-headers'
+        SecurityHeadersConfig:
+          ContentSecurityPolicy:
+            Override: true
+            ContentSecurityPolicy: "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.amazonaws.com; font-src 'self'; connect-src 'self' https://*.amazonaws.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
+          StrictTransportSecurity: { Override: true, AccessControlMaxAgeSec: 31536000, IncludeSubdomains: false, Preload: false }
+          ContentTypeOptions: { Override: true }
+          FrameOptions: { Override: true, FrameOption: DENY }
+          ReferrerPolicy: { Override: true, ReferrerPolicy: strict-origin-when-cross-origin }
+        CustomHeadersConfig:
+          Items:
+            - { Header: Permissions-Policy, Value: 'camera=(), microphone=(), geolocation=(), payment=()', Override: true }
 
   SiteBucketPolicy:
     Type: AWS::S3::BucketPolicy

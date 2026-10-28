@@ -41,14 +41,14 @@ export async function renderWrite(ctx, editing) {
       </div>
       <div class="form-section">
         <div class="field"><span>사진 <small>최대 ${LIMITS.images}장 · 자동으로 줄여 올립니다</small></span>
-          <div class="attach" id="imgs"></div>
+          <div class="attach" id="imgs"></div><small>내용 칸에 사진을 붙여넣거나, 이 화면에 파일을 끌어 놓아도 됩니다.</small>
           <label class="add-file">${icon('image', 'sm')}사진 추가<input type="file" accept="image/*" multiple hidden id="img-in"></label></div>
         <div class="field"><span>파일 <small>최대 ${LIMITS.files}개 · 1개당 ${LIMITS.fileMB}MB</small></span>
           <div class="attach" id="fls"></div>
           <label class="add-file">${icon('clip', 'sm')}파일 추가<input type="file" multiple hidden id="file-in"></label></div>
       </div>
       <p class="err" id="err"></p>
-      <div class="form-actions"><button type="button" class="btn line lg" data-back>취소</button><button class="btn lg" id="submit">${editing ? '수정 완료' : '등록'}</button></div>
+      <div class="form-actions"><span class="draft num" id="draft" aria-live="polite"></span><button type="button" class="btn line lg" data-back>취소</button><button class="btn lg" id="submit">${editing ? '수정 완료' : '등록'}</button></div>
     </form></div>`;
 
   const form = $('#wf');
@@ -82,24 +82,69 @@ export async function renderWrite(ctx, editing) {
   drawAttach();
   $('#imgs').addEventListener('click', (e) => { const b = e.target.closest('[data-ri]'); if (b) { images.splice(+b.dataset.ri, 1); drawAttach(); } });
   $('#fls').addEventListener('click', (e) => { const b = e.target.closest('[data-rf]'); if (b) { files.splice(+b.dataset.rf, 1); drawAttach(); } });
-  $('#img-in').addEventListener('change', (e) => {
-    for (const f of e.target.files) {
+  const addImages = (list) => {
+    for (const f of list) {
       if (images.length >= LIMITS.images) { toast(`사진은 ${LIMITS.images}장까지 올릴 수 있습니다`); break; }
       if (!f.type.startsWith('image/')) { toast(`${f.name}은(는) 사진 파일이 아닙니다`); continue; }
-      images.push({ kind: 'new', file: f, name: f.name, url: URL.createObjectURL(f) });
+      images.push({ kind: 'new', file: f, name: f.name || '붙여넣은 사진.jpg', url: URL.createObjectURL(f) });
     }
-    e.target.value = '';
     drawAttach();
-  });
-  $('#file-in').addEventListener('change', (e) => {
-    for (const f of e.target.files) {
+  };
+  const addFiles = (list) => {
+    for (const f of list) {
       if (files.length >= LIMITS.files) { toast(`파일은 ${LIMITS.files}개까지 올릴 수 있습니다`); break; }
       if (f.size > LIMITS.fileMB * 1024 * 1024) { toast(`${f.name}은(는) ${LIMITS.fileMB}MB를 넘어 올릴 수 없습니다`); continue; }
       files.push({ kind: 'new', file: f, name: f.name, size: f.size });
     }
-    e.target.value = '';
     drawAttach();
+  };
+  $('#img-in').addEventListener('change', (e) => { addImages([...e.target.files]); e.target.value = ''; });
+  $('#file-in').addEventListener('change', (e) => { addFiles([...e.target.files]); e.target.value = ''; });
+  // 내용 칸에 사진 붙여넣기, 글쓰기 칸에 끌어 놓기(사진은 사진으로, 나머지는 첨부 파일로)
+  form.body.addEventListener('paste', (e) => {
+    const pics = [...(e.clipboardData?.files || [])].filter((f) => f.type.startsWith('image/'));
+    if (pics.length) { e.preventDefault(); addImages(pics); toast(`사진 ${pics.length}장을 붙였습니다`); }
   });
+  form.addEventListener('dragover', (e) => { if ([...e.dataTransfer.types].includes('Files')) { e.preventDefault(); form.classList.add('drop-on'); } });
+  form.addEventListener('dragleave', (e) => { if (!form.contains(e.relatedTarget)) form.classList.remove('drop-on'); });
+  form.addEventListener('drop', (e) => {
+    if (!e.dataTransfer.files.length) return;
+    e.preventDefault(); form.classList.remove('drop-on');
+    const all = [...e.dataTransfer.files];
+    addImages(all.filter((f) => f.type.startsWith('image/')));
+    addFiles(all.filter((f) => !f.type.startsWith('image/')));
+  });
+
+  // 임시 저장(새 글만, 이 브라우저에): 3초마다, 등록하면 지움
+  const DRAFT = `tsc:draft:${me.uid}`;
+  const saveDraft = () => {
+    if (editing) return;
+    const d = { board, cat, title: form.title.value, body: form.body.value, source: form.source.value, at: Date.now() };
+    try {
+      if (d.title.trim() || d.body.trim()) { localStorage.setItem(DRAFT, JSON.stringify(d)); $('#draft').textContent = `임시 저장됨 ${new Date(d.at).toTimeString().slice(0, 5)}`; }
+    } catch { /* 저장소 사용 불가 */ }
+  };
+  if (!editing) {
+    let d = null;
+    try { d = JSON.parse(localStorage.getItem(DRAFT)); } catch { /* 없음 */ }
+    if (d && (d.title || d.body) && Date.now() - d.at < 14 * 86400000) {
+      const box = document.createElement('div');
+      box.className = 'notice-box';
+      box.style.marginBottom = '16px';
+      box.innerHTML = `${icon('info')}<div style="flex:1">쓰다 만 글이 있어요: <b>${esc(d.title || '(제목 없음)')}</b> <span class="hint">${new Date(d.at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+        <div style="display:flex;gap:8px;margin-top:10px"><button type="button" class="btn sm" data-restore>이어서 쓰기</button><button type="button" class="btn sm line" data-drop>지우기</button></div></div>`;
+      form.before(box);
+      box.querySelector('[data-restore]').onclick = () => {
+        if (boards.includes(d.board)) { board = d.board; form.board.value = board; }
+        cat = d.cat; drawBoard();
+        form.title.value = d.title || ''; form.body.value = d.body || ''; form.source.value = d.source || '';
+        box.remove(); form.body.focus();
+      };
+      box.querySelector('[data-drop]').onclick = () => { try { localStorage.removeItem(DRAFT); } catch { /* 무시 */ } box.remove(); };
+    }
+    let timer = null;
+    form.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(saveDraft, 3000); });
+  }
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -144,6 +189,7 @@ export async function renderWrite(ctx, editing) {
       let id = post?.id;
       if (editing) await be.updatePost(id, { ...data, approved: board !== 'data' || (be.isAdmin() && !!post.approved) });
       else id = await be.createPost({ ...data, board });
+      try { if (!editing) localStorage.removeItem(DRAFT); } catch { /* 무시 */ }
       toast(board === 'data' && !be.isAdmin() ? '자료를 올렸습니다. 관리자 확인 후 공개됩니다.' : editing ? '수정했습니다' : '글을 등록했습니다');
       location.replace(`#/post/${id}`);
     } catch (e2) {

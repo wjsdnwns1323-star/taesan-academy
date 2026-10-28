@@ -55,8 +55,9 @@ const clean = (item) => {
 };
 
 /* ---------------- 앱 ---------------- */
-// store: 저장소, files: 파일 주소 발급, idp: 로그인(Cognito 또는 체험용), env: { demo, qnaOpen, smsDailyMax, now }
-export function createApp({ store, files, idp, env = {} }) {
+// store: 저장소, files: 파일 주소 발급, idp: 로그인(Cognito 또는 체험용), sms: 문자 보내기(아이디 찾기),
+// env: { demo, qnaOpen, smsDailyMax, now }
+export function createApp({ store, files, idp, sms, env = {} }) {
   const now = env.now || Date.now;
   const routes = [];
   const on = (method, pattern, fn) => routes.push({ method, parts: pattern.split('/').filter(Boolean), fn });
@@ -74,6 +75,20 @@ export function createApp({ store, files, idp, env = {} }) {
   async function active(ctx) { const u = await user(ctx); if (u.banned) throw E.banned(); return u; }
   async function admin(ctx) { const u = await user(ctx); if (u.role !== 'admin') throw E.admin(); return u; }
   const isAdmin = (u) => u?.role === 'admin';
+  // 내가 차단한 회원(글·댓글을 가림)
+  async function blocksOf(ctx, u) {
+    if (!u) return new Set();
+    if (!ctx._blocks) ctx._blocks = store.query({ pk: `U#${u.uid}`, skBegins: 'BLK#', limit: 500 }).then((l) => new Set(l.map((b) => b.uid)));
+    return ctx._blocks;
+  }
+  // 관리자가 개인정보를 열람·변경한 기록(개인정보의 안전성 확보조치 기준 제8조, 2년 보관)
+  async function audit(u, action, target, count = 1) {
+    const t = now();
+    const month = new Date(t + 9 * 3600000).toISOString().slice(0, 7);
+    await store.put({ pk: `AUDIT#${month}`, sk: `${pad(t)}#${rnd(6)}`, adminUid: u.uid, admin: u.username, action, target, count, at: t, ttl: Math.floor(t / 1000) + 2 * 366 * 86400 }).catch(() => {});
+  }
+  const sha256 = async (text) => Array.from(new Uint8Array(await globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(text))), (b) => b.toString(16).padStart(2, '0')).join('');
+  const smsMax = () => env.smsDailyMax || 300;
 
   // 하루 횟수 제한(문자 발송·업로드 등)
   async function limit(key, max) {
@@ -89,11 +104,20 @@ export function createApp({ store, files, idp, env = {} }) {
   /* ----- 회원가입·로그인 ----- */
   const profileOut = (p) => ({ uid: p.uid, username: p.username, nickname: p.nickname, grade: p.grade, role: p.role, banned: !!p.banned, createdAt: p.createdAt });
 
+  // 너무 쉬운 비밀번호(아이디가 들어간 것, 흔한 것) 거절
+  const COMMON = ['12345678', '123456789', '1234567890', 'password', 'password1', 'qwer1234', 'qwerty12', 'asdf1234', '11111111', '00000000', 'abcd1234', 'iloveyou', '1q2w3e4r', 'q1w2e3r4', 'a1234567'];
+  function checkPassword(pw, username) {
+    if (!str(pw, 64) || pw.length < 8) throw bad('비밀번호는 8자 이상이어야 합니다.');
+    if (pw !== pw.trim()) throw bad('비밀번호 앞뒤에는 빈칸을 넣을 수 없습니다.');
+    const low = pw.toLowerCase();
+    if (username && low.includes(username)) throw new ApiError(400, 'weak-password', '비밀번호에 아이디를 넣을 수 없습니다.');
+    if (COMMON.includes(low) || /^(.)\1+$/.test(pw)) throw new ApiError(400, 'weak-password', '너무 쉬운 비밀번호입니다. 다른 비밀번호를 정해 주세요.');
+  }
+
   function checkAccount(b) {
     const username = String(b.username || '').trim().toLowerCase();
     if (!USERNAME_RE.test(username)) throw bad('아이디는 영문 소문자·숫자·밑줄(_) 4~20자로 정해 주세요.');
-    if (!str(b.password, 64) || b.password.length < 8) throw bad('비밀번호는 8자 이상이어야 합니다.');
-    if (b.password !== b.password.trim()) throw bad('비밀번호 앞뒤에는 빈칸을 넣을 수 없습니다.');
+    checkPassword(b.password, username);
     if (!PHONE_RE.test(String(b.phone || ''))) throw bad('휴대폰 번호를 확인해 주세요.');
     return { username, password: b.password, phone: b.phone, e164: toE164(b.phone) };
   }
@@ -112,6 +136,32 @@ export function createApp({ store, files, idp, env = {} }) {
     return { sent: true };
   });
 
+  // 만 14세 미만: 보호자 휴대폰으로 동의 인증번호(개인정보 보호법 제22조의2)
+  on('POST', 'auth/guardian/start', async (ctx) => {
+    const phone = String(ctx.body.phone || '');
+    const childName = String(ctx.body.childName || '').trim().slice(0, 20);
+    if (!PHONE_RE.test(phone)) throw bad('보호자 휴대폰 번호를 확인해 주세요.');
+    if (!childName) throw bad('가입하는 학생의 이름을 먼저 입력해 주세요.');
+    const e164 = toE164(phone);
+    await limit(`sms#${e164}`, 5);
+    await limit('sms#all', smsMax());
+    const code = env.demo ? '123456' : String(100000 + (globalThis.crypto.getRandomValues(new Uint32Array(1))[0] % 900000));
+    await store.put({ pk: `OTP#guardian#${e164}`, sk: 'OTP', hash: await sha256(`${e164}:${code}`), tries: 0, exp: now() + 10 * 60000, ttl: Math.floor(now() / 1000) + 3600 });
+    await sms.send(e164, `[태산입시] ${childName} 학생의 회원가입 보호자 동의 인증번호: ${code}. 동의하시면 학생에게 알려 주세요.`);
+    return { sent: true };
+  });
+  async function checkGuardian(phone, code) {
+    const e164 = toE164(phone);
+    const otp = await store.get(`OTP#guardian#${e164}`, 'OTP');
+    const wrong = () => new ApiError(400, 'invalid-code', '보호자 인증번호가 맞지 않거나 시간이 지났어요.');
+    if (!otp || otp.exp < now() || otp.tries >= 5) throw wrong();
+    if (otp.hash !== await sha256(`${e164}:${code}`)) {
+      await store.update(`OTP#guardian#${e164}`, 'OTP', { add: { tries: 1 } }).catch(() => {});
+      throw wrong();
+    }
+    await store.del(`OTP#guardian#${e164}`, 'OTP');
+  }
+
   // 2단계: 인증번호 확인 → 회원 정보 저장 → 로그인
   on('POST', 'auth/confirm', async (ctx) => {
     const b = ctx.body;
@@ -129,8 +179,18 @@ export function createApp({ store, files, idp, env = {} }) {
     if (!['남', '여'].includes(b.gender)) throw bad('성별을 선택해 주세요.');
     const age = b.age;
     if (!Number.isInteger(age) || age < 8 || age > 99) throw bad('나이를 숫자로 입력해 주세요.');
-    if (age < 14 && b.guardianConsent !== true) throw bad('만 14세 미만은 보호자 동의가 필요합니다.');
     if (b.agreeRules !== true || b.agreePrivacy !== true) throw bad('필수 항목에 동의해 주세요.');
+    let guardian = { guardianConsent: false, guardianName: '', guardianPhone: '', guardianAt: 0 };
+    if (age < 14) {
+      const gName = String(b.guardianName || '').trim();
+      const gPhone = String(b.guardianPhone || '');
+      if (!nonEmpty(gName, 20)) throw bad('만 14세 미만은 보호자 이름이 필요합니다.');
+      if (!PHONE_RE.test(gPhone)) throw bad('보호자 휴대폰 번호를 확인해 주세요.');
+      if (toE164(gPhone) === a.e164) throw bad('보호자 휴대폰은 학생 번호와 달라야 합니다.');
+      if (!/^[0-9]{6}$/.test(String(b.guardianCode || ''))) throw bad('보호자 인증번호 6자리를 입력해 주세요.');
+      await checkGuardian(gPhone, String(b.guardianCode));
+      guardian = { guardianConsent: true, guardianName: gName, guardianPhone: gPhone, guardianAt: now() };
+    }
 
     const { sub } = await idp.confirm(a.username, code);
     const t = now();
@@ -140,7 +200,7 @@ export function createApp({ store, files, idp, env = {} }) {
     try {
       await store.transact([
         { put: profile, ifNotExists: true },
-        { put: { pk: `U#${sub}`, sk: 'PRIVATE', realName, phone: a.phone, gender: b.gender, age, memberType, childGrade, guardianConsent: b.guardianConsent === true, agreedAt: t }, ifNotExists: true },
+        { put: { pk: `U#${sub}`, sk: 'PRIVATE', realName, phone: a.phone, gender: b.gender, age, memberType, childGrade, ...guardian, agreedAt: t }, ifNotExists: true },
         { put: { pk: `NICK#${nickname}`, sk: 'NICK', uid: sub }, ifNotExists: true },
         { put: { pk: `PHONE#${a.e164}`, sk: 'PHONE', uid: sub }, ifNotExists: true },
       ]);
@@ -169,10 +229,67 @@ export function createApp({ store, files, idp, env = {} }) {
     return idp.refresh(ctx.body.refreshToken);
   });
 
+  // 로그아웃: 이 기기의 로그인 유지 토큰을 폐기
+  on('POST', 'auth/logout', async (ctx) => {
+    const t = ctx.body.refreshToken;
+    if (str(t, 8192) && t) await idp.revoke(t).catch(() => {});
+    return { ok: true };
+  });
+
+  // 비밀번호 찾기 1단계: 가입한 휴대폰으로 인증번호(있는 아이디인지는 알려 주지 않음)
+  on('POST', 'auth/forgot', async (ctx) => {
+    const username = String(ctx.body.username || '').trim().toLowerCase();
+    if (!USERNAME_RE.test(username)) throw bad('아이디를 확인해 주세요.');
+    await limit(`reset#${username}`, 5);
+    await limit('sms#all', smsMax());
+    const r = await idp.forgot(username).catch((e) => { if (e instanceof ApiError && e.status === 429) throw e; return null; });
+    return { sent: true, destination: r?.destination || '' };
+  });
+  // 2단계: 인증번호와 새 비밀번호
+  on('POST', 'auth/reset', async (ctx) => {
+    const username = String(ctx.body.username || '').trim().toLowerCase();
+    const code = String(ctx.body.code || '');
+    const pw = ctx.body.password;
+    if (!USERNAME_RE.test(username) || !/^[0-9]{6}$/.test(code)) throw bad('아이디와 인증번호 6자리를 확인해 주세요.');
+    checkPassword(pw, username);
+    await idp.confirmForgot(username, code, pw);
+    return { ok: true };
+  });
+
+  // 아이디 찾기: 휴대폰 인증번호를 확인한 뒤에만 아이디를 알려 줌
+  on('POST', 'auth/find-id/start', async (ctx) => {
+    const phone = String(ctx.body.phone || '');
+    if (!PHONE_RE.test(phone)) throw bad('휴대폰 번호를 확인해 주세요.');
+    const e164 = toE164(phone);
+    await limit(`sms#${e164}`, 5);
+    await limit('sms#all', smsMax());
+    const code = env.demo ? '123456' : String(100000 + (globalThis.crypto.getRandomValues(new Uint32Array(1))[0] % 900000));
+    await store.put({ pk: `OTP#findid#${e164}`, sk: 'OTP', hash: await sha256(`${e164}:${code}`), tries: 0, exp: now() + 5 * 60000, ttl: Math.floor(now() / 1000) + 3600 });
+    await sms.send(e164, `[태산입시] 아이디 찾기 인증번호는 ${code} 입니다`);
+    return { sent: true };
+  });
+  on('POST', 'auth/find-id/confirm', async (ctx) => {
+    const phone = String(ctx.body.phone || '');
+    const code = String(ctx.body.code || '');
+    if (!PHONE_RE.test(phone) || !/^[0-9]{6}$/.test(code)) throw bad('휴대폰 번호와 인증번호 6자리를 확인해 주세요.');
+    const e164 = toE164(phone);
+    const otp = await store.get(`OTP#findid#${e164}`, 'OTP');
+    const wrong = () => new ApiError(400, 'invalid-code', '인증번호가 맞지 않거나 시간이 지났어요.');
+    if (!otp || otp.exp < now() || otp.tries >= 5) throw wrong();
+    if (otp.hash !== await sha256(`${e164}:${code}`)) {
+      await store.update(`OTP#findid#${e164}`, 'OTP', { add: { tries: 1 } }).catch(() => {});
+      throw wrong();
+    }
+    await store.del(`OTP#findid#${e164}`, 'OTP');
+    const ph = await store.get(`PHONE#${e164}`, 'PHONE');
+    const prof = ph ? await store.get(`U#${ph.uid}`, 'PROFILE') : null;
+    return { username: prof?.username || null, createdAt: prof?.createdAt || null };
+  });
+
   on('POST', 'auth/password', async (ctx) => {
     const u = await user(ctx);
     const { oldPassword, newPassword } = ctx.body;
-    if (!str(newPassword, 64) || newPassword.length < 8 || newPassword !== newPassword.trim()) throw bad('새 비밀번호는 8자 이상이어야 합니다.');
+    checkPassword(newPassword, u.username);
     await idp.login(u.username, String(oldPassword || '')); // 현재 비밀번호 확인
     await idp.setPassword(u.username, newPassword);
     return { ok: true };
@@ -185,7 +302,8 @@ export function createApp({ store, files, idp, env = {} }) {
     const u = await user(ctx);
     await idp.login(u.username, String(ctx.body?.password || ''));
     const priv = await store.get(`U#${u.uid}`, 'PRIVATE');
-    const keys = [[`U#${u.uid}`, 'PROFILE'], [`U#${u.uid}`, 'PRIVATE'], [`NICK#${u.nickname}`, 'NICK']];
+    const mine = await store.query({ pk: `U#${u.uid}`, limit: 5000 });
+    const keys = [...mine.map((x) => [x.pk, x.sk]), [`NICK#${u.nickname}`, 'NICK']];
     if (ctx.auth.phone) keys.push([`PHONE#${ctx.auth.phone}`, 'PHONE']);
     else if (priv?.phone) keys.push([`PHONE#${toE164(priv.phone)}`, 'PHONE']);
     await store.delMany(keys);
@@ -200,6 +318,7 @@ export function createApp({ store, files, idp, env = {} }) {
     if (ctx.query.private) {
       const privs = await store.getMany(list.map((u) => [`U#${u.uid}`, 'PRIVATE']));
       list.forEach((u, i) => { u.priv = clean(privs[i]) || null; });
+      await audit(await me(ctx), 'list-private', 'members', list.length);
     }
     return list.map((u) => ({ ...u, id: u.uid }));
   });
@@ -212,6 +331,7 @@ export function createApp({ store, files, idp, env = {} }) {
     if (ctx.query.private) {
       if (u.uid !== uid && !isAdmin(u)) throw E.forbidden();
       out.priv = clean(await store.get(`U#${uid}`, 'PRIVATE'));
+      if (u.uid !== uid) await audit(u, 'view-private', uid);
     }
     return out;
   });
@@ -219,6 +339,7 @@ export function createApp({ store, files, idp, env = {} }) {
   on('GET', 'users/:uid/private', async (ctx, { uid }) => {
     const u = await user(ctx);
     if (u.uid !== uid && !isAdmin(u)) throw E.forbidden();
+    if (u.uid !== uid) await audit(u, 'view-private', uid);
     return clean(await store.get(`U#${uid}`, 'PRIVATE')) || null;
   });
 
@@ -230,7 +351,14 @@ export function createApp({ store, files, idp, env = {} }) {
     if ('banned' in ctx.body) { if (typeof ctx.body.banned !== 'boolean') throw bad('정지 값이 올바르지 않습니다.'); set.banned = ctx.body.banned; }
     if (!Object.keys(set).length) throw bad('바꿀 내용이 없습니다.');
     try { await store.update(`U#${uid}`, 'PROFILE', { set }); } catch (e) { if (e instanceof Conflict) throw E.notFound('회원을 찾을 수 없습니다.'); throw e; }
+    await audit(u, `set-${Object.keys(set).join(',')}`, uid);
     return { ok: true };
+  });
+
+  on('GET', 'audit', async (ctx) => {
+    await admin(ctx);
+    const month = /^\d{4}-\d{2}$/.test(ctx.query.month || '') ? ctx.query.month : new Date(now() + 9 * 3600000).toISOString().slice(0, 7);
+    return (await store.query({ pk: `AUDIT#${month}`, desc: true, limit: 500 })).map(clean);
   });
 
   /* ----- 글 ----- */
@@ -328,16 +456,29 @@ export function createApp({ store, files, idp, env = {} }) {
     if (q.pinned) filters.push((p) => !!p.pinned);
     if (!ownOrAdmin) filters.push(visible);
     let rows = (await store.query({ ...opts, desc: true, limit: filters.length > 1 ? Math.min(1000, lim * 3) : lim, skLt: q.before || undefined })).map(clean);
+    const blocked = await blocksOf(ctx, u);
+    if (blocked.size && !ownOrAdmin) filters.push((p) => !blocked.has(p.uid));
     rows = rows.filter((p) => filters.every((f) => f(p))).slice(0, lim);
     return u ? rows : rows.map(guestRow);
   });
 
   on('GET', 'posts/:id', async (ctx, { id }) => {
     const { p, u } = await seePost(ctx, id);
-    const [body, like] = await store.getMany([[`P#${id}`, 'BODY'], [`P#${id}`, `L#${u.uid}`]]);
+    const [body, like, mark] = await store.getMany([[`P#${id}`, 'BODY'], [`P#${id}`, `L#${u.uid}`], [`U#${u.uid}`, `BM#${id}`]]);
     let meta = p;
     if (ctx.query.view) meta = clean(await store.update(`P#${id}`, 'META', { add: { viewCount: 1 } }).catch(() => p));
-    return { ...meta, ...clean(body), id, liked: !!like };
+    // 같은 게시판의 이전 글(더 오래된 글)·다음 글(더 새 글)
+    let prev = null, next = null;
+    if (visible(p)) {
+      const sk = `${pad(p.createdAt)}#${p.id}`;
+      const blocked = await blocksOf(ctx, u);
+      const pick = (l) => { const x = l.find((r) => !blocked.has(r.uid)); return x ? { id: x.id, title: x.title, createdAt: x.createdAt } : null; };
+      [prev, next] = await Promise.all([
+        store.query({ index: 'gsi1', pk: `B#${p.board}`, skLt: sk, desc: true, limit: 5 }).then(pick),
+        store.query({ index: 'gsi1', pk: `B#${p.board}`, skGt: sk, limit: 5 }).then(pick),
+      ]);
+    }
+    return { ...meta, ...clean(body), id, liked: !!like, bookmarked: !!mark, prev, next };
   });
 
   on('POST', 'posts', async (ctx) => {
@@ -442,6 +583,48 @@ export function createApp({ store, files, idp, env = {} }) {
     return { liked: want, likeCount: p?.likeCount || 0 };
   });
 
+  // 스크랩(나만 보는 저장)
+  on('POST', 'posts/:id/bookmark', async (ctx, { id }) => {
+    const { u } = await seePost(ctx, id);
+    if (ctx.body.on === false) await store.del(`U#${u.uid}`, `BM#${id}`);
+    else {
+      const n = (await store.query({ pk: `U#${u.uid}`, skBegins: 'BM#', limit: 1001 })).length;
+      if (n >= 1000) throw bad('스크랩은 1,000개까지 할 수 있습니다.');
+      await store.put({ pk: `U#${u.uid}`, sk: `BM#${id}`, postId: id, at: now() });
+    }
+    return { bookmarked: ctx.body.on !== false };
+  });
+  on('GET', 'me/bookmarks', async (ctx) => {
+    const u = await user(ctx);
+    const marks = (await store.query({ pk: `U#${u.uid}`, skBegins: 'BM#', limit: 1000 })).sort((a, b) => b.at - a.at);
+    const metas = await store.getMany(marks.map((m) => [`P#${m.postId}`, 'META']));
+    return metas.map((m, i) => (m && canSee(m, u) ? { ...clean(m), bookmarkedAt: marks[i].at } : null)).filter(Boolean);
+  });
+
+  // 내가 쓴 댓글
+  on('GET', 'me/comments', async (ctx) => {
+    const u = await user(ctx);
+    return (await store.query({ index: 'gsi3', pk: `UC#${u.uid}`, desc: true, limit: 100 })).map(clean)
+      .map((c) => ({ id: c.id, postId: c.postId, postTitle: c.postTitle, body: c.body, createdAt: c.createdAt, likeCount: c.likeCount }));
+  });
+
+  // 회원 차단: 그 회원의 글과 댓글이 나에게 보이지 않음
+  on('GET', 'me/blocks', async (ctx) => {
+    const u = await user(ctx);
+    return (await store.query({ pk: `U#${u.uid}`, skBegins: 'BLK#', limit: 500 })).map(clean);
+  });
+  on('POST', 'me/blocks', async (ctx) => {
+    const u = await user(ctx);
+    const uid = String(ctx.body.uid || '');
+    if (!uid || !str(uid, 128) || uid === u.uid) throw bad('차단할 회원이 올바르지 않습니다.');
+    if (ctx.body.on === false) { await store.del(`U#${u.uid}`, `BLK#${uid}`); return { blocked: false }; }
+    const t = await store.get(`U#${uid}`, 'PROFILE');
+    if (!t) throw E.notFound('회원을 찾을 수 없습니다.');
+    if (isAdmin(t)) throw bad('운영진은 차단할 수 없습니다.');
+    await store.put({ pk: `U#${u.uid}`, sk: `BLK#${uid}`, uid, nickname: t.nickname, at: now() });
+    return { blocked: true };
+  });
+
   // 문제풀이: 글쓴이가 답변 채택(한 번만)
   on('POST', 'posts/:id/accept', async (ctx, { id }) => {
     const u = await active(ctx);
@@ -466,7 +649,12 @@ export function createApp({ store, files, idp, env = {} }) {
       store.query({ pk: `P#${id}`, skBegins: `CL#${u.uid}#`, limit: 2000 }),
     ]);
     const liked = new Set(mine.map((x) => x.sk.slice(`CL#${u.uid}#`.length)));
-    return list.map((c) => ({ ...clean(c), liked: liked.has(c.id) }));
+    const blocked = await blocksOf(ctx, u);
+    return list.map((c) => {
+      const out = { ...clean(c), liked: liked.has(c.id), parentId: c.parentId || '' };
+      if (blocked.has(c.uid) && !c.deleted) Object.assign(out, { body: '', image: '', blocked: true });
+      return out;
+    });
   });
 
   on('POST', 'posts/:id/comments', async (ctx, { id }) => {
@@ -476,20 +664,48 @@ export function createApp({ store, files, idp, env = {} }) {
     const image = ctx.body.image ?? '';
     if (!nonEmpty(body, LIMIT.comment)) throw bad('댓글을 입력해 주세요(3,000자까지).');
     if (!jpeg(image, LIMIT.commentImage)) throw bad('댓글 사진이 너무 크거나 올바르지 않습니다.');
+    const parentId = String(ctx.body.parentId || '');
+    let parent = null;
+    if (parentId) {
+      parent = str(parentId, 40) ? await store.get(`P#${id}`, `C#${parentId}`) : null;
+      if (!parent || parent.deleted) throw E.notFound('답글을 달 댓글을 찾을 수 없습니다.');
+      if (parent.parentId) throw bad('답글에는 다시 답글을 달 수 없습니다.');
+    }
     const t = now(), cid = newId(t);
     await store.transact([
-      { put: { pk: `P#${id}`, sk: `C#${cid}`, id: cid, uid: u.uid, nickname: u.nickname, grade: u.grade, body, image, createdAt: t, likeCount: 0 }, ifNotExists: true },
+      { put: { pk: `P#${id}`, sk: `C#${cid}`, id: cid, uid: u.uid, nickname: u.nickname, grade: u.grade, body, image, createdAt: t, likeCount: 0, parentId,
+        postId: id, postTitle: p.title.slice(0, 100), gsi3pk: `UC#${u.uid}`, gsi3sk: `${pad(t)}#${cid}` }, ifNotExists: true },
       { update: { pk: `P#${id}`, sk: 'META', patch: { add: { commentCount: 1 } } }, ifExists: true },
     ]);
-    await notify(p.uid, u, 'comment', p, body);
+    if (parent) await notify(parent.uid, u, 'reply', p, body);
+    if (!parent || parent.uid !== p.uid) await notify(p.uid, u, 'comment', p, body);
     return { id: cid };
+  });
+
+  on('PATCH', 'posts/:id/comments/:cid', async (ctx, { id, cid }) => {
+    const u = await active(ctx);
+    const c = str(cid, 40) ? await store.get(`P#${id}`, `C#${cid}`) : null;
+    if (!c || c.deleted) throw E.notFound('댓글을 찾을 수 없습니다.');
+    if (c.uid !== u.uid) throw E.forbidden('직접 쓴 댓글만 고칠 수 있습니다.');
+    const body = String(ctx.body.body ?? '');
+    if (!nonEmpty(body, LIMIT.comment)) throw bad('댓글을 입력해 주세요(3,000자까지).');
+    await store.update(`P#${id}`, `C#${cid}`, { set: { body, editedAt: now() } });
+    return { ok: true };
   });
 
   on('DELETE', 'posts/:id/comments/:cid', async (ctx, { id, cid }) => {
     const u = await user(ctx);
     const c = str(cid, 40) ? await store.get(`P#${id}`, `C#${cid}`) : null;
-    if (!c) return { ok: true };
+    if (!c || c.deleted) return { ok: true };
     if (c.uid !== u.uid && !isAdmin(u)) throw E.forbidden('직접 쓴 댓글만 삭제할 수 있습니다.');
+    const hasReplies = !c.parentId && (await store.query({ pk: `P#${id}`, skBegins: 'C#', limit: 2000 })).some((x) => x.parentId === cid && !x.deleted);
+    if (hasReplies) {
+      await store.transact([
+        { update: { pk: `P#${id}`, sk: `C#${cid}`, patch: { set: { deleted: true, body: '', image: '' }, remove: ['gsi3pk', 'gsi3sk'] } }, ifExists: true },
+        { update: { pk: `P#${id}`, sk: 'META', patch: { add: { commentCount: -1 } } }, ifExists: true },
+      ]).catch((e) => { if (!(e instanceof Conflict)) throw e; });
+      return { ok: true };
+    }
     try {
       await store.transact([
         { del: { pk: `P#${id}`, sk: `C#${cid}` }, ifExists: true },
@@ -559,7 +775,7 @@ export function createApp({ store, files, idp, env = {} }) {
     await admin(ctx);
     const r = await store.get(`R#${id}`, 'R');
     if (!r) throw E.notFound('신고를 찾을 수 없습니다.');
-    await store.update(`R#${id}`, 'R', { set: { status: 'done', gsi1pk: 'REPORT#done' } });
+    await store.update(`R#${id}`, 'R', { set: { status: 'done', gsi1pk: 'REPORT#done', doneAt: now(), ttl: Math.floor(now() / 1000) + 366 * 86400 } });
     return { ok: true };
   });
 
@@ -575,12 +791,15 @@ export function createApp({ store, files, idp, env = {} }) {
   });
   on('POST', 'banners', async (ctx) => {
     await admin(ctx);
-    const { kind, image = '', text = '', link = '' } = ctx.body;
-    if (!['image', 'text'].includes(kind)) throw bad('배너 종류가 올바르지 않습니다.');
+    const { kind, image = '', text = '', link = '', date = '' } = ctx.body;
+    if (!['image', 'text', 'event'].includes(kind)) throw bad('배너 종류가 올바르지 않습니다.');
     if (!str(text, 100) || !jpeg(image, LIMIT.bannerImage)) throw bad('배너 내용이 올바르지 않습니다.');
+    if (kind !== 'image' && !nonEmpty(text, 100)) throw bad('내용을 입력해 주세요.');
+    // 입시 일정: 날짜(YYYY-MM-DD)와 이름
+    if (kind === 'event' && !(/^\d{4}-\d{2}-\d{2}$/.test(date) && !Number.isNaN(Date.parse(`${date}T00:00:00+09:00`)))) throw bad('날짜를 확인해 주세요.');
     if (!str(link, 300) || (link && !/^(#\/|https:\/\/)/.test(link))) throw bad('링크는 https:// 또는 #/ 로 시작해야 합니다.');
     const t = now(), id = newId(t);
-    await store.put({ pk: 'BANNER', sk: id, id, kind, image, text, sub: '', link, createdAt: t });
+    await store.put({ pk: 'BANNER', sk: id, id, kind, image, text, sub: '', link, date: kind === 'event' ? date : '', createdAt: t });
     return { id };
   });
   on('DELETE', 'banners/:id', async (ctx, { id }) => {
@@ -701,10 +920,10 @@ export function createMemoryStore(initial = {}, onWrite) {
       m.delete(K(pk, sk)); changed();
     },
     async delMany(keys) { keys.forEach(([pk, sk]) => m.delete(K(pk, sk))); changed(); },
-    async query({ index, pk, skBegins, skLt, desc, limit = 100 }) {
+    async query({ index, pk, skBegins, skLt, skGt, desc, limit = 100 }) {
       const P = index ? `${index}pk` : 'pk', S = index ? `${index}sk` : 'sk';
       const rows = [...m.values()].filter((x) => x[P] === pk && typeof x[S] === 'string'
-        && (!skBegins || x[S].startsWith(skBegins)) && (!skLt || x[S] < skLt));
+        && (!skBegins || x[S].startsWith(skBegins)) && (!skLt || x[S] < skLt) && (!skGt || x[S] > skGt));
       rows.sort((a, b) => (a[S] < b[S] ? -1 : a[S] > b[S] ? 1 : 0));
       if (desc) rows.reverse();
       return rows.slice(0, limit).map(copy);
@@ -765,6 +984,18 @@ export function createDemoIdp(store, { now = Date.now } = {}) {
       throw new ApiError(401, 'session-expired', '다시 로그인해 주세요.');
     },
     async setPassword(username, password) { await store.update(`IDP#${username}`, 'IDP', { set: { password } }); },
+    async forgot(username) {
+      const a = await get(username);
+      if (!a?.confirmed) return null;
+      await store.update(`IDP#${username}`, 'IDP', { set: { resetCode: '123456' } });
+      return { destination: a.phone.replace(/^\+82(\d{2})\d+(\d{4})$/, '010-****-$2') };
+    },
+    async confirmForgot(username, code, password) {
+      const a = await get(username);
+      if (!a?.resetCode || a.resetCode !== code) throw new ApiError(400, 'invalid-code', '인증번호가 맞지 않거나 시간이 지났어요.');
+      await store.update(`IDP#${username}`, 'IDP', { set: { password }, remove: ['resetCode'] });
+    },
+    async revoke() {},
     async verify(token) {
       if (!String(token).startsWith('demo.')) return null;
       const c = dec(token.slice(5));

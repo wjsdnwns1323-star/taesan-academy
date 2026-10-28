@@ -16,7 +16,9 @@ async function setup(env = {}) {
     async remove(key) { removed.push(key); },
   };
   const idp = createDemoIdp(store);
-  const app = createApp({ store, files, idp, env: { demo: true, ...env } });
+  const texts = [];
+  const sms = { async send(to, text) { texts.push({ to, text }); } };
+  const app = createApp({ store, files, idp, sms, env: { demo: true, ...env } });
   const call = async (method, path, body, token, query) => {
     const r = await app.handle({ method, path, body, token, query });
     return r;
@@ -34,25 +36,27 @@ async function setup(env = {}) {
   let n = 0;
   const join = async (username, extra = {}) => {
     const phone = extra.phone || `010-1234-${String(1000 + n++).slice(-4)}`;
-    await ok('POST', '/auth/start', { username, password: 'password1', phone });
+    await ok('POST', '/auth/start', { username, password: 'tsPass_01', phone });
     const r = await ok('POST', '/auth/confirm', {
-      username, password: 'password1', phone, code: '123456', realName: '홍길동', gender: '여', age: 45,
+      username, password: 'tsPass_01', phone, code: '123456', realName: '홍길동', gender: '여', age: 45,
       memberType: '학부모', childGrade: '고2', agreeRules: true, agreePrivacy: true, ...extra,
     });
     return { token: r.idToken, me: r.me, refresh: r.refreshToken };
   };
-  return { store, app, call, ok, fail, join, removed };
+  return { store, app, call, ok, fail, join, removed, texts };
 }
 
 const post = (over = {}) => ({ board: 'talk', category: 'daily', title: '안녕하세요', body: '본문입니다', images: [], files: [], source: '', ...over });
 
 test('회원가입: 인증·검증·중복', async () => {
   const t = await setup();
-  await t.fail(400, 'POST', '/auth/start', { username: 'AB', password: 'password1', phone: '010-1111-2222' });
+  await t.fail(400, 'POST', '/auth/start', { username: 'AB', password: 'tsPass_01', phone: '010-1111-2222' });
   await t.fail(400, 'POST', '/auth/start', { username: 'mom01', password: 'short', phone: '010-1111-2222' });
-  await t.fail(400, 'POST', '/auth/start', { username: 'mom01', password: 'password1', phone: '02-123-4567' });
-  await t.ok('POST', '/auth/start', { username: 'mom01', password: 'password1', phone: '010-1111-2222' });
-  const base = { username: 'mom01', password: 'password1', phone: '010-1111-2222', realName: '김엄마', gender: '여', age: 44, memberType: '학부모', childGrade: '중3', agreeRules: true, agreePrivacy: true };
+  assert.equal((await t.fail(400, 'POST', '/auth/start', { username: 'mom01', password: 'mom01pass', phone: '010-1111-2222' })).error, 'weak-password');
+  assert.equal((await t.fail(400, 'POST', '/auth/start', { username: 'mom01', password: 'qwer1234', phone: '010-1111-2222' })).error, 'weak-password');
+  await t.fail(400, 'POST', '/auth/start', { username: 'mom01', password: 'tsPass_01', phone: '02-123-4567' });
+  await t.ok('POST', '/auth/start', { username: 'mom01', password: 'tsPass_01', phone: '010-1111-2222' });
+  const base = { username: 'mom01', password: 'tsPass_01', phone: '010-1111-2222', realName: '김엄마', gender: '여', age: 44, memberType: '학부모', childGrade: '중3', agreeRules: true, agreePrivacy: true };
   await t.fail(400, 'POST', '/auth/confirm', { ...base, code: '000000' });
   await t.fail(400, 'POST', '/auth/confirm', { ...base, code: '123456', agreePrivacy: false });
   await t.fail(400, 'POST', '/auth/confirm', { ...base, code: '123456', childGrade: '' });
@@ -62,59 +66,67 @@ test('회원가입: 인증·검증·중복', async () => {
   assert.equal(r.me.role, 'member');
   assert.ok(r.idToken && r.refreshToken);
   // 같은 아이디·같은 번호는 다시 못 씀
-  assert.equal((await t.fail(409, 'POST', '/auth/start', { username: 'mom01', password: 'password1', phone: '010-9999-2222' })).error, 'username-taken');
-  assert.equal((await t.fail(409, 'POST', '/auth/start', { username: 'mom02', password: 'password1', phone: '01011112222' })).error, 'phone-taken');
+  assert.equal((await t.fail(409, 'POST', '/auth/start', { username: 'mom01', password: 'tsPass_01', phone: '010-9999-2222' })).error, 'username-taken');
+  assert.equal((await t.fail(409, 'POST', '/auth/start', { username: 'mom02', password: 'tsPass_01', phone: '01011112222' })).error, 'phone-taken');
   // 다시 확인해도 기존 계정이 지워지지 않음
   await t.fail(400, 'POST', '/auth/confirm', { ...base, code: '123456' });
-  await t.ok('POST', '/auth/login', { username: 'mom01', password: 'password1' });
+  await t.ok('POST', '/auth/login', { username: 'mom01', password: 'tsPass_01' });
   // 만 14세 미만은 보호자 동의
-  await t.ok('POST', '/auth/start', { username: 'kid01', password: 'password1', phone: '010-3333-4444' });
-  const kid = { username: 'kid01', password: 'password1', phone: '010-3333-4444', code: '123456', realName: '어린이', gender: '남', age: 13, memberType: '학생', grade: '중1', agreeRules: true, agreePrivacy: true };
-  await t.fail(400, 'POST', '/auth/confirm', kid);
-  const k = await t.ok('POST', '/auth/confirm', { ...kid, guardianConsent: true });
+  await t.ok('POST', '/auth/start', { username: 'kid01', password: 'tsPass_01', phone: '010-3333-4444' });
+  const kid = { username: 'kid01', password: 'tsPass_01', phone: '010-3333-4444', code: '123456', realName: '어린이', gender: '남', age: 13, memberType: '학생', grade: '중1', agreeRules: true, agreePrivacy: true };
+  await t.fail(400, 'POST', '/auth/confirm', kid); // 보호자 정보 없음
+  await t.fail(400, 'POST', '/auth/confirm', { ...kid, guardianConsent: true }); // 체크만으로는 안 됨
+  await t.fail(400, 'POST', '/auth/guardian/start', { phone: '010-5555-6666', childName: '' });
+  await t.ok('POST', '/auth/guardian/start', { phone: '010-5555-6666', childName: '어린이' });
+  assert.match(t.texts.at(-1).text, /어린이 학생의 회원가입 보호자 동의 인증번호: 123456/);
+  await t.fail(400, 'POST', '/auth/confirm', { ...kid, guardianName: '어른', guardianPhone: '010-3333-4444', guardianCode: '123456' }); // 학생 번호와 같음
+  await t.fail(400, 'POST', '/auth/confirm', { ...kid, guardianName: '어른', guardianPhone: '010-5555-6666', guardianCode: '000000' });
+  const k = await t.ok('POST', '/auth/confirm', { ...kid, guardianName: '어른', guardianPhone: '010-5555-6666', guardianCode: '123456' });
   assert.equal(k.me.grade, '중1');
   const priv = await t.ok('GET', `/users/${k.me.uid}/private`, null, k.idToken);
   assert.equal(priv.guardianConsent, true);
+  assert.equal(priv.guardianName, '어른');
+  assert.ok(priv.guardianAt > 0);
   assert.equal(priv.childGrade, '');
 });
 
 test('확인 안 한 가입은 다시 시작할 수 있음', async () => {
   const t = await setup();
-  await t.ok('POST', '/auth/start', { username: 'half01', password: 'password1', phone: '010-5555-6666' });
-  await t.ok('POST', '/auth/start', { username: 'half01', password: 'password2', phone: '010-5555-7777' });
-  const r = await t.ok('POST', '/auth/confirm', { username: 'half01', password: 'password2', phone: '010-5555-7777', code: '123456', realName: '반쪽', gender: '남', age: 17, memberType: '학생', grade: '고1', agreeRules: true, agreePrivacy: true });
+  await t.ok('POST', '/auth/start', { username: 'half01', password: 'tsPass_01', phone: '010-5555-6666' });
+  await t.ok('POST', '/auth/start', { username: 'half01', password: 'tsPass_02', phone: '010-5555-7777' });
+  const r = await t.ok('POST', '/auth/confirm', { username: 'half01', password: 'tsPass_02', phone: '010-5555-7777', code: '123456', realName: '반쪽', gender: '남', age: 17, memberType: '학생', grade: '고1', agreeRules: true, agreePrivacy: true });
   assert.equal(r.me.username, 'half01');
 });
 
 test('문자 발송 횟수 제한', async () => {
   const t = await setup({ smsDailyMax: 3 });
-  for (let i = 0; i < 3; i++) await t.ok('POST', '/auth/start', { username: `user0${i}`, password: 'password1', phone: `010-7000-000${i}` });
-  assert.equal((await t.fail(429, 'POST', '/auth/start', { username: 'user09', password: 'password1', phone: '010-7000-0009' })).error, 'too-many-requests');
+  for (let i = 0; i < 3; i++) await t.ok('POST', '/auth/start', { username: `user0${i}`, password: 'tsPass_01', phone: `010-7000-000${i}` });
+  assert.equal((await t.fail(429, 'POST', '/auth/start', { username: 'user09', password: 'tsPass_01', phone: '010-7000-0009' })).error, 'too-many-requests');
   const t2 = await setup();
-  for (let i = 0; i < 5; i++) await t2.ok('POST', '/auth/start', { username: `same0${i}`, password: 'password1', phone: '010-7000-1111' });
-  await t2.fail(429, 'POST', '/auth/start', { username: 'same09', password: 'password1', phone: '010-7000-1111' });
+  for (let i = 0; i < 5; i++) await t2.ok('POST', '/auth/start', { username: `same0${i}`, password: 'tsPass_01', phone: '010-7000-1111' });
+  await t2.fail(429, 'POST', '/auth/start', { username: 'same09', password: 'tsPass_01', phone: '010-7000-1111' });
 });
 
 test('로그인·토큰 갱신·비밀번호 변경·탈퇴', async () => {
   const t = await setup();
   const a = await t.join('papa01');
   await t.fail(401, 'POST', '/auth/login', { username: 'papa01', password: 'wrongpass' });
-  const l = await t.ok('POST', '/auth/login', { username: 'PAPA01 ', password: 'password1' });
+  const l = await t.ok('POST', '/auth/login', { username: 'PAPA01 ', password: 'tsPass_01' });
   assert.equal(l.me.uid, a.me.uid);
   const r = await t.ok('POST', '/auth/refresh', { refreshToken: l.refreshToken });
   assert.ok(r.idToken);
   await t.fail(401, 'POST', '/auth/refresh', { refreshToken: 'nope' });
   assert.equal((await t.ok('GET', '/me', null, r.idToken)).username, 'papa01');
   assert.equal((await t.fail(401, 'GET', '/me', null, 'demo.garbage')).error, 'session-expired');
-  await t.fail(401, 'POST', '/auth/password', { oldPassword: 'bad', newPassword: 'newpassword' }, a.token);
-  await t.fail(400, 'POST', '/auth/password', { oldPassword: 'password1', newPassword: 'short' }, a.token);
-  await t.ok('POST', '/auth/password', { oldPassword: 'password1', newPassword: 'newpassword' }, a.token);
-  await t.fail(401, 'POST', '/auth/login', { username: 'papa01', password: 'password1' });
-  await t.ok('POST', '/auth/login', { username: 'papa01', password: 'newpassword' });
+  await t.fail(401, 'POST', '/auth/password', { oldPassword: 'bad', newPassword: 'tsNewPass_1' }, a.token);
+  await t.fail(400, 'POST', '/auth/password', { oldPassword: 'tsPass_01', newPassword: 'short' }, a.token);
+  await t.ok('POST', '/auth/password', { oldPassword: 'tsPass_01', newPassword: 'tsNewPass_1' }, a.token);
+  await t.fail(401, 'POST', '/auth/login', { username: 'papa01', password: 'tsPass_01' });
+  await t.ok('POST', '/auth/login', { username: 'papa01', password: 'tsNewPass_1' });
   // 탈퇴하면 같은 번호로 다시 가입 가능
-  await t.fail(401, 'DELETE', '/me', { password: 'password1' }, a.token);
-  await t.ok('DELETE', '/me', { password: 'newpassword' }, a.token);
-  await t.fail(401, 'POST', '/auth/login', { username: 'papa01', password: 'newpassword' });
+  await t.fail(401, 'DELETE', '/me', { password: 'tsPass_01' }, a.token);
+  await t.ok('DELETE', '/me', { password: 'tsNewPass_1' }, a.token);
+  await t.fail(401, 'POST', '/auth/login', { username: 'papa01', password: 'tsNewPass_1' });
   await t.join('papa01', { phone: '010-1234-1000' });
 });
 
@@ -213,6 +225,13 @@ test('관리자: 공지·고정·자료 승인·숨김·회원 관리', async ()
   await t.ok('PATCH', `/users/${b.me.uid}`, { banned: false, role: 'admin' }, adm.token);
   await t.ok('POST', '/posts', post({ board: 'notice', category: 'notice' }), b.token);
   await t.fail(400, 'PATCH', `/users/${a.me.uid}`, { role: 'owner' }, adm.token);
+  // 관리자 개인정보 열람 기록
+  await t.fail(403, 'GET', '/audit', null, a.token);
+  const log = await t.ok('GET', '/audit', null, adm.token);
+  assert.ok(log.some((l) => l.action === 'list-private' && l.count === 3));
+  assert.ok(log.some((l) => l.action === 'view-private' && l.target === b.me.uid));
+  assert.ok(log.some((l) => l.action === 'set-banned'));
+  assert.ok(log.every((l) => l.admin === 'admin'));
 });
 
 test('좋아요·댓글·알림·채택', async () => {
@@ -295,6 +314,11 @@ test('배너', async () => {
   await t.ok('PUT', '/banners/cover', { text: '태산입시', sub: '설명', image: 'data:image/jpeg;base64,/9j/AA' }, adm.token);
   await t.ok('POST', '/banners', { kind: 'text', text: '설명회 안내', link: '#/notices' }, adm.token);
   await t.fail(400, 'POST', '/banners', { kind: 'text', text: '나쁜 링크', link: 'javascript:alert(1)' }, adm.token);
+  await t.fail(400, 'POST', '/banners', { kind: 'event', text: '수능', date: '2026-13-40' }, adm.token);
+  await t.fail(400, 'POST', '/banners', { kind: 'event', text: '', date: '2026-11-19' }, adm.token);
+  const ev = await t.ok('POST', '/banners', { kind: 'event', text: '대학수학능력시험', date: '2026-11-19' }, adm.token);
+  assert.equal((await t.ok('GET', '/banners')).find((x) => x.id === ev.id).date, '2026-11-19');
+  await t.ok('DELETE', `/banners/${ev.id}`, null, adm.token);
   const list = await t.ok('GET', '/banners');
   assert.equal(list.length, 2);
   assert.equal(list.find((x) => x.id === 'cover').sub, '설명');
@@ -347,8 +371,8 @@ test('정렬: 새 글이 먼저', async () => {
   const store = await makeStore();
   const app = createApp({ store, files: {}, idp: createDemoIdp(store, { now: () => clock }), env: { demo: true, now: () => clock } });
   const h = (method, path, body, token, query) => app.handle({ method, path, body, token, query });
-  await h('POST', '/auth/start', { username: 'order1', password: 'password1', phone: '010-2222-3333' });
-  const { body: { idToken } } = await h('POST', '/auth/confirm', { username: 'order1', password: 'password1', phone: '010-2222-3333', code: '123456', realName: '순서', gender: '남', age: 18, memberType: '학생', grade: '고3', agreeRules: true, agreePrivacy: true });
+  await h('POST', '/auth/start', { username: 'order1', password: 'tsPass_01', phone: '010-2222-3333' });
+  const { body: { idToken } } = await h('POST', '/auth/confirm', { username: 'order1', password: 'tsPass_01', phone: '010-2222-3333', code: '123456', realName: '순서', gender: '남', age: 18, memberType: '학생', grade: '고3', agreeRules: true, agreePrivacy: true });
   for (const title of ['첫째', '둘째', '셋째']) { clock += 1000; await h('POST', '/posts', post({ title }), idToken); }
   const { body } = await h('GET', '/posts', null, null, { limit: '2' });
   assert.deepEqual(body.map((p) => p.title), ['셋째', '둘째']);
@@ -361,4 +385,120 @@ test('체험 모드용 복사본(public/js/server-core.js)이 core.mjs 와 같�
   const a = await readFile(new URL('../core.mjs', import.meta.url), 'utf8');
   const b = await readFile(new URL('../../../public/js/server-core.js', import.meta.url), 'utf8');
   assert.ok(a === b, 'scripts/sync-core.sh 를 실행하세요');
+});
+
+test('비밀번호 찾기·아이디 찾기·로그아웃', async () => {
+  const t = await setup();
+  const a = await t.join('mom_find', { phone: '010-4444-5555' });
+  const f = await t.ok('POST', '/auth/forgot', { username: 'mom_find' });
+  assert.equal(f.destination, '010-****-5555');
+  assert.equal((await t.ok('POST', '/auth/forgot', { username: 'nobody1' })).sent, true); // 없는 아이디도 같은 응답
+  await t.fail(400, 'POST', '/auth/reset', { username: 'mom_find', code: '000000', password: 'tsNewPass99' });
+  await t.fail(400, 'POST', '/auth/reset', { username: 'mom_find', code: '123456', password: 'short' });
+  await t.ok('POST', '/auth/reset', { username: 'mom_find', code: '123456', password: 'tsNewPass99' });
+  await t.fail(400, 'POST', '/auth/reset', { username: 'mom_find', code: '123456', password: 'tsAgain999' }); // 한 번만
+  await t.fail(401, 'POST', '/auth/login', { username: 'mom_find', password: 'tsPass_01' });
+  const l = await t.ok('POST', '/auth/login', { username: 'mom_find', password: 'tsNewPass99' });
+  for (let i = 0; i < 4; i++) await t.ok('POST', '/auth/forgot', { username: 'mom_find' });
+  await t.fail(429, 'POST', '/auth/forgot', { username: 'mom_find' });
+  // 아이디 찾기: 인증번호를 맞혀야 알려 줌
+  await t.ok('POST', '/auth/find-id/start', { phone: '010-4444-5555' });
+  assert.match(t.texts.at(-1).text, /아이디 찾기 인증번호는 123456/);
+  assert.equal(t.texts.at(-1).to, '+821044445555');
+  await t.fail(400, 'POST', '/auth/find-id/confirm', { phone: '010-4444-5555', code: '000000' });
+  const r = await t.ok('POST', '/auth/find-id/confirm', { phone: '01044445555', code: '123456' });
+  assert.equal(r.username, 'mom_find');
+  await t.fail(400, 'POST', '/auth/find-id/confirm', { phone: '010-4444-5555', code: '123456' }); // 한 번 쓰면 끝
+  await t.ok('POST', '/auth/find-id/start', { phone: '010-9999-0000' });
+  assert.equal((await t.ok('POST', '/auth/find-id/confirm', { phone: '010-9999-0000', code: '123456' })).username, null);
+  // 틀린 번호 5번이면 막힘
+  await t.ok('POST', '/auth/find-id/start', { phone: '010-4444-5555' });
+  for (let i = 0; i < 5; i++) await t.fail(400, 'POST', '/auth/find-id/confirm', { phone: '010-4444-5555', code: '000000' });
+  await t.fail(400, 'POST', '/auth/find-id/confirm', { phone: '010-4444-5555', code: '123456' });
+  assert.equal((await t.ok('POST', '/auth/logout', { refreshToken: l.refreshToken })).ok, true);
+  assert.ok(a.me.uid);
+});
+
+test('스크랩·이전/다음 글·내 댓글', async () => {
+  const t = await setup();
+  const a = await t.join('writer_a');
+  const b = await t.join('reader_b');
+  const ids = [];
+  for (const title of ['첫 글', '둘째 글', '셋째 글']) ids.push((await t.ok('POST', '/posts', post({ title }), a.token)).id);
+  const mid = await t.ok('GET', `/posts/${ids[1]}`, null, b.token);
+  assert.equal(mid.prev.title, '첫 글');
+  assert.equal(mid.next.title, '셋째 글');
+  assert.equal(mid.bookmarked, false);
+  assert.equal((await t.ok('GET', `/posts/${ids[0]}`, null, b.token)).prev, null);
+  await t.ok('POST', `/posts/${ids[0]}/bookmark`, { on: true }, b.token);
+  await t.ok('POST', `/posts/${ids[2]}/bookmark`, { on: true }, b.token);
+  assert.equal((await t.ok('GET', `/posts/${ids[0]}`, null, b.token)).bookmarked, true);
+  let marks = await t.ok('GET', '/me/bookmarks', null, b.token);
+  assert.deepEqual(marks.map((x) => x.title).sort(), ['셋째 글', '첫 글']);
+  await t.ok('POST', `/posts/${ids[0]}/bookmark`, { on: false }, b.token);
+  await t.ok('DELETE', `/posts/${ids[2]}`, null, a.token);
+  marks = await t.ok('GET', '/me/bookmarks', null, b.token);
+  assert.equal(marks.length, 0); // 지운 글은 목록에서 빠짐
+  await t.ok('POST', `/posts/${ids[1]}/comments`, { body: '좋은 글이네요' }, b.token);
+  const mine = await t.ok('GET', '/me/comments', null, b.token);
+  assert.equal(mine.length, 1);
+  assert.equal(mine[0].postTitle, '둘째 글');
+  assert.equal((await t.ok('GET', '/me/comments', null, a.token)).length, 0);
+});
+
+test('답글·댓글 수정·답글 있는 댓글 삭제', async () => {
+  const t = await setup();
+  const a = await t.join('author_a');
+  const b = await t.join('reply_b');
+  const c = await t.join('reply_c');
+  const { id } = await t.ok('POST', '/posts', post(), a.token);
+  const top = await t.ok('POST', `/posts/${id}/comments`, { body: '질문 있어요' }, b.token);
+  const rep = await t.ok('POST', `/posts/${id}/comments`, { body: '저도 궁금해요', parentId: top.id }, c.token);
+  await t.fail(400, 'POST', `/posts/${id}/comments`, { body: '답글의 답글', parentId: rep.id }, a.token);
+  await t.fail(404, 'POST', `/posts/${id}/comments`, { body: '없는 댓글', parentId: 'nope' }, a.token);
+  const bn = await t.ok('GET', '/notifications', null, b.token);
+  assert.equal(bn[0].type, 'reply');
+  assert.ok((await t.ok('GET', '/notifications', null, a.token)).every((n) => n.type === 'comment'));
+  // 수정
+  await t.fail(403, 'PATCH', `/posts/${id}/comments/${top.id}`, { body: '남이 고침' }, c.token);
+  await t.ok('PATCH', `/posts/${id}/comments/${top.id}`, { body: '질문 있어요(수정)' }, b.token);
+  let cs = await t.ok('GET', `/posts/${id}/comments`, null, a.token);
+  assert.equal(cs.find((x) => x.id === top.id).body, '질문 있어요(수정)');
+  assert.ok(cs.find((x) => x.id === top.id).editedAt);
+  assert.equal(cs.find((x) => x.id === rep.id).parentId, top.id);
+  // 답글 있는 댓글은 '삭제된 댓글'로 남음
+  await t.ok('DELETE', `/posts/${id}/comments/${top.id}`, null, b.token);
+  cs = await t.ok('GET', `/posts/${id}/comments`, null, a.token);
+  assert.equal(cs.length, 2);
+  assert.equal(cs.find((x) => x.id === top.id).deleted, true);
+  assert.equal(cs.find((x) => x.id === top.id).body, '');
+  assert.equal((await t.ok('GET', `/posts/${id}`, null, a.token)).commentCount, 1);
+  assert.equal((await t.ok('GET', '/me/comments', null, b.token)).length, 0);
+  await t.ok('DELETE', `/posts/${id}/comments/${rep.id}`, null, c.token);
+  assert.equal((await t.ok('GET', `/posts/${id}`, null, a.token)).commentCount, 0);
+});
+
+test('회원 차단', async () => {
+  const t = await setup();
+  const adm = await t.join('admin');
+  const a = await t.join('block_a');
+  const b = await t.join('block_b');
+  const { id } = await t.ok('POST', '/posts', post({ title: 'b의 글' }), b.token);
+  await t.ok('POST', '/posts', post({ title: 'a의 글' }), a.token);
+  await t.ok('POST', `/posts/${id}/comments`, { body: 'b의 댓글' }, b.token);
+  await t.fail(400, 'POST', '/me/blocks', { uid: a.me.uid }, a.token);
+  await t.fail(400, 'POST', '/me/blocks', { uid: adm.me.uid }, a.token);
+  await t.ok('POST', '/me/blocks', { uid: b.me.uid }, a.token);
+  assert.deepEqual((await t.ok('GET', '/me/blocks', null, a.token)).map((x) => x.nickname), ['block_b']);
+  assert.deepEqual((await t.ok('GET', '/posts', null, a.token, {})).map((x) => x.title), ['a의 글']);
+  assert.equal((await t.ok('GET', '/posts', null, adm.token, {})).length, 2);
+  const cs = await t.ok('GET', `/posts/${id}/comments`, null, a.token);
+  assert.equal(cs[0].blocked, true);
+  assert.equal(cs[0].body, '');
+  await t.ok('POST', '/me/blocks', { uid: b.me.uid, on: false }, a.token);
+  assert.equal((await t.ok('GET', '/posts', null, a.token, {})).length, 2);
+  // 탈퇴하면 내 스크랩·차단·알림도 지워짐
+  await t.ok('POST', '/me/blocks', { uid: b.me.uid }, a.token);
+  await t.ok('DELETE', '/me', { password: 'tsPass_01' }, a.token);
+  assert.deepEqual(await t.store.query({ pk: `U#${a.me.uid}`, limit: 100 }), []);
 });

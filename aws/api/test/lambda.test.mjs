@@ -51,6 +51,9 @@ function fakeCognito() {
       }
       if (name === 'AdminDeleteUserCommand') { if (!u) throw err('UserNotFoundException'); users.delete(i.Username); return {}; }
       if (name === 'AdminSetUserPasswordCommand') { u.password = i.Password; return {}; }
+      if (name === 'ForgotPasswordCommand') { if (u) u.reset = '777777'; return { CodeDeliveryDetails: { Destination: '+*******5678', DeliveryMedium: 'SMS' } }; }
+      if (name === 'ConfirmForgotPasswordCommand') { if (!u || u.reset !== i.ConfirmationCode) throw err('CodeMismatchException'); u.password = i.Password; delete u.reset; return {}; }
+      if (name === 'RevokeTokenCommand') { assert.equal(i.ClientId, CLIENT); return {}; }
       if (name === 'AdminInitiateAuthCommand') {
         assert.equal(i.UserPoolId, POOL);
         if (i.AuthFlow === 'REFRESH_TOKEN_AUTH') {
@@ -97,7 +100,7 @@ test('Cognito 가입·로그인 흐름이 HTTP 요청으로 동작', async () =>
     assert.equal(r.headers['cache-control'], 'no-store');
     return { status: r.statusCode, body: JSON.parse(r.body) };
   };
-  const acct = { username: 'mom01', password: 'password1', phone: '010-1234-5678' };
+  const acct = { username: 'mom01', password: 'tsPass_01', phone: '010-1234-5678' };
   assert.equal((await call('POST', '/auth/start', acct)).status, 200);
   assert.equal(cognito.users.get('mom01').phone, '+821012345678');
   const info = { ...acct, realName: '김엄마', gender: '여', age: 44, memberType: '학부모', childGrade: '고1', agreeRules: true, agreePrivacy: true };
@@ -112,7 +115,7 @@ test('Cognito 가입·로그인 흐름이 HTTP 요청으로 동작', async () =>
   assert.ok(cognito.users.has('mom01'));
   // 로그인 실패·성공
   assert.equal((await call('POST', '/auth/login', { username: 'mom01', password: 'bad' })).body.error, 'invalid-credential');
-  const login = await call('POST', '/auth/login', { username: 'mom01', password: 'password1' });
+  const login = await call('POST', '/auth/login', { username: 'mom01', password: 'tsPass_01' });
   assert.equal(login.status, 200);
   const me = await call('GET', '/me', null, login.body.idToken);
   assert.equal(me.body.username, 'mom01');
@@ -121,10 +124,10 @@ test('Cognito 가입·로그인 흐름이 HTTP 요청으로 동작', async () =>
   assert.equal(rf.status, 200);
   assert.equal((await call('POST', '/auth/refresh', { refreshToken: 'r-nope' })).body.error, 'session-expired');
   // 확인 안 한 가입은 지우고 다시
-  await call('POST', '/auth/start', { username: 'half01', password: 'password1', phone: '010-2222-3333' });
-  assert.equal((await call('POST', '/auth/start', { username: 'half01', password: 'password2', phone: '010-2222-4444' })).status, 200);
+  await call('POST', '/auth/start', { username: 'half01', password: 'tsPass_01', phone: '010-2222-3333' });
+  assert.equal((await call('POST', '/auth/start', { username: 'half01', password: 'tsPass_02', phone: '010-2222-4444' })).status, 200);
   assert.equal(cognito.users.get('half01').phone, '+821022224444');
-  assert.equal((await call('POST', '/auth/start', { username: 'mom01', password: 'password1', phone: '010-9999-8888' })).body.error, 'username-taken');
+  assert.equal((await call('POST', '/auth/start', { username: 'mom01', password: 'tsPass_01', phone: '010-9999-8888' })).body.error, 'username-taken');
   // 파일 주소
   const f = await call('POST', '/files', { name: '수학 자료.pdf', type: 'application/pdf', size: 1234 }, rf.body.idToken);
   assert.equal(f.status, 200);
@@ -136,12 +139,20 @@ test('Cognito 가입·로그인 흐름이 HTTP 요청으로 동작', async () =>
   const url = new URL(g.body.url);
   assert.equal(url.searchParams.get('response-content-type'), 'application/octet-stream');
   assert.match(url.searchParams.get('response-content-disposition'), /^attachment; filename="__ __.pdf"; filename\*=UTF-8''%EC%88%98/);
+  // 비밀번호 찾기·로그아웃
+  assert.equal((await call('POST', '/auth/forgot', { username: 'mom01' })).body.destination, '+*******5678');
+  assert.equal((await call('POST', '/auth/reset', { username: 'mom01', code: '111111', password: 'tsPass_05' })).body.error, 'invalid-code');
+  assert.equal((await call('POST', '/auth/reset', { username: 'mom01', code: '777777', password: 'tsPass_05' })).status, 200);
+  assert.equal(cognito.users.get('mom01').password, 'tsPass_05');
+  assert.equal((await call('POST', '/auth/login', { username: 'mom01', password: 'tsPass_05' })).status, 200);
+  cognito.users.get('mom01').password = 'tsPass_01';
+  assert.equal((await call('POST', '/auth/logout', { refreshToken: login.body.refreshToken })).status, 200);
   // 비밀번호 변경·탈퇴
-  assert.equal((await call('POST', '/auth/password', { oldPassword: 'password1', newPassword: 'password9' }, rf.body.idToken)).status, 200);
-  assert.equal(cognito.users.get('mom01').password, 'password9');
-  assert.equal((await call('DELETE', '/me', { password: 'password9' }, rf.body.idToken)).status, 200);
+  assert.equal((await call('POST', '/auth/password', { oldPassword: 'tsPass_01', newPassword: 'tsPass_09' }, rf.body.idToken)).status, 200);
+  assert.equal(cognito.users.get('mom01').password, 'tsPass_09');
+  assert.equal((await call('DELETE', '/me', { password: 'tsPass_09' }, rf.body.idToken)).status, 200);
   assert.ok(!cognito.users.has('mom01'));
-  assert.equal((await call('POST', '/auth/start', { username: 'mom02', password: 'password1', phone: '010-1234-5678' })).status, 200);
+  assert.equal((await call('POST', '/auth/start', { username: 'mom02', password: 'tsPass_01', phone: '010-1234-5678' })).status, 200);
   // 없는 주소·잘못된 메서드
   assert.equal((await call('GET', '/nope')).status, 404);
   assert.equal((await call('DELETE', '/banners')).status, 405);

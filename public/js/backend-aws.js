@@ -4,7 +4,8 @@
 import { AWS_CONFIG } from './aws-config.js';
 import { LIMITS, QNA_OPEN } from './config.js';
 
-export const DEMO = new URLSearchParams(location.search).has('demo') || !AWS_CONFIG.api;
+const DEMO_PARAMS = new URLSearchParams(location.search);
+export const DEMO = DEMO_PARAMS.has('demo') || !AWS_CONFIG.api;
 export const USERNAME_RE = /^[a-z0-9_]{4,20}$/;
 export const toE164 = (phone) => `+82${phone.replace(/[^0-9]/g, '').replace(/^0/, '')}`;
 const BASE = (AWS_CONFIG.sameOrigin || []).includes(location.hostname) ? '/api' : `${String(AWS_CONFIG.api).replace(/\/$/, '')}/api`;
@@ -13,11 +14,17 @@ function fail(code, message, status = 0) { const e = new Error(message || '오�
 
 /* ---------------- 로그인 상태 ---------------- */
 const SKEY = DEMO ? 'tsc:demo-session' : 'tsc:session';
-const readSession = () => { try { return JSON.parse(localStorage.getItem(SKEY)); } catch { return null; } };
-let session = readSession(); // { idToken, refreshToken, exp }
+const readSession = () => {
+  try { return JSON.parse(localStorage.getItem(SKEY)) || JSON.parse(sessionStorage.getItem(SKEY)); } catch { return null; }
+};
+let session = readSession(); // { idToken, refreshToken, exp, keep }
+// keep=false 면 이 탭을 닫을 때 로그아웃되도록 sessionStorage 에 둡니다(로그인 상태 유지 끔)
 function setSession(s) {
   session = s;
-  try { if (s) localStorage.setItem(SKEY, JSON.stringify(s)); else localStorage.removeItem(SKEY); } catch { /* 저장소 사용 불가 */ }
+  try {
+    localStorage.removeItem(SKEY); sessionStorage.removeItem(SKEY);
+    if (s) (s.keep === false ? sessionStorage : localStorage).setItem(SKEY, JSON.stringify(s));
+  } catch { /* 저장소 사용 불가 */ }
 }
 let me = null; // { uid, username, nickname, grade, role, banned, createdAt }
 const listeners = new Set();
@@ -50,7 +57,18 @@ async function demoServer() {
       const db = core.createMemoryStore(saved, (m) => {
         try { localStorage.setItem('tsc:demo-db', JSON.stringify(Object.fromEntries(m))); } catch (e) { console.warn('체험 데이터를 저장하지 못했습니다', e); }
       });
-      return core.createApp({ store: db, files: demoFiles, idp: core.createDemoIdp(db), env: { demo: true, qnaOpen: QNA_OPEN, smsDailyMax: 10000 } });
+      let clock = null; // 예시 데이터를 만들 때만 지난 시각으로
+      const now = () => clock ?? Date.now();
+      const app = core.createApp({
+        store: db, files: demoFiles, idp: core.createDemoIdp(db, { now }), env: { demo: true, qnaOpen: QNA_OPEN, smsDailyMax: 10000, now },
+        sms: { async send(to, text) { console.info('[체험 문자]', to, text); } },
+      });
+      // ?seed=1: 비어 있으면 예시 회원·글·댓글을 넣습니다
+      if (DEMO_PARAMS.has('seed') && !(await db.get('IDP#admin', 'IDP'))) {
+        const { seedDemo } = await import('./demo-seed.js');
+        await seedDemo({ app, store: db, setClock: (t) => { clock = t; } });
+      }
+      return app;
     })();
   }
   return demoApp;
@@ -119,6 +137,11 @@ async function flush() {
 
 /* ---------------- 시작 ---------------- */
 export async function init() {
+  // 체험 모드 ?as=아이디: 그 예시 계정으로 바로 로그인(화면 점검용)
+  if (DEMO && DEMO_PARAMS.get('as')) {
+    const r = await (await demoServer()).handle({ method: 'POST', path: '/auth/login', body: { username: DEMO_PARAMS.get('as'), password: 'demo1234' } });
+    if (r.status === 200) setSession({ idToken: r.body.idToken, refreshToken: r.body.refreshToken, exp: Date.now() + r.body.expiresIn * 1000 });
+  } else if (DEMO && DEMO_PARAMS.has('seed')) await demoServer();
   if (session) {
     try { me = await api('GET', '/me'); } catch (e) {
       me = null;
@@ -140,12 +163,16 @@ export async function sendPhoneCode({ phone, username, password }) {
   await api('POST', '/auth/start', { body: { username: String(username || '').trim().toLowerCase(), password, phone } });
 }
 
+// 만 14세 미만: 보호자 휴대폰으로 동의 인증번호
+export async function guardianStart(phone, childName) { await api('POST', '/auth/guardian/start', { body: { phone, childName } }); }
+
 // 2단계: 인증번호 확인과 회원 정보 저장을 한 번에
 export async function signUp(f) {
   const r = await api('POST', '/auth/confirm', {
     body: {
       username: f.username, password: f.password, phone: f.phone, code: f.code, realName: f.realName, gender: f.gender, age: f.age,
       memberType: f.memberType, grade: f.grade, childGrade: f.childGrade || '', guardianConsent: !!f.guardianConsent,
+      guardianName: f.guardianName || '', guardianPhone: f.guardianPhone || '', guardianCode: f.guardianCode || '',
       agreeRules: f.agreeRules !== false, agreePrivacy: f.agreePrivacy !== false,
     },
   });
@@ -154,18 +181,28 @@ export async function signUp(f) {
   emit();
 }
 
-export async function signIn(username, password) {
+export async function signIn(username, password, keep = true) {
   const r = await api('POST', '/auth/login', { body: { username: username.trim().toLowerCase(), password } });
-  setSession({ idToken: r.idToken, refreshToken: r.refreshToken, exp: Date.now() + r.expiresIn * 1000 });
+  setSession({ idToken: r.idToken, refreshToken: r.refreshToken, exp: Date.now() + r.expiresIn * 1000, keep });
   me = r.me;
   emit();
 }
 
+// 로그아웃: 서버에서도 로그인 유지 토큰을 폐기(실패해도 이 기기에서는 로그아웃)
 export async function signOut() {
+  const t = session?.refreshToken;
   setSession(null);
   me = null;
   emit();
+  if (t) await send('POST', '/auth/logout', { body: { refreshToken: t } }).catch(() => {});
 }
+
+// 비밀번호 찾기: 가입한 휴대폰으로 인증번호 → 새 비밀번호
+export async function forgotPassword(username) { return api('POST', '/auth/forgot', { body: { username: String(username).trim().toLowerCase() } }); }
+export async function resetPassword(username, code, password) { await api('POST', '/auth/reset', { body: { username: String(username).trim().toLowerCase(), code, password } }); }
+// 아이디 찾기: 휴대폰 인증번호를 확인하면 아이디를 알려 줌
+export async function findIdStart(phone) { await api('POST', '/auth/find-id/start', { body: { phone } }); }
+export async function findIdConfirm(phone, code) { return api('POST', '/auth/find-id/confirm', { body: { phone, code } }); }
 
 export async function changePassword(oldPassword, newPassword) { await api('POST', '/auth/password', { body: { oldPassword, newPassword } }); }
 export const getPrivate = (uid = me?.uid) => get(`/users/${encodeURIComponent(uid)}/private`);
@@ -287,7 +324,8 @@ export async function listComments(postId) {
   commentLikes.set(postId, new Set(list.filter((c) => c.liked).map((c) => c.id)));
   return list;
 }
-export async function addComment(post, body, image = '') { return (await api('POST', `/posts/${encodeURIComponent(post.id)}/comments`, { body: { body, image } })).id; }
+export async function addComment(post, body, image = '', parentId = '') { return (await api('POST', `/posts/${encodeURIComponent(post.id)}/comments`, { body: { body, image, parentId } })).id; }
+export async function editComment(postId, cid, body) { await api('PATCH', `/posts/${encodeURIComponent(postId)}/comments/${encodeURIComponent(cid)}`, { body: { body } }); }
 export async function deleteComment(postId, cid) { await api('DELETE', `/posts/${encodeURIComponent(postId)}/comments/${encodeURIComponent(cid)}`); }
 export async function commentLiked(postId, cid) { return !!commentLikes.get(postId)?.has(cid); }
 export async function toggleCommentLike(postId, cid, on) {
@@ -297,6 +335,13 @@ export async function toggleCommentLike(postId, cid, on) {
   commentLikes.set(postId, s);
 }
 export async function acceptComment(post, comment) { await api('POST', `/posts/${encodeURIComponent(post.id)}/accept`, { body: { commentId: comment.id } }); }
+
+/* ---------------- 스크랩·내 댓글·차단 ---------------- */
+export async function toggleBookmark(postId, on) { await api('POST', `/posts/${encodeURIComponent(postId)}/bookmark`, { body: { on } }); }
+export const listBookmarks = () => get('/me/bookmarks');
+export const listMyComments = () => get('/me/comments');
+export const listBlocks = () => get('/me/blocks');
+export async function setBlock(uid, on) { await api('POST', '/me/blocks', { body: { uid, on } }); }
 
 /* ---------------- 알림 ---------------- */
 export const listNotifications = () => (me ? get('/notifications') : Promise.resolve([]));
@@ -313,7 +358,7 @@ export async function closeReport(id) { await api('POST', `/reports/${encodeURIC
 
 /* ---------------- 배너·상단 안내 ---------------- */
 export const listBanners = () => get('/banners');
-export async function addBanner(b) { await api('POST', '/banners', { body: { kind: b.kind, image: b.image || '', text: b.text || '', link: b.link || '' } }); }
+export async function addBanner(b) { await api('POST', '/banners', { body: { kind: b.kind, image: b.image || '', text: b.text || '', link: b.link || '', date: b.date || '' } }); }
 export async function saveCover(c) { await api('PUT', '/banners/cover', { body: { text: c.text || '', sub: c.sub || '', image: c.image || '' } }); }
 export async function deleteBanner(id) { await api('DELETE', `/banners/${encodeURIComponent(id)}`); }
 
@@ -322,5 +367,6 @@ export async function getMember(uid) {
   try { return await get(`/users/${encodeURIComponent(uid)}`, { private: 1 }); } catch (e) { if (e.status === 404) return null; throw e; }
 }
 // 회원 목록(개인정보 포함, 관리자만)
-export const listUsers = () => get('/users', { private: 1 });
+export const listUsers = (o = {}) => get('/users', { private: o.withPrivate === false ? '' : 1 });
+export const listAudit = (month) => get('/audit', { month });
 export async function setUserFlags(uid, patch) { await api('PATCH', `/users/${encodeURIComponent(uid)}`, { body: patch }); }

@@ -10,8 +10,9 @@ import { createPresignedPost } from '@aws-sdk/s3-presigned-post';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import {
   CognitoIdentityProviderClient, SignUpCommand, ConfirmSignUpCommand, AdminGetUserCommand, AdminDeleteUserCommand,
-  AdminInitiateAuthCommand, AdminSetUserPasswordCommand,
+  AdminInitiateAuthCommand, AdminSetUserPasswordCommand, ForgotPasswordCommand, ConfirmForgotPasswordCommand, RevokeTokenCommand,
 } from '@aws-sdk/client-cognito-identity-provider';
+import { SNSClient, PublishCommand } from '@aws-sdk/client-sns';
 import { createApp, ApiError, Conflict } from './core.mjs';
 
 const { TABLE, BUCKET, USER_POOL_ID, CLIENT_ID, SMS_DAILY_MAX, QNA_OPEN, AWS_REGION, DYNAMO_ENDPOINT } = process.env;
@@ -80,12 +81,13 @@ export function createDynamoStore(table, client) {
         }
       }
     },
-    async query({ index, pk, skBegins, skLt, desc, limit = 100 }) {
+    async query({ index, pk, skBegins, skLt, skGt, desc, limit = 100 }) {
       const P = index ? `${index}pk` : 'pk', S = index ? `${index}sk` : 'sk';
       const p = { TableName: table, KeyConditionExpression: '#p = :p', ExpressionAttributeNames: { '#p': P }, ExpressionAttributeValues: { ':p': pk }, ScanIndexForward: !desc };
       if (index) p.IndexName = index;
       if (skBegins) { p.KeyConditionExpression += ' AND begins_with(#s, :s)'; p.ExpressionAttributeNames['#s'] = S; p.ExpressionAttributeValues[':s'] = skBegins; }
       else if (skLt) { p.KeyConditionExpression += ' AND #s < :s'; p.ExpressionAttributeNames['#s'] = S; p.ExpressionAttributeValues[':s'] = skLt; }
+      else if (skGt) { p.KeyConditionExpression += ' AND #s > :s'; p.ExpressionAttributeNames['#s'] = S; p.ExpressionAttributeValues[':s'] = skGt; }
       const out = [];
       let start;
       do {
@@ -200,6 +202,17 @@ export function createCognitoIdp({ poolId, clientId, region, client }) {
     async setPassword(username, password) {
       await send(new AdminSetUserPasswordCommand({ UserPoolId: poolId, Username: username, Password: password, Permanent: true }));
     },
+    // 비밀번호 찾기: 가입한 휴대폰으로 인증번호(없는 아이디여도 같은 응답)
+    async forgot(username) {
+      const r = await send(new ForgotPasswordCommand({ ClientId: clientId, Username: username }));
+      return { destination: r.CodeDeliveryDetails?.Destination || '' };
+    },
+    async confirmForgot(username, code, password) {
+      try {
+        await send(new ConfirmForgotPasswordCommand({ ClientId: clientId, Username: username, ConfirmationCode: code, Password: password }));
+      } catch (e) { if (e.code === 'invalid-credential') throw err(400, 'invalid-code', '인증번호가 맞지 않거나 시간이 지났어요.'); throw e; }
+    },
+    async revoke(refreshToken) { await client.send(new RevokeTokenCommand({ ClientId: clientId, Token: refreshToken })); },
     // ID 토큰 확인(RS256 서명·발급처·앱·만료)
     async verify(token) {
       const [h, p, s] = String(token).split('.');
@@ -216,6 +229,20 @@ export function createCognitoIdp({ poolId, clientId, region, client }) {
   };
 }
 
+/* ---------------- 문자(아이디 찾기 인증번호) ---------------- */
+export function createSnsSms(sns) {
+  return {
+    async send(phone, text) {
+      try {
+        await sns.send(new PublishCommand({ PhoneNumber: phone, Message: text, MessageAttributes: { 'AWS.SNS.SMS.SMSType': { DataType: 'String', StringValue: 'Transactional' } } }));
+      } catch (e) {
+        console.error('sms', e.name, e.message);
+        throw new ApiError(502, 'sms-failed', '인증 문자를 보내지 못했어요. 잠시 후 다시 시도해 주세요.');
+      }
+    },
+  };
+}
+
 /* ---------------- 처리기 ---------------- */
 let app = null;
 function getApp() {
@@ -225,6 +252,7 @@ function getApp() {
       store: createDynamoStore(TABLE, ddb),
       files: createS3Files(BUCKET, new S3Client({})),
       idp: createCognitoIdp({ poolId: USER_POOL_ID, clientId: CLIENT_ID, region: AWS_REGION, client: new CognitoIdentityProviderClient({}) }),
+      sms: createSnsSms(new SNSClient({})),
       env: { qnaOpen: QNA_OPEN === 'true', smsDailyMax: parseInt(SMS_DAILY_MAX, 10) || 300 },
     });
   }

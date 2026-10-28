@@ -27,6 +27,13 @@ export const safeLink = (s) => (/^(#\/|https:\/\/)/.test(s || '') ? s : '');
 // 선 아이콘(굵기 1.75)
 const P = {
   search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
+  bookmark: '<path d="M19 21l-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>',
+  link: '<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>',
+  more: '<circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/>',
+  reply: '<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>',
+  ban: '<circle cx="12" cy="12" r="9"/><path d="m5.7 5.7 12.6 12.6"/>',
+  calendar: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
+  eyeoff: '<path d="M9.9 4.2A9.6 9.6 0 0 1 12 4c6.5 0 10 8 10 8a17 17 0 0 1-2.2 3.2M6.6 6.6A17 17 0 0 0 2 12s3.5 8 10 8a9.7 9.7 0 0 0 5.4-1.6"/><path d="m2 2 20 20"/><path d="M14.1 14.1a3 3 0 0 1-4.2-4.2"/>',
   bell: '<path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
   user: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
   menu: '<path d="M4 6h16M4 12h16M4 18h16"/>',
@@ -56,6 +63,7 @@ const P = {
   lock: '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
   home: '<path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/>',
   up: '<path d="m18 15-6-6-6 6"/>',
+  down: '<path d="m6 9 6 6 6-6"/>',
   inbox: '<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5.1 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.9A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1.1"/>',
   flag: '<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><path d="M4 22v-7"/>',
   settings: '<path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/>',
@@ -85,17 +93,96 @@ export function catName(p) {
 }
 export const tagHtml = (p) => `<span class="tag${p.board === 'notice' || p.pinned ? ' notice' : ''}">${esc(catName(p))}</span>`;
 
-// 홈 상자·검색 결과용 한 줄
-export function rowHtml(p, rank) {
-  return `<a class="row" href="#/post/${esc(p.id)}">${rank ? `<span class="rank">${rank}</span>` : ''}${tagHtml(p)}<span class="t">${esc(p.title)}</span>
-    ${p.commentCount ? `<span class="cmt">${p.commentCount}</span>` : ''}<time>${shortDate(p.createdAt)}</time></a>`;
+// 읽은 글(이 브라우저에만, 최근 500개): 목록에서 흐리게
+const READ_KEY = 'tsc:read';
+export function markReadPost(id) {
+  try {
+    const l = JSON.parse(localStorage.getItem(READ_KEY) || '[]').filter((x) => x !== id);
+    l.unshift(id);
+    localStorage.setItem(READ_KEY, JSON.stringify(l.slice(0, 500)));
+  } catch { /* 저장소 사용 불가 */ }
+}
+export const readSet = () => { try { return new Set(JSON.parse(localStorage.getItem(READ_KEY) || '[]')); } catch { return new Set(); } };
+
+// 하루 안에 올라온 글
+export const isNew = (p) => Date.now() - p.createdAt < 86400000;
+export const newBadge = (p) => (isNew(p) ? '<span class="new" aria-label="새 글">N</span>' : '');
+// 회원마다 같은 연한 색(구분용, 데이터 색 아님)
+export function avatarHtml(name, uid = '') {
+  let h = 0;
+  for (const c of String(uid || name)) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return `<span class="avatar h${(h % 6) + 1}" aria-hidden="true">${esc(String(name || '?')[0])}</span>`;
+}
+// 검색어 강조(이스케이프한 뒤 표시)
+export function highlight(text, word) {
+  const t = esc(text);
+  const w = String(word || '').trim();
+  if (!w) return t;
+  const e = esc(w).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return t.replace(new RegExp(e, 'gi'), (m) => `<mark>${m}</mark>`);
 }
 
-// 목록형(검색·내 글)
-export function listItemHtml(p) {
+// 홈 상자·검색 결과용 한 줄
+export function rowHtml(p, rank, { by = false } = {}) {
+  return `<a class="row" href="#/post/${esc(p.id)}">${rank ? `<span class="rank${rank <= 3 ? ' top' : ''}">${rank}</span>` : ''}${tagHtml(p)}<span class="t">${esc(p.title)}</span>
+    ${p.commentCount ? `<span class="cmt">${p.commentCount}</span>` : ''}${newBadge(p)}${by ? `<span class="by">${esc(p.nickname)}</span>` : ''}<time>${shortDate(p.createdAt)}</time></a>`;
+}
+
+// 목록형(검색·내 글·스크랩)
+export function listItemHtml(p, word = '') {
   return `<a class="list-item" href="#/post/${esc(p.id)}"><div class="main">
-    <span class="t">${esc(p.title)}${p.board === 'data' && !p.approved ? ' <span class="tag warn">승인 대기</span>' : ''}</span>
-    <div class="m">${tagHtml(p)}${p.board === 'notice' ? '' : `<span>${esc(BOARDS[p.board]?.name || '')}</span>`}<span>${shortDate(p.createdAt)}</span>${p.commentCount ? `<span>댓글 ${p.commentCount}</span>` : ''}</div></div></a>`;
+    <span class="t">${highlight(p.title, word)}${p.board === 'data' && !p.approved && !p.hidden ? ' <span class="tag warn">승인 대기</span>' : ''}${p.hidden ? ' <span class="tag">숨김</span>' : ''}</span>
+    <div class="m">${tagHtml(p)}${p.board === 'notice' ? '' : `<span>${esc(BOARDS[p.board]?.name || '')}</span>`}<span>${esc(p.nickname || '')}</span><span class="num">${shortDate(p.createdAt)}</span>${p.commentCount ? `<span>댓글 ${p.commentCount}</span>` : ''}</div>
+    ${word && p.excerpt && p.excerpt.toLowerCase().includes(word.toLowerCase()) ? `<div class="m"><span class="q">${highlight(p.excerpt, word)}</span></div>` : ''}</div></a>`;
+}
+
+// 사진 크게 보기
+export function viewer(src) {
+  const v = document.createElement('div');
+  v.className = 'viewer';
+  v.innerHTML = `<img src="${esc(src)}" alt="크게 본 사진">`;
+  const close = () => { v.remove(); document.removeEventListener('keydown', onKey); };
+  const onKey = (e) => { if (e.key === 'Escape') close(); };
+  v.addEventListener('click', close);
+  document.addEventListener('keydown', onKey);
+  document.body.appendChild(v);
+}
+
+// 버튼 아래 작은 메뉴: items [{label, icon, fn, cls}]
+export function pop(anchor, items) {
+  document.querySelector('.pop')?.remove();
+  const m = document.createElement('div');
+  m.className = 'pop';
+  m.setAttribute('role', 'menu');
+  m.innerHTML = items.map((it, i) => `<button type="button" role="menuitem" data-i="${i}" class="${it.cls || ''}">${it.icon ? icon(it.icon, 'sm') : ''}${esc(it.label)}</button>`).join('');
+  document.body.appendChild(m);
+  const r = anchor.getBoundingClientRect();
+  const left = Math.min(window.scrollX + r.left, window.scrollX + document.documentElement.clientWidth - m.offsetWidth - 8);
+  m.style.left = `${Math.max(8, left)}px`;
+  m.style.top = `${window.scrollY + r.bottom + 4}px`;
+  const close = () => { m.remove(); document.removeEventListener('click', outside, true); document.removeEventListener('keydown', onKey); };
+  const outside = (e) => { if (!m.contains(e.target)) close(); };
+  const onKey = (e) => { if (e.key === 'Escape') { close(); anchor.focus(); } };
+  m.addEventListener('click', (e) => { const b = e.target.closest('[data-i]'); if (b) { close(); items[+b.dataset.i].fn(); } });
+  setTimeout(() => document.addEventListener('click', outside, true), 0);
+  document.addEventListener('keydown', onKey);
+  m.querySelector('button')?.focus();
+}
+
+// 주소 복사
+export async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); return true; } catch {
+    const t = document.createElement('textarea'); t.value = text; document.body.appendChild(t); t.select();
+    const ok = document.execCommand('copy'); t.remove(); return ok;
+  }
+}
+
+// D-day: 오늘이면 D-DAY, 지났으면 null
+export function dday(date) {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const d = new Date(`${date}T00:00:00`);
+  const n = Math.round((d - today) / 86400000);
+  return n < 0 ? null : n === 0 ? 'D-DAY' : `D-${n}`;
 }
 
 // 관리자가 정한 배너(표지)·상단 안내 문구는 한 번만 불러옵니다

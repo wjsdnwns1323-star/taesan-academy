@@ -25,3 +25,15 @@ export const LIMITS = {
   images: 10,         // 글 하나에 사진 수
   imagePx: 1600,      // 사진은 이 크기로 줄여서 저장
 };
+
+// 개인정보 처리방침에 들어가는 정보. 보호책임자 이름·이메일을 정하면 채워 주세요(비어 있으면 직책만 보입니다).
+// 처리방침 내용을 바꾸면 effective(시행일)를 새 날짜로 바꾸고, 바뀌기 전 방침은 history 에 남겨 주세요.
+export const PRIVACY = {
+  officerName: '',
+  officerTitle: '태산학원 원장',
+  phone: '042-321-5788',
+  email: '',
+  address: '대전광역시 서구 둔산남로 96 E.플러스빌딩 2층',
+  effective: '2026-11-01',
+  history: [],
+};

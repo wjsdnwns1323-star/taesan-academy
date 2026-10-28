@@ -1,7 +1,10 @@
-// 글 보기: 본문·사진·첨부·좋아요·댓글·답변 채택·신고·관리(숨김·삭제·승인)
+// 글 보기: 본문·사진·첨부, 좋아요·스크랩·공유, 댓글·답글(고치기·지우기·좋아요·채택·신고), 관리(숨김·삭제·승인), 이전·다음 글
 import * as be from './backend.js';
 import { BOARDS, DATA_RULES } from './boards.js';
-import { esc, $, $$, ago, dateTime, toast, icon, empty, pageHead, tagHtml, loadImages, linkify, size, safeImg, modal, confirmBox } from './ui.js';
+import {
+  esc, $, $$, ago, dateTime, shortDate, toast, icon, empty, pageHead, tagHtml, loadImages, linkify, size, safeImg, modal, confirmBox,
+  avatarHtml, viewer, pop, copyText, markReadPost,
+} from './ui.js';
 
 const boardHref = (b) => (b === 'data' ? '#/study' : b === 'notice' ? '#/notices' : `#/community/${b}`);
 
@@ -9,13 +12,16 @@ export async function renderPost(ctx) {
   const { view, arg } = ctx;
   const post = await be.getPost(arg).catch(() => null);
   if (!ctx.alive()) return;
-  if (!post) { view.innerHTML = `${pageHead('글을 찾을 수 없습니다')}${empty('삭제되었거나 볼 수 없는 글입니다', 'info')}`; return; }
+  if (!post) { view.innerHTML = `${pageHead('글을 찾을 수 없습니다')}${empty('삭제되었거나 볼 수 없는 글입니다', 'info')}<p style="text-align:center"><a class="btn line" href="#/community/all">전체글 보기</a></p>`; return; }
+  markReadPost(post.id);
   const me = be.currentUser();
   const mine = post.uid === me.uid;
   const admin = be.isAdmin();
   const [liked, comments] = await Promise.all([be.liked(post.id), be.listComments(post.id)]);
   if (!ctx.alive()) return;
   const board = BOARDS[post.board];
+  const canReply = be.has('editComment');
+  const canMark = be.has('toggleBookmark');
 
   const status = post.board === 'qna' ? (post.status === 'solved' ? '<span class="tag ok">해결</span>' : '<span class="tag brand">답변 대기</span>') : '';
   const pending = post.board === 'data' && !post.approved && !post.hidden
@@ -23,14 +29,15 @@ export async function renderPost(ctx) {
        ${admin ? '<div style="display:flex;gap:8px;margin-top:12px"><button class="btn sm" id="approve">승인</button><button class="btn sm danger" id="reject">규칙 위반으로 삭제</button></div>' : ''}</div></div>` : '';
   const hiddenNote = post.hidden ? `<div class="notice-box warn" style="margin-top:20px">${icon('lock')}<div><b>숨긴 글입니다.</b> 관리자만 볼 수 있습니다.</div></div>` : '';
   const files = post.files || [];
+  const visibleCount = comments.filter((c) => !c.deleted).length;
 
   view.innerHTML = `<article class="article">
     <header class="article-head">
       <nav class="crumb"><a href="${boardHref(post.board)}">${esc(board?.name || '게시판')}</a>${icon('right')}${tagHtml(post)} ${status}</nav>
       <h1>${esc(post.title)}</h1>
       <div class="article-meta">
-        <span class="avatar">${esc(post.nickname?.[0] || '?')}</span>
-        <b data-uid="${admin ? esc(post.uid) : ''}">${esc(post.nickname)}</b><span>${esc(post.grade)}</span>
+        <span class="who">${avatarHtml(post.nickname, post.uid)}<b data-uid="${admin ? esc(post.uid) : ''}">${esc(post.nickname)}</b><span>${esc(post.grade)}</span>
+          ${!mine && canReply ? `<button type="button" class="text-btn" id="author-menu" aria-label="${esc(post.nickname)}님 메뉴" aria-haspopup="menu" style="height:24px;padding:0 4px">${icon('more', 'sm')}</button>` : ''}</span>
         <i class="sep"></i><span class="num">${dateTime(post.createdAt)}${post.updatedAt ? ' (수정됨)' : ''}</span>
         <i class="sep"></i><span>조회 <span class="num">${(post.viewCount || 0).toLocaleString()}</span></span>
       </div>
@@ -41,48 +48,62 @@ export async function renderPost(ctx) {
     ${post.source ? `<p class="source"><b>출처</b>${esc(post.source)}</p>` : ''}
     ${files.length ? `<div class="attach-list"><div class="h">첨부 파일 ${files.length}</div>${files.map((f, i) => `<div class="attach-item">${icon('file')}<span class="nm">${esc(f.name)}</span><small>${size(f.size)}</small>
       <button type="button" class="btn sm line" data-dl="${i}">${icon('download', 'sm')}내려받기</button></div>`).join('')}</div>` : ''}
-    ${post.board === 'data' ? `<p class="hint" style="margin-bottom:24px">내려받은 자료는 개인 학습에만 사용해 주세요. ${esc(DATA_RULES[5])}</p>` : ''}
+    ${post.board === 'data' ? `<p class="hint" style="margin-bottom:24px">내려받은 자료는 개인 학습에만 써 주세요. ${esc(DATA_RULES[5])}</p>` : ''}
     <div class="article-actions">
       <button type="button" class="like-btn ${liked ? 'on' : ''}" id="like" aria-pressed="${liked}">${icon('heart', 'sm')}좋아요 <span class="num">${post.likeCount || 0}</span></button>
-      <span class="stat">${icon('chat', 'sm')}댓글 <span class="num">${comments.length}</span></span>
+      ${canMark ? `<button type="button" class="like-btn ${post.bookmarked ? 'on' : ''}" id="mark" aria-pressed="${!!post.bookmarked}">${icon('bookmark', 'sm')}스크랩</button>` : ''}
+      <button type="button" class="text-btn" id="share">${icon('link', 'sm')}링크 복사</button>
       <span class="sp"></span>
-      ${mine ? `<a class="text-btn" href="#/edit/${esc(post.id)}" style="display:inline-flex;align-items:center">수정</a>` : ''}
+      ${mine ? `<a class="text-btn" href="#/edit/${esc(post.id)}">수정</a>` : ''}
       ${admin ? `<button type="button" class="text-btn" id="hide">${post.hidden ? '다시 공개' : '숨김'}</button>` : ''}
       ${mine || admin ? '<button type="button" class="text-btn danger" id="del">삭제</button>' : ''}
       ${mine ? '' : '<button type="button" class="text-btn" id="report">신고</button>'}
-      <a class="text-btn" href="${boardHref(post.board)}" style="display:inline-flex;align-items:center">목록</a>
     </div>
-    <section class="comments">
-      <h2 class="comments-h">댓글<span class="num">${comments.length}</span></h2>
+    ${post.prev || post.next ? `<nav class="post-nav" aria-label="이전·다음 글">
+      ${post.next ? `<a href="#/post/${esc(post.next.id)}"><span>${icon('up', 'sm')}다음 글</span><span class="t">${esc(post.next.title)}</span><time>${shortDate(post.next.createdAt)}</time></a>` : ''}
+      ${post.prev ? `<a href="#/post/${esc(post.prev.id)}"><span>${icon('down', 'sm')}이전 글</span><span class="t">${esc(post.prev.title)}</span><time>${shortDate(post.prev.createdAt)}</time></a>` : ''}
+    </nav>` : ''}
+    <div style="display:flex;justify-content:flex-end;padding:12px 0"><a class="btn line sm" href="${boardHref(post.board)}">${icon('list', 'sm')}목록</a></div>
+    <section class="comments" aria-label="댓글">
+      <h2 class="comments-h">댓글<span class="num">${visibleCount}</span></h2>
       <div id="clist"></div>
-      <form class="composer" id="cform">
-        <div class="composer-prev hidden" id="cprev"></div>
-        <textarea name="body" rows="2" maxlength="3000" placeholder="${post.board === 'qna' ? '풀이나 답변을 남겨 주세요' : '댓글을 남겨 주세요'}" aria-label="댓글"></textarea>
-        <div class="composer-bar"><label>${icon('image', 'sm')}사진<input type="file" accept="image/*" hidden id="cimg"></label><span class="sp"></span><button class="btn sm" id="csend">등록</button></div>
-      </form>
+      ${composer('cform', post.board === 'qna' ? '풀이나 답변을 남겨 주세요' : '댓글을 남겨 주세요')}
     </section>
   </article>`;
   loadImages(view);
+  $$('.article-images img', view).forEach((img) => img.addEventListener('click', () => img.src && viewer(img.src)));
 
-  // 댓글 목록
-  const likedComments = new Set();
-  await Promise.all(comments.map(async (c) => { if (await be.commentLiked(post.id, c.id).catch(() => false)) likedComments.add(c.id); }));
-  if (!ctx.alive()) return;
-  const canAccept = mine && post.board === 'qna' && !post.acceptedCommentId;
-  const sorted = [...comments].sort((a, b) => (b.id === post.acceptedCommentId) - (a.id === post.acceptedCommentId));
-  $('#clist').innerHTML = sorted.map((c) => `<div class="comment ${c.id === post.acceptedCommentId ? 'accepted' : ''}" data-c="${esc(c.id)}">
-      <div class="comment-head"><span class="avatar">${esc(c.nickname?.[0] || '?')}</span><b data-uid="${admin ? esc(c.uid) : ''}">${esc(c.nickname)}</b><small>${esc(c.grade)}</small>
-        ${c.uid === post.uid ? '<span class="tag brand">작성자</span>' : ''}${c.id === post.acceptedCommentId ? '<span class="tag ok">채택된 답변</span>' : ''}</div>
-      <div class="comment-body">${linkify(c.body)}</div>
-      ${safeImg(c.image) ? `<img src="${safeImg(c.image)}" alt="댓글 사진">` : ''}
-      <div class="comment-tools"><span class="text-btn" style="cursor:default">${ago(c.createdAt)}</span>
-        <button type="button" class="text-btn ${likedComments.has(c.id) ? 'on' : ''}" data-clike>${icon('heart', 'sm')}<span class="num">${c.likeCount || 0}</span></button>
-        ${canAccept && c.uid !== me.uid ? '<button type="button" class="text-btn" data-accept style="color:var(--green)">채택</button>' : ''}
-        ${c.uid === me.uid || admin ? '<button type="button" class="text-btn" data-cdel>삭제</button>' : ''}
-        ${c.uid === me.uid ? '' : '<button type="button" class="text-btn" data-crep>신고</button>'}
-      </div></div>`).join('') || '<p class="hint" style="padding:16px 0">첫 댓글을 남겨 주세요.</p>';
+  // 댓글 목록(답글은 원댓글 아래)
+  const tops = comments.filter((c) => !c.parentId);
+  const kids = (id) => comments.filter((c) => c.parentId === id);
+  const one = (c, reply) => {
+    const ghost = c.deleted || c.blocked;
+    const accepted = post.acceptedCommentId === c.id;
+    const own = c.uid === me.uid;
+    return `<div class="comment${reply ? ' reply' : ''}${accepted ? ' accepted' : ''}${ghost ? ' ghost' : ''}" data-c="${esc(c.id)}" id="c-${esc(c.id)}">
+      ${ghost ? `<span class="avatar" aria-hidden="true">${icon(c.blocked ? 'ban' : 'chat', 'sm')}</span>` : avatarHtml(c.nickname, c.uid)}
+      <div>
+        ${ghost ? '' : `<div class="comment-head"><b data-uid="${admin ? esc(c.uid) : ''}">${esc(c.nickname)}</b><span>${esc(c.grade)}</span>${c.uid === post.uid ? '<span class="tag brand">작성자</span>' : ''}${accepted ? '<span class="tag ok">채택</span>' : ''}<span class="num">${ago(c.createdAt)}${c.editedAt ? ' · 수정됨' : ''}</span></div>`}
+        <div class="comment-body">${c.deleted ? '삭제된 댓글입니다.' : c.blocked ? '차단한 회원의 댓글입니다.' : linkify(c.body)}</div>
+        ${!ghost && safeImg(c.image) ? `<img class="cimg" src="${safeImg(c.image)}" alt="댓글 사진" loading="lazy">` : ''}
+        ${ghost ? '' : `<div class="comment-tools">
+          <button type="button" class="text-btn ${c.liked ? 'on' : ''}" data-clike aria-pressed="${!!c.liked}" aria-label="댓글 좋아요">${icon('heart', 'sm')}<span class="num">${c.likeCount || 0}</span></button>
+          ${canReply && !reply ? '<button type="button" class="text-btn" data-reply>답글</button>' : ''}
+          ${post.board === 'qna' && post.uid === me.uid && !post.acceptedCommentId && !own ? '<button type="button" class="text-btn" data-accept>채택</button>' : ''}
+          ${own && canReply ? '<button type="button" class="text-btn" data-cedit>수정</button>' : ''}
+          ${own || admin ? '<button type="button" class="text-btn danger" data-cdel>삭제</button>' : ''}
+          ${own ? '' : '<button type="button" class="text-btn" data-crep>신고</button>'}
+        </div>`}
+        <div data-slot></div>
+      </div></div>`;
+  };
+  $('#clist').innerHTML = tops.map((c) => one(c, false) + kids(c.id).map((r) => one(r, true)).join('')).join('')
+    || '<p class="hint" style="padding:16px 0">첫 댓글을 남겨 보세요.</p>';
+  $$('#clist img.cimg').forEach((img) => img.addEventListener('click', () => viewer(img.src)));
+  // 알림에서 들어오면 그 댓글로
+  if (location.hash.includes('c=')) $(`#c-${new URLSearchParams(location.hash.split('?')[1]).get('c')}`)?.scrollIntoView({ block: 'center' });
 
-  // 좋아요
+  // 좋아요·스크랩·공유
   let isLiked = liked, count = post.likeCount || 0, busy = false;
   $('#like').addEventListener('click', async (e) => {
     if (busy) return;
@@ -96,6 +117,24 @@ export async function renderPost(ctx) {
     } catch (err) { toast(be.errorText(err)); }
     busy = false;
   });
+  let marked = !!post.bookmarked;
+  $('#mark')?.addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    try {
+      await be.toggleBookmark(post.id, !marked);
+      marked = !marked;
+      btn.classList.toggle('on', marked); btn.setAttribute('aria-pressed', marked);
+      toast(marked ? '스크랩했어요. 내 정보 > 스크랩에서 볼 수 있어요' : '스크랩을 취소했어요');
+    } catch (err) { toast(be.errorText(err)); }
+  });
+  $('#share').addEventListener('click', async () => {
+    const url = `${location.origin}${location.pathname}#/post/${post.id}`;
+    if (navigator.share && matchMedia('(max-width: 1023px)').matches) { navigator.share({ title: post.title, url }).catch(() => {}); return; }
+    toast(await copyText(url) ? '글 주소를 복사했습니다' : '주소를 복사하지 못했습니다');
+  });
+  $('#author-menu')?.addEventListener('click', (e) => pop(e.currentTarget, [
+    { label: `${post.nickname}님 차단`, icon: 'ban', cls: 'danger', fn: () => blockUser(post.uid, post.nickname) },
+  ]));
 
   // 첨부 내려받기
   $$('[data-dl]', view).forEach((b) => b.addEventListener('click', async () => {
@@ -103,7 +142,7 @@ export async function renderPost(ctx) {
     b.disabled = true;
     try {
       const a = document.createElement('a');
-      a.href = await be.fileUrl(f.id); a.download = f.name; a.click();
+      a.href = await be.fileUrl(f.id); a.download = f.name; a.rel = 'noopener'; a.click();
     } catch (err) { toast(be.errorText(err)); }
     b.disabled = false;
   }));
@@ -124,6 +163,8 @@ export async function renderPost(ctx) {
     try { await be.approvePost(post, false); toast('자료를 삭제했습니다'); ctx.go('#/admin?tab=posts'); } catch (err) { toast(be.errorText(err)); }
   });
 
+  const reload = (cid) => ctx.go(`#/post/${post.id}?r=${Date.now()}${cid ? `&c=${cid}` : ''}`);
+
   // 댓글 버튼
   $('#clist').addEventListener('click', async (e) => {
     const el = e.target.closest('[data-c]');
@@ -134,55 +175,97 @@ export async function renderPost(ctx) {
       if (likeBtn) {
         const on = !likeBtn.classList.contains('on');
         await be.toggleCommentLike(post.id, c.id, on);
-        likeBtn.classList.toggle('on', on);
+        likeBtn.classList.toggle('on', on); likeBtn.setAttribute('aria-pressed', on);
         const n = $('.num', likeBtn); n.textContent = +n.textContent + (on ? 1 : -1);
+      } else if (e.target.closest('[data-reply]')) {
+        const slot = $('[data-slot]', el);
+        if (slot.innerHTML) { slot.innerHTML = ''; return; }
+        $$('#clist [data-slot]').forEach((s) => { s.innerHTML = ''; });
+        slot.innerHTML = `<p class="reply-to">${esc(c.nickname)}님에게 답글</p>${composer('rform', '답글을 남겨 주세요', true)}`;
+        wireComposer($('#rform', slot), async (body, image) => { const id = await be.addComment(post, body, image, c.id); reload(id); });
+        $('#rform textarea', slot).focus();
+      } else if (e.target.closest('[data-cedit]')) {
+        const bodyEl = $('.comment-body', el);
+        if ($('form', bodyEl)) return;
+        bodyEl.innerHTML = `<form class="composer small" data-edit><textarea maxlength="3000" aria-label="댓글 수정">${esc(c.body)}</textarea>
+          <div class="composer-bar"><span class="sp"></span><button type="button" class="btn sm line" data-cancel>취소</button><button class="btn sm">저장</button></div></form>`;
+        const f = $('form', bodyEl);
+        const ta = $('textarea', f);
+        ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length);
+        $('[data-cancel]', f).onclick = () => { bodyEl.innerHTML = linkify(c.body); };
+        f.addEventListener('submit', async (ev) => {
+          ev.preventDefault();
+          const v = ta.value.trim();
+          if (!v) return;
+          try { await be.editComment(post.id, c.id, v); toast('댓글을 고쳤습니다'); reload(c.id); } catch (err) { toast(be.errorText(err)); }
+        });
       } else if (e.target.closest('[data-accept]')) {
         if (!await confirmBox('답변 채택', `${c.nickname}님의 답변을 채택합니다. 채택은 바꿀 수 없습니다.`, '채택')) return;
         await be.acceptComment(post, c);
-        toast('답변을 채택했습니다'); ctx.go(`#/post/${post.id}?r=${Date.now()}`);
+        toast('답변을 채택했습니다'); reload(c.id);
       } else if (e.target.closest('[data-cdel]')) {
-        if (!await confirmBox('댓글 삭제', '이 댓글을 삭제합니다.', '삭제', true)) return;
+        if (!await confirmBox('댓글 삭제', kids(c.id).some((k) => !k.deleted) ? '이 댓글을 삭제합니다. 답글은 남고 이 자리에는 "삭제된 댓글입니다"가 보입니다.' : '이 댓글을 삭제합니다.', '삭제', true)) return;
         await be.deleteComment(post.id, c.id);
-        toast('댓글을 삭제했습니다'); ctx.go(`#/post/${post.id}?r=${Date.now()}`);
+        toast('댓글을 삭제했습니다'); reload();
       } else if (e.target.closest('[data-crep]')) {
         await doReport(post, c);
       }
     } catch (err) { toast(be.errorText(err)); }
   });
 
-  // 댓글 쓰기(사진 1장)
-  let cimg = '';
-  $('#cimg').addEventListener('change', async (e) => {
+  wireComposer($('#cform'), async (body, image) => { const id = await be.addComment(post, body, image); reload(id); });
+}
+
+// 댓글 입력 상자(사진 1장, 글자 수)
+function composer(id, placeholder, small = false) {
+  return `<form class="composer${small ? ' small' : ''}" id="${id}">
+    <div class="composer-prev hidden" data-prev></div>
+    <textarea name="body" rows="2" maxlength="3000" placeholder="${esc(placeholder)}" aria-label="${small ? '답글' : '댓글'}"></textarea>
+    <div class="composer-bar"><label>${icon('image', 'sm')}사진<input type="file" accept="image/*" hidden data-img></label><span class="sp"></span><span class="count num" data-count>0/3,000</span><button class="btn sm" data-send>등록</button></div>
+  </form>`;
+}
+function wireComposer(form, onSend) {
+  let img = '';
+  const ta = $('textarea', form);
+  const prev = $('[data-prev]', form);
+  $('[data-img]', form).addEventListener('change', async (e) => {
     const f = e.target.files[0];
     if (!f) return;
     try {
-      cimg = await be.imageDataUrl(f, 290000, [[900, 0.75], [800, 0.68], [640, 0.6], [480, 0.6]]);
-      $('#cprev').innerHTML = `<img src="${safeImg(cimg)}" alt=""><span>사진 1장</span><button type="button" class="text-btn" id="cx">빼기</button>`;
-      $('#cprev').classList.remove('hidden');
-      $('#cx').onclick = () => { cimg = ''; $('#cprev').classList.add('hidden'); };
+      img = await be.imageDataUrl(f, 290000, [[900, 0.75], [800, 0.68], [640, 0.6], [480, 0.6]]);
+      prev.innerHTML = `<img src="${safeImg(img)}" alt=""><span>사진 1장</span><button type="button" class="text-btn" data-x>빼기</button>`;
+      prev.classList.remove('hidden');
+      $('[data-x]', prev).onclick = () => { img = ''; prev.classList.add('hidden'); e.target.value = ''; };
     } catch (err) { toast(be.errorText(err)); }
   });
-  const ta = $('#cform textarea');
-  ta.addEventListener('input', () => { ta.style.height = 'auto'; ta.style.height = `${Math.min(240, ta.scrollHeight)}px`; });
-  $('#cform').addEventListener('submit', async (e) => {
+  ta.addEventListener('input', () => {
+    ta.style.height = 'auto'; ta.style.height = `${Math.min(240, ta.scrollHeight)}px`;
+    $('[data-count]', form).textContent = `${ta.value.length.toLocaleString()}/3,000`;
+  });
+  // Ctrl+Enter 로 등록
+  ta.addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) form.requestSubmit(); });
+  form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const body = ta.value.trim();
     if (!body) { ta.focus(); return; }
-    const btn = $('#csend');
+    const btn = $('[data-send]', form);
     btn.disabled = true;
-    try {
-      await be.addComment(post, body, cimg);
-      ctx.go(`#/post/${post.id}?r=${Date.now()}`);
-    } catch (err) { toast(be.errorText(err)); btn.disabled = false; }
+    try { await onSend(body, img); } catch (err) { toast(be.errorText(err)); btn.disabled = false; }
   });
+}
+
+async function blockUser(uid, nickname) {
+  if (!await confirmBox('회원 차단', `앞으로 ${nickname}님의 글과 댓글이 보이지 않습니다. 차단은 내 정보 > 차단한 회원에서 언제든 풀 수 있습니다.`, '차단', true)) return;
+  try { await be.setBlock(uid, true); toast(`${nickname}님을 차단했습니다`); location.hash = '#/community/all'; } catch (err) { toast(be.errorText(err)); }
 }
 
 const REASONS = ['욕설·비방', '개인정보 노출', '저작권 침해', '음란·불법 내용', '광고·도배', '기타'];
 async function doReport(post, comment) {
   const reason = await modal({
     title: comment ? '댓글 신고' : '글 신고',
-    body: `<div class="radio-list">${REASONS.map((r, i) => `<label><input type="radio" name="reason" value="${r}" ${i ? '' : 'checked'}>${r}</label>`).join('')}</div>
-      <textarea class="textarea" name="detail" style="min-height:80px;margin-top:8px" maxlength="200" placeholder="자세한 내용(선택)"></textarea>`,
+    body: `<div class="radio-list" role="radiogroup">${REASONS.map((r, i) => `<label><input type="radio" name="reason" value="${r}" ${i ? '' : 'checked'}>${r}</label>`).join('')}</div>
+      <textarea class="textarea" name="detail" style="min-height:80px;margin-top:8px;font-size:14px" maxlength="200" placeholder="자세한 내용(선택)"></textarea>
+      <p class="hint" style="margin-top:8px">관리자가 확인한 뒤 처리합니다. 누가 신고했는지는 공개하지 않습니다.</p>`,
     buttons: [{ label: '취소', value: null, cls: 'line' }, { label: '신고', value: (box) => {
       const r = $('input[name=reason]:checked', box).value; const d = $('[name=detail]', box).value.trim();
       return d ? `${r}: ${d}` : r;
