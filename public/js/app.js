@@ -3,8 +3,8 @@ import * as be from './backend.js';
 import { BOARDS, COMMUNITY_TABS } from './boards.js';
 import { SITE_NAME, SITE_DESC, QNA_OPEN } from './config.js';
 import {
-  esc, $, $$, toast, icon, BOARD_ICON, empty, pageHead, tagHtml, rowHtml, listItemHtml, shortDate, ago, fullDate, getBanners, safeLink, safeImg, modal, confirmBox,
-  avatarHtml, newBadge, highlight, dday, readSet,
+  esc, $, $$, toast, icon, empty, pageHead, tagHtml, rowHtml, listItemHtml, shortDate, ago, fullDate, getBanners, safeLink, safeImg, modal, confirmBox,
+  newBadge, highlight, dday, readSet,
 } from './ui.js';
 import { renderPost } from './post.js';
 import { renderWrite } from './write.js';
@@ -102,11 +102,9 @@ function renderChrome(page, arg, q) {
   const writeHref = `#/write?board=${WRITE_KEYS.includes(key) ? key : 'talk'}`;
 
   $('#gnb-nav').innerHTML = me
-    ? `<a href="#/notifications" class="icon-only" aria-label="알림">${icon('bell')}<i class="dot hidden" data-bell></i></a>
-       ${admin ? `<a href="#/admin" aria-label="관리자">${icon('shield', 'sm')}관리자<span class="count num" data-queue></span></a>` : ''}
-       <a href="#/me">${esc(me.nickname)}님</a>
-       <a class="btn" href="${writeHref}">${icon('pen', 'sm')}글쓰기</a>`
-    : '<a href="#/login">로그인</a><a class="btn" href="#/join">회원가입</a>';
+    ? `<a href="#/me"><b>${esc(me.nickname)}</b>님</a><a href="#/notifications">알림<i class="dot hidden" data-bell></i></a>
+       ${admin ? '<a href="#/admin">관리자<span class="count num" data-queue></span></a>' : ''}<a href="#/me?tab=settings">설정</a>`
+    : '<a href="#/login">로그인</a><a href="#/join">회원가입</a>';
   $('#gnb-m').innerHTML = `<a href="#/search" aria-label="검색">${icon('search')}</a>
     ${me ? `<a href="#/notifications" aria-label="알림">${icon('bell')}<i class="dot hidden" data-bell></i></a>` : `<a href="#/login" aria-label="로그인">${icon('user')}</a>`}
     <a href="#/menu" aria-label="전체 메뉴">${icon('menu')}</a>`;
@@ -117,23 +115,37 @@ function renderChrome(page, arg, q) {
   $('#lnb').innerHTML = tabs.map(([k, n, h]) => `<a href="${h}" data-k="${k}" class="${k === key ? 'on' : ''}">${n}</a>`).join('');
   showTab();
 
-  const curCat = q.get('category') || '';
-  const link = (k, label, href, ic, extra = '') => `<a class="side-link${k === key ? ' on' : ''}" href="${href}" data-k="${k}"${k === key ? ' aria-current="page"' : ''}>${icon(ic)}${esc(label)}${extra}</a>`;
-  const board = (b) => link(b, BOARDS[b].name, boardHref(b), BOARD_ICON[b])
-    + (b === key ? BOARDS[b].categories.map((c) => `<a class="side-link sub${c.id === curCat ? ' on' : ''}" href="${boardHref(b)}?category=${encodeURIComponent(c.id)}">${esc(c.name)}</a>`).join('') : '');
+  // 오른쪽: 로그인·내 정보, 인기글, 공지, 안내
   $('#side').innerHTML = `
-    ${me ? `<div class="side-me">${avatarHtml(me.nickname, me.uid)}<div><b>${esc(me.nickname)}</b><small>${esc(me.grade)}${me.role === 'admin' ? ' · 운영진' : ''}</small></div><a href="#/me">내 정보</a></div>
-      <div class="side-actions"><a class="btn wide" href="${writeHref}">${icon('pen', 'sm')}글쓰기</a></div>`
-    : '<div class="side-actions"><a class="btn" href="#/join">회원가입</a><a class="btn line" href="#/login">로그인</a></div>'}
-    <nav class="side-menu">
-      ${link('home', '홈', '#/', 'home')}${link('rec', '인기글', '#/community/rec', 'flame')}${link('all', '전체글', '#/community/all', 'list')}
-      <h4>입시 정보</h4>${board('news')}${board('admission')}
-      <h4>이야기</h4>${board('talk')}${board('school')}${QNA_OPEN ? board('qna') : ''}
-      <h4>자료</h4>${board('data')}
-      <h4>안내</h4>${link('notice', '공지사항', '#/notices', 'megaphone')}${link('rules', '이용규칙', '#/rules', 'file')}${link('privacy', '개인정보 처리방침', '#/privacy', 'lock')}
-      ${admin ? `<h4>관리</h4>${link('admin', '관리자', '#/admin', 'shield', '<span class="count" data-queue></span>')}` : ''}
-    </nav>`;
+    <section class="box me-box">${me
+    ? `<div class="me-name"><b>${esc(me.nickname)}</b>님<small>${esc(me.grade)}${me.role === 'admin' ? ' · 운영진' : ''}</small></div>
+       <nav class="me-links"><a href="#/me">내 정보</a><a href="#/me?tab=posts">내 글</a><a href="#/notifications">알림<i class="dot hidden" data-bell></i></a>${admin ? '<a href="#/admin">관리자<span class="count num" data-queue></span></a>' : ''}</nav>
+       <a class="btn block" href="${writeHref}">${icon('pen', 'sm')}글쓰기</a>`
+    : `<p>회원만 글 내용을 볼 수 있습니다.</p><a class="btn block" href="#/login">로그인</a>
+       <nav class="me-links"><a href="#/join">회원가입</a><a href="#/find-id">아이디 찾기</a><a href="#/reset-password">비밀번호 찾기</a></nav>`}</section>
+    <section class="box side-hot"><h3 class="box-h"><a href="#/community/rec">인기글</a><a class="more" href="#/community/rec">더보기</a></h3><ol class="mini" id="side-hot"><li class="none">불러오는 중</li></ol></section>
+    <section class="box"><h3 class="box-h"><a href="#/notices">공지사항</a><a class="more" href="#/notices">더보기</a></h3><ul class="mini" id="side-notice"></ul></section>
+    <section class="box"><h3 class="box-h">안내</h3><nav class="info-links"><a href="#/rules">이용규칙</a><a href="#/data-rules">자료실 규칙</a><a href="#/privacy">개인정보 처리방침</a></nav><p class="side-addr">운영 태산학원 · 042-321-5788</p></section>`;
+  fillSide();
   if (admin) refreshQueue();
+}
+
+// 오른쪽 인기글·공지(1분 동안은 받아 둔 것을 씀)
+let sideCache = { t: 0, who: null, hot: [], notice: [] };
+async function fillSide() {
+  const who = be.currentUser()?.uid || '';
+  if (Date.now() - sideCache.t > 60000 || sideCache.who !== who) {
+    try {
+      const [recent, notices] = await Promise.all([be.listPosts({ limit: 200 }), be.listPosts({ board: 'notice', limit: 5 })]);
+      const h = hot(recent).slice(0, 7);
+      // 비어 있으면 다음 화면에서 다시 받음
+      sideCache = { t: h.length ? Date.now() : 0, who, hot: h, notice: notices.slice(0, 4) };
+    } catch { sideCache.t = 0; }
+  }
+  const item = (p, i) => `<li><a href="#/post/${esc(p.id)}">${i === undefined ? '' : `<span class="rank${i < 3 ? ' top' : ''}">${i + 1}</span>`}<span class="t">${esc(p.title)}</span>${p.commentCount ? `<span class="cmt">${p.commentCount}</span>` : ''}</a></li>`;
+  const h = $('#side-hot'), n = $('#side-notice');
+  if (h) h.innerHTML = sideCache.hot.map((p, i) => item(p, i)).join('') || '<li class="none">최근 7일 동안 올라온 글이 없습니다</li>';
+  if (n) n.innerHTML = sideCache.notice.map((p) => item(p)).join('') || '<li class="none">공지가 없습니다</li>';
 }
 
 // 모바일 게시판 탭: 현재 탭을 가운데로, 없으면 맨 앞으로
@@ -145,7 +157,7 @@ function showTab() {
 // 글 보기 화면: 글이 속한 게시판을 메뉴에 표시
 addEventListener('tsc:board', (e) => {
   const k = CSS.escape(String(e.detail || ''));
-  $$(`#lnb a[data-k="${k}"], #side .side-link[data-k="${k}"]`).forEach((a) => a.classList.add('on'));
+  $$(`#lnb a[data-k="${k}"]`).forEach((a) => a.classList.add('on'));
   showTab();
 });
 
@@ -251,7 +263,7 @@ async function renderBoard(ctx, board) {
   const writeHref = `#/write?board=${board}${cat ? `&category=${encodeURIComponent(cat)}` : ''}`;
   const base = virtual ? `#/community/${board}` : boardHref(board);
   const qs = (patch) => { const u = new URLSearchParams(q); Object.entries(patch).forEach(([k, v]) => (v ? u.set(k, v) : u.delete(k))); const s = u.toString(); return s ? `${base}?${s}` : base; };
-  const cols = `<colgroup><col style="width:112px"><col><col style="width:136px"><col style="width:96px"><col style="width:64px"><col style="width:64px">${admin ? '<col style="width:108px">' : ''}</colgroup>`;
+  const cols = `<colgroup><col style="width:96px"><col><col style="width:116px"><col style="width:72px"><col style="width:48px"><col style="width:52px">${admin ? '<col style="width:84px">' : ''}</colgroup>`;
 
   view.innerHTML = `${pageHead(b.name, { desc: BOARD_DESC[board], actions: writable ? `<a class="btn" href="${writeHref}">${icon('pen', 'sm')}글쓰기</a>` : '' })}
     ${board === 'data' ? `<div class="notice-box" style="margin-bottom:16px">${icon('info')}<div>직접 만들었거나 배포 허락을 받은 자료만 올릴 수 있고, 관리자가 확인한 뒤 공개됩니다. <a href="#/data-rules">자료실 규칙</a></div></div>` : ''}
@@ -373,10 +385,9 @@ function renderMenu({ view }) {
   const me = be.currentUser();
   const a = (href, label) => `<a href="${href}">${esc(label)}${icon('right', 'sm')}</a>`;
   view.innerHTML = `${pageHead('전체 메뉴')}
-    <div class="side-me" style="margin:0 0 24px;padding:0 4px">${me
-      ? `${avatarHtml(me.nickname, me.uid)}<div><b>${esc(me.nickname)}</b><small>@${esc(me.username)} · ${esc(me.grade)}${me.role === 'admin' ? ' · 운영진' : ''}</small></div><a href="#/me">내 정보</a>`
-      : '<span class="logo-tile"><img src="images/logo.webp" alt=""></span><div><b>태산입시</b><small>로그인하면 글 내용을 볼 수 있습니다</small></div>'}</div>
-    ${me ? '' : '<div class="grid-2" style="margin-bottom:24px"><a class="btn line" href="#/login">로그인</a><a class="btn" href="#/join">회원가입</a></div>'}
+    <section class="box me-box" style="margin-bottom:14px">${me
+      ? `<div class="me-name"><b>${esc(me.nickname)}</b>님<small>@${esc(me.username)} · ${esc(me.grade)}${me.role === 'admin' ? ' · 운영진' : ''}</small></div><a class="btn line block" href="#/me">내 정보</a>`
+      : '<p>로그인하면 글 내용을 볼 수 있습니다.</p><div class="grid-2"><a class="btn line" href="#/login">로그인</a><a class="btn" href="#/join">회원가입</a></div>'}</section>
     <div class="menu-group"><h2>게시판</h2>${a('#/community/rec', '인기글')}${a('#/community/all', '전체글')}${COMMUNITY_TABS.slice(1).map((t) => a(`#/community/${t.id}`, t.name)).join('')}${QNA_OPEN ? a('#/community/qna', '문제풀이') : ''}${a('#/study', '자료실')}${a('#/notices', '공지사항')}</div>
     ${me ? `<div class="menu-group"><h2>내 활동</h2>${a('#/me', '내 정보')}${a('#/me?tab=posts', '내가 쓴 글')}${be.has('listMyComments') ? a('#/me?tab=comments', '내 댓글') + a('#/me?tab=bookmarks', '스크랩') : ''}${a('#/notifications', '알림')}</div>` : ''}
     ${me?.role === 'admin' ? `<div class="menu-group"><h2>관리</h2>${a('#/admin?tab=users', '회원 관리')}${a('#/admin?tab=posts', '글 관리')}${a('#/admin?tab=cover', '표지')}${be.has('events') ? a('#/admin?tab=events', '입시 일정') : ''}${a('#/write?board=notice', '공지 쓰기')}</div>` : ''}

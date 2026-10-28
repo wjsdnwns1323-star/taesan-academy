@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#f3f5f8">
+  <meta name="theme-color" content="#1b3a7a">
   <meta name="description" content="대전 학생과 학부모가 입시 정보와 고민을 나누는 곳">
   <meta property="og:type" content="website">
   <meta property="og:title" content="태산입시">
@@ -11,43 +11,44 @@
   <meta property="og:url" content="https://taesan.uinone.net/">
   <title>태산입시</title>
   <link rel="icon" href="images/logo.png">
-  <link rel="preload" href="fonts/wanted-sans/wanted-sans.css" as="style">
-  <link rel="stylesheet" href="fonts/wanted-sans/wanted-sans.css">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
   <a class="skip" href="#view">본문 바로가기</a>
   <div class="app" id="app">
     <header class="topbar">
-      <a href="#/" class="site-logo" aria-label="태산입시 홈"><img src="images/logo.webp" alt="태산학원" width="72" height="36"><span>입시 커뮤니티</span></a>
-      <form class="search" id="gnb-search" role="search">
-        <svg class="icon sm" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-        <input name="q" placeholder="게시글 검색" aria-label="게시글 검색" autocomplete="off">
-      </form>
-      <nav class="top-actions" id="gnb-nav" aria-label="내 메뉴"></nav>
-      <div class="top-m" id="gnb-m"></div>
+      <div class="top-in">
+        <a href="#/" class="site-logo" aria-label="태산입시 홈"><img src="images/logo.webp" alt="태산학원" width="66" height="36"><span>입시 커뮤니티</span></a>
+        <form class="search" id="gnb-search" role="search">
+          <input name="q" placeholder="게시글 검색" aria-label="게시글 검색" autocomplete="off">
+          <button aria-label="검색"><svg class="icon sm" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></button>
+        </form>
+        <nav class="top-actions" id="gnb-nav" aria-label="내 메뉴"></nav>
+        <div class="top-m" id="gnb-m"></div>
+      </div>
     </header>
 
-    <aside class="side" id="side" aria-label="게시판 메뉴"></aside>
+    <nav class="gnb" aria-label="게시판"><div class="gnb-in tabs-m-in" id="lnb"></div></nav>
 
-    <nav class="tabs-m" aria-label="게시판"><div class="tabs-m-in" id="lnb"></div></nav>
-
-    <main class="sheet" id="sheet">
-      <div class="notice-line hidden" id="topline">
-        <svg class="icon sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1Z"/><path d="M15 9a3 3 0 0 1 0 6"/></svg>
-        <a id="tl-text" href="#/"></a>
-        <button type="button" data-tl="-1" aria-label="이전 안내"><svg class="icon sm" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button>
-        <button type="button" data-tl="1" aria-label="다음 안내"><svg class="icon sm" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></button>
-      </div>
-      <div id="view" tabindex="-1"><div class="loading">불러오는 중</div></div>
-      <footer class="footer">
-        <div class="footer-name">태산입시</div>
-        <div class="footer-cols">
-          <p>운영 태산학원 · 대전광역시 서구 둔산남로 96 E.플러스빌딩 2층 · 042-321-5788</p>
-          <nav aria-label="안내"><a href="#/rules">이용규칙</a><a href="#/data-rules">자료실 규칙</a><a href="#/privacy"><b>개인정보 처리방침</b></a></nav>
+    <div class="body-in">
+      <main class="sheet" id="sheet">
+        <div class="notice-line hidden" id="topline">
+          <svg class="icon sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1Z"/><path d="M15 9a3 3 0 0 1 0 6"/></svg>
+          <a id="tl-text" href="#/"></a>
+          <button type="button" data-tl="-1" aria-label="이전 안내"><svg class="icon sm" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button>
+          <button type="button" data-tl="1" aria-label="다음 안내"><svg class="icon sm" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></button>
         </div>
-      </footer>
-    </main>
+        <div id="view" tabindex="-1"><div class="loading">불러오는 중</div></div>
+      </main>
+      <aside class="side" id="side" aria-label="내 정보·인기글"></aside>
+    </div>
+
+    <footer class="footer">
+      <div class="footer-in">
+        <nav aria-label="안내"><a href="#/rules">이용규칙</a><a href="#/data-rules">자료실 규칙</a><a href="#/privacy"><b>개인정보 처리방침</b></a></nav>
+        <p><b>태산입시</b> · 운영 태산학원 · 대전광역시 서구 둔산남로 96 E.플러스빌딩 2층 · 042-321-5788</p>
+      </div>
+    </footer>
   </div>
 
   <button class="to-top" id="to-top" aria-label="맨 위로"><svg class="icon" viewBox="0 0 24 24"><path d="m18 15-6-6-6 6"/></svg></button>
