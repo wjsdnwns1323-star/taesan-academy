@@ -11,8 +11,10 @@ export const {
   DEMO, init, currentUser, isAdmin, onUser, errorText, USERNAME_RE, toE164, signUp, signIn, signOut, changePassword, getPrivate, getUser, withdraw,
   uploadFile, fileUrl, listPosts, listMyPosts, listPending, getPost, createPost, updatePost, deletePost, approvePost, liked, toggleLike,
   listComments, addComment, deleteComment, commentLiked, toggleCommentLike, acceptComment, listNotifications, hasUnread, markRead,
-  report, listReports, closeReport, listBanners, addBanner, saveCover, deleteBanner, setHidden, listHidden, getMember, listUsers, setUserFlags,
+  report, listReports, closeReport, listBanners, addBanner, saveCover, deleteBanner, setHidden, listHidden, getMember, setUserFlags,
 } = impl;
+// 회원 목록: AWS는 { withPrivate } 를, Firebase는 다음 쪽 위치(문자)만 받습니다
+export const listUsers = (o) => (SERVER === 'aws' ? aws.listUsers(o) : fb.listUsers(typeof o === 'string' ? o : undefined));
 
 // AWS로 옮긴 뒤 생긴 기능(예전 Firebase 서버에서는 화면에서 숨깁니다)
 const NEW = ['guardianStart', 'forgotPassword', 'resetPassword', 'findIdStart', 'findIdConfirm', 'editComment', 'toggleBookmark', 'listBookmarks', 'listMyComments', 'listBlocks', 'setBlock', 'listAudit', 'votePoll'];

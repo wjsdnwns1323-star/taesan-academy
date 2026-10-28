@@ -615,3 +615,45 @@ test('보안: 정지된 관리자는 관리자 기능을 쓸 수 없음', async 
   await t.fail(403, 'GET', `/users/${sock.me.uid}/private`, null, rogue.token);
   await t.fail(403, 'PATCH', `/users/${sock.me.uid}`, { role: 'admin' }, rogue.token);
 });
+
+test('보안: 권한 표(비회원·다른 회원·정지 회원이 못 하는 일)', async () => {
+  const t = await setup();
+  const owner = await t.join('admin'), a = await t.join('perm_a'), b = await t.join('perm_b'), x = await t.join('perm_banned');
+  await t.ok('PATCH', `/users/${x.me.uid}`, { banned: true }, owner.token);
+  const { id } = await t.ok('POST', '/posts', post({ poll: { options: ['가', '나'], days: 3 } }), a.token);
+  const { id: cid } = await t.ok('POST', `/posts/${id}/comments`, { body: '댓글' }, a.token);
+  // 비회원: 본문·댓글·개인정보·쓰기 모두 불가
+  await t.fail(401, 'GET', `/posts/${id}`);
+  await t.fail(401, 'GET', `/posts/${id}/comments`);
+  await t.fail(401, 'POST', '/posts', post());
+  await t.fail(401, 'GET', `/users/${a.me.uid}/private`);
+  assert.equal((await t.ok('GET', '/posts', null, null, { board: 'talk' }))[0].body, undefined);
+  // 다른 회원: 남의 글·댓글 수정·삭제, 개인정보, 관리자 기능 불가
+  await t.fail(403, 'PATCH', `/posts/${id}`, post({ title: '바꿈' }), b.token);
+  await t.fail(403, 'DELETE', `/posts/${id}`, null, b.token);
+  await t.fail(403, 'PATCH', `/posts/${id}/comments/${cid}`, { body: '바꿈' }, b.token);
+  await t.fail(403, 'DELETE', `/posts/${id}/comments/${cid}`, null, b.token);
+  await t.fail(403, 'GET', `/users/${a.me.uid}/private`, null, b.token);
+  await t.fail(403, 'GET', `/users/${a.me.uid}`, null, b.token, { private: '1' });
+  for (const [m, path, body] of [['GET', '/users'], ['PATCH', `/users/${a.me.uid}`, { role: 'admin' }], ['GET', '/audit'], ['GET', '/reports'],
+    ['POST', `/posts/${id}/hide`, { hidden: true }], ['PUT', '/banners/cover', { text: 'x' }], ['POST', '/banners', { kind: 'text', text: 'x' }]]) {
+    await t.fail(403, m, path, body || {}, b.token);
+  }
+  // 응답에 개인정보가 섞이지 않음
+  const pub = await t.ok('GET', `/users/${a.me.uid}`, null, b.token);
+  for (const k of ['realName', 'phone', 'age', 'gender', 'priv']) assert.equal(pub[k], undefined, k);
+  const view = await t.ok('GET', `/posts/${id}`, null, b.token);
+  for (const k of ['realName', 'phone']) assert.equal(view[k], undefined, k);
+  // 정지 회원: 읽기만
+  await t.ok('GET', `/posts/${id}`, null, x.token);
+  for (const [m, path, body] of [['POST', '/posts', post()], ['POST', `/posts/${id}/comments`, { body: 'x' }], ['POST', `/posts/${id}/like`, { on: true }],
+    ['POST', `/posts/${id}/vote`, { choices: [0] }], ['POST', '/files', { name: 'a.jpg', type: 'image/jpeg', size: 10 }]]) {
+    await t.fail(403, m, path, body, x.token);
+  }
+  // 숨긴 글: 다른 회원은 보기·댓글·좋아요·투표·스크랩 불가
+  await t.ok('POST', `/posts/${id}/hide`, { hidden: true }, owner.token);
+  for (const [m, path, body] of [['GET', `/posts/${id}`], ['GET', `/posts/${id}/comments`], ['POST', `/posts/${id}/comments`, { body: 'x' }],
+    ['POST', `/posts/${id}/like`, { on: true }], ['POST', `/posts/${id}/vote`, { choices: [0] }], ['POST', `/posts/${id}/bookmark`, { on: true }]]) {
+    await t.fail(404, m, path, body, b.token);
+  }
+});
