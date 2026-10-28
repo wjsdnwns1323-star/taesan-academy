@@ -6,17 +6,61 @@ import { esc, $, $$, ago, fullDate, toast, icon, empty, pageHead, tagHtml, safeI
 export async function renderAdmin(ctx) {
   const { view, q } = ctx;
   if (!be.isAdmin()) { view.innerHTML = `${pageHead('관리자')}${empty('관리자만 볼 수 있습니다', 'lock')}`; return; }
-  const tabs = [['users', '회원 관리'], ['posts', '글 관리'], ['cover', '표지·안내'], ...(be.has('events') ? [['events', '입시 일정'], ['audit', '열람 기록']] : [])];
-  const tab = tabs.some(([id]) => id === q.get('tab')) ? q.get('tab') : 'users';
+  const tabs = [['home', '현황'], ['users', '회원 관리'], ['posts', '글 관리'], ['cover', '표지·안내'], ...(be.has('events') ? [['events', '입시 일정'], ['audit', '열람 기록']] : [])];
+  const tab = tabs.some(([id]) => id === q.get('tab')) ? q.get('tab') : 'home';
   view.innerHTML = `${pageHead('관리자', { actions: '<a class="btn line keep" href="#/write?board=notice">공지 쓰기</a>' })}
     <nav class="tabs">${tabs.map(([id, n]) => `<a href="#/admin?tab=${id}" class="${id === tab ? 'on' : ''}">${n}</a>`).join('')}</nav>
     <div id="ab"><div class="loading">불러오는 중</div></div>`;
   const box = $('#ab');
+  if (tab === 'home') await overviewTab(ctx, box);
   if (tab === 'users') await usersTab(ctx, box);
   if (tab === 'posts') await postsTab(ctx, box);
   if (tab === 'cover') await coverTab(ctx, box);
   if (tab === 'events') await eventsTab(ctx, box);
   if (tab === 'audit') await auditTab(ctx, box);
+}
+
+/* ---------------- 현황: 회원·글 수, 처리할 일, 최근 14일 새 글 ---------------- */
+async function overviewTab(ctx, box) {
+  const [users, posts, pending, reports] = await Promise.all([be.listUsers({ withPrivate: false }), be.listPosts({ limit: 500 }), be.listPending(), be.listReports()]);
+  if (!ctx.alive()) return;
+  const DAY = 86400000;
+  const day0 = new Date(); day0.setHours(0, 0, 0, 0);
+  const today = day0.getTime(), week = today - 6 * DAY, month = today - 29 * DAY;
+  const days = Array.from({ length: 14 }, (_, i) => today - (13 - i) * DAY);
+  const counts = days.map((d) => posts.filter((p) => p.createdAt >= d && p.createdAt < d + DAY).length);
+  const max = Math.max(...counts);
+  const label = (d) => { const x = new Date(d); return `${x.getMonth() + 1}월 ${x.getDate()}일`; };
+  const peak = counts.indexOf(max);
+  const byBoard = Object.entries(posts.filter((p) => p.createdAt >= month).reduce((m, p) => ({ ...m, [p.board]: (m[p.board] || 0) + 1 }), {})).sort((a, b) => b[1] - a[1]);
+  const stat = (dt, dd, sub) => `<div><dt>${dt}</dt><dd class="num">${dd.toLocaleString()}</dd><small>${sub}</small></div>`;
+  box.innerHTML = `<dl class="ov-stats">
+      ${stat('전체 회원', users.length, `최근 7일 가입 <b class="num">${users.filter((u) => u.createdAt >= week).length}</b>`)}
+      ${stat('오늘 새 글', counts[13], `최근 7일 <b class="num">${counts.slice(7).reduce((a, b) => a + b, 0)}</b>`)}
+      ${stat('승인 대기 자료', pending.length, pending.length ? '<a href="#/admin?tab=posts">확인하러 가기</a>' : '처리할 자료 없음')}
+      ${stat('열린 신고', reports.length, reports.length ? '<a href="#/admin?tab=posts">확인하러 가기</a>' : '처리할 신고 없음')}
+    </dl>
+    <section class="admin-section"><h2>최근 14일 새 글</h2>
+      <div class="ov-chart">
+        <div class="ov-plot" role="img" aria-label="최근 14일 새 글 수, 가장 많은 날 ${label(days[peak])} ${max}개">
+          ${max ? `<span class="ov-max num">${max}</span>` : ''}
+          ${counts.map((n, i) => `<div class="ov-bar${i === 13 ? ' today' : ''}" tabindex="0" data-tip="${label(days[i])} · 새 글 ${n}개" aria-label="${label(days[i])} ${n}개">
+            ${n && (i === peak || i === 13) ? `<b class="num">${n}</b>` : ''}<i style="height:${max ? Math.round((n / max) * 100) : 0}%"></i></div>`).join('')}
+        </div>
+        <div class="ov-x">${days.map((d, i) => `<span class="${i % 4 === 1 ? '' : 'sm-hide'}">${i === 13 ? '오늘' : i % 2 === 1 ? `${new Date(d).getMonth() + 1}/${new Date(d).getDate()}` : ''}</span>`).join('')}</div>
+        <p class="ov-read hint" aria-live="polite">막대에 손가락이나 마우스를 올리면 그날 글 수가 보입니다.</p>
+      </div>
+      <details class="ov-table"><summary>표로 보기</summary>
+        <table class="mini-table"><thead><tr><th>날짜</th><th class="r">새 글</th></tr></thead><tbody>${days.map((d, i) => `<tr><td>${label(d)}</td><td class="r num">${counts[i]}</td></tr>`).reverse().join('')}</tbody></table></details>
+      ${posts.length >= 500 ? '<p class="hint">최근 글 500개로 셉니다.</p>' : ''}
+    </section>
+    <section class="admin-section"><h2>게시판별 새 글 <span>최근 30일</span></h2>
+      ${byBoard.length ? `<table class="mini-table ov-boards"><tbody>${byBoard.map(([b, n]) => `<tr><td>${esc(BOARDS[b]?.name || b)}</td><td class="r num">${n}</td></tr>`).join('')}</tbody></table>` : '<p class="hint">최근 30일 동안 올라온 글이 없습니다.</p>'}
+    </section>`;
+  const read = $('.ov-read', box);
+  const show = (e) => { const b = e.target.closest('.ov-bar'); if (b) read.textContent = b.dataset.tip; };
+  $('.ov-plot', box).addEventListener('pointerover', show);
+  $('.ov-plot', box).addEventListener('focusin', show);
 }
 
 /* ---------------- 회원 관리 ---------------- */
@@ -26,7 +70,7 @@ async function usersTab(ctx, box) {
   const privs = new Map(await Promise.all(users.map(async (u) => [u.id, u.priv !== undefined ? u.priv : await be.getPrivate(u.id).catch(() => null)])));
   if (!ctx.alive()) return;
   box.innerHTML = `<div class="toolbar"><input class="input" id="uf" placeholder="아이디·닉네임·이름·휴대폰 검색" aria-label="회원 검색"></div>
-    <p class="hint" style="margin-bottom:12px">회원 <b class="num" style="color:var(--g900)">${users.length}</b>명 · 개인정보는 학원 업무에만 사용하고 외부로 옮기지 마세요.</p>
+    <p class="hint" style="margin-bottom:12px">회원 <b class="num" style="color:var(--text)">${users.length}</b>명 · 개인정보는 학원 업무에만 사용하고 외부로 옮기지 마세요.</p>
     <table class="admin-table"><thead><tr><th>회원</th><th>이름</th><th>휴대폰</th><th>성별</th><th class="r">나이</th><th>구분</th><th class="r">가입일</th><th>상태</th><th></th></tr></thead>
     <tbody id="ut">${users.map((u) => {
       const p = privs.get(u.id) || {};

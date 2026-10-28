@@ -555,6 +555,34 @@ mark { background: #fff1b8; color: inherit; border-radius: 2px; padding: 0 1px; 
 .toolbar { display: flex; gap: 8px; margin: 16px 0; align-items: center; }
 .toolbar .input { max-width: 320px; height: 38px; }
 .cover-prev { margin-bottom: 8px; }
+/* 관리자 현황: 상자 없이 위 진한 줄 + 칸 사이 세로줄 */
+.ov-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 20px 0 0; border-top: 1px solid var(--text); border-bottom: 1px solid var(--border); }
+.ov-stats > div { padding: 16px 20px 18px; border-left: 1px solid var(--rule); min-width: 0; }
+.ov-stats > div:first-child { border-left: 0; padding-left: 0; }
+.ov-stats dt { font-size: 13px; color: var(--muted); }
+.ov-stats dd { margin: 4px 0 2px; font-size: 28px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.2; }
+.ov-stats small { font-size: 13px; color: var(--faint); }
+.ov-stats small b { color: var(--text); font-weight: 600; }
+.ov-stats small a { color: var(--brand); font-weight: 600; }
+.ov-chart { --bar: #3a62b3; }
+.ov-plot { position: relative; height: 168px; display: grid; grid-template-columns: repeat(14, minmax(0, 1fr)); gap: 2px; align-items: end; padding-top: 20px; border-bottom: 1px solid var(--control); background: linear-gradient(var(--rule), var(--rule)) 0 20px / 100% 1px no-repeat; }
+.ov-max { position: absolute; left: 0; top: 2px; font-size: 11px; color: var(--faint); }
+.ov-bar { height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 4px; outline: none; cursor: default; }
+.ov-bar i { display: block; width: min(100%, 28px); border-radius: 4px 4px 0 0; background: var(--bar); }
+.ov-bar b { font-size: 12px; font-weight: 600; color: var(--text); }
+.ov-bar:hover i, .ov-bar:focus-visible i { background: var(--brand); }
+.ov-bar:focus-visible { box-shadow: 0 0 0 2px var(--brand-100); border-radius: 4px; }
+.ov-x { display: grid; grid-template-columns: repeat(14, minmax(0, 1fr)); gap: 2px; margin-top: 6px; }
+.ov-x span { font-size: 11px; color: var(--faint); text-align: center; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.ov-read { margin-top: 10px; min-height: 20px; }
+.ov-table { margin-top: 8px; }
+.ov-table summary { font-size: 13px; color: var(--muted); cursor: pointer; width: max-content; }
+.ov-table table { margin-top: 8px; max-width: 320px; }
+.ov-boards { max-width: 420px; }
+.mini-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.mini-table th { height: 36px; text-align: left; font-size: 13px; font-weight: 500; color: var(--faint); border-bottom: 1px solid var(--border); }
+.mini-table td { height: 40px; border-bottom: 1px solid var(--rule); }
+.mini-table .r { text-align: right; }
 
 /* 문서(이용규칙·처리방침) */
 .doc { max-width: 800px; font-size: 15px; color: var(--text); line-height: 1.8; }
@@ -680,6 +708,12 @@ mark { background: #fff1b8; color: inherit; border-radius: 2px; padding: 0 1px; 
   .set-row { grid-template-columns: 1fr; gap: 12px; padding: 20px 0; }
   .dl > div { grid-template-columns: 96px 1fr; }
 
+  .ov-stats { grid-template-columns: 1fr 1fr; }
+  .ov-stats > div { padding: 14px 0 16px 16px; }
+  .ov-stats > div:nth-child(odd) { border-left: 0; padding-left: 0; }
+  .ov-stats > div:nth-child(n + 3) { border-top: 1px solid var(--rule); }
+  .ov-stats dd { font-size: 24px; }
+  .ov-x span.sm-hide { visibility: hidden; }
   .admin-table thead { display: none; }
   .admin-table, .admin-table tbody, .admin-table tr, .admin-table td { display: block; }
   .admin-table tr { padding: 12px 0; border-bottom: 1px solid var(--rule); }

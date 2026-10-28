@@ -239,6 +239,6 @@ export function modal({ title, body, buttons = [{ label: '닫기', value: null, 
 }
 
 export async function confirmBox(title, message, ok = '확인', danger = false) {
-  return (await modal({ title, body: `<p style="font-size:15px;color:var(--g700)">${esc(message)}</p>`,
+  return (await modal({ title, body: `<p style="font-size:15px;color:var(--muted)">${esc(message)}</p>`,
     buttons: [{ label: '취소', value: false, cls: 'line' }, { label: ok, value: true, cls: danger ? 'danger' : '' }] })) === true;
 }
