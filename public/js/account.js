@@ -115,7 +115,7 @@ export function renderJoin(ctx) {
     : '<label class="check"><input type="checkbox" name="guardianConsent"><span>[필수] 만 14세 미만으로, 보호자(법정대리인)의 동의를 받았습니다.</span></label>'}
       </div>
       <div class="agree">
-        <label class="check"><input type="checkbox" id="agree-all"><span><b>전체 동의</b></span></label>
+        <label class="check all"><input type="checkbox" id="agree-all"><span><b>전체 동의</b></span></label>
         <label class="check"><input type="checkbox" name="agreeRules"><span>[필수] <a href="#/rules" target="_blank">커뮤니티 이용규칙</a>에 동의합니다</span></label>
         <label class="check"><input type="checkbox" name="agreePrivacy"><span>[필수] <a href="#/privacy" target="_blank">개인정보 수집·이용</a>에 동의합니다 (이름·휴대폰·성별·나이·구분·학년, 회원 관리 목적, 탈퇴할 때까지 보관)</span></label>
       </div>

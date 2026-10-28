@@ -443,8 +443,9 @@ mark { background: #fff1b8; color: inherit; border-radius: 2px; padding: 0 1px; 
 .attach .x { position: absolute; top: -8px; right: -8px; width: 24px; height: 24px; border-radius: 50%; background: var(--text); color: #fff; display: grid; place-items: center; }
 .attach .x .icon { width: 14px; height: 14px; }
 .attach .a.f .x { top: 8px; right: 8px; background: none; color: var(--faint); }
-.add-file { display: inline-flex; align-items: center; gap: 6px; height: 38px; padding: 0 14px; border: 1px dashed var(--control); border-radius: var(--r); font-size: 14px; color: var(--muted); cursor: pointer; width: max-content; }
-.add-file:hover { border-color: var(--brand); color: var(--brand); }
+.add-file { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 10px; margin-left: -10px; border-radius: var(--r); font-size: 14px; font-weight: 600; color: var(--brand); cursor: pointer; width: max-content; }
+.add-file:hover { background: var(--brand-50); }
+.add-file:focus-within { outline: 2px solid var(--brand); outline-offset: 2px; }
 .drop-on { outline: 2px dashed var(--brand); outline-offset: 6px; border-radius: var(--r); }
 
 /* 로그인·가입·찾기 */
@@ -462,7 +463,7 @@ mark { background: #fff1b8; color: inherit; border-radius: 2px; padding: 0 1px; 
 .auth-foot { margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--rule); text-align: center; font-size: 14px; color: var(--muted); }
 .auth-foot a { color: var(--brand); font-weight: 600; margin-left: 6px; }
 .agree { display: flex; flex-direction: column; gap: 12px; }
-.agree > label:first-child { padding-bottom: 12px; border-bottom: 1px solid var(--rule); }
+.agree > .all { padding-bottom: 12px; border-bottom: 1px solid var(--rule); }
 .result-box { padding: 24px 0; text-align: center; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
 .result-box b { display: block; font-size: 20px; font-weight: 700; margin: 4px 0; }
 
@@ -582,7 +583,7 @@ mark { background: #fff1b8; color: inherit; border-radius: 2px; padding: 0 1px; 
   .top-m .dot { top: 9px; right: 9px; box-shadow: 0 0 0 2px var(--sheet); }
   .side { display: none; }
   .tabs-m { display: block; position: sticky; top: var(--top-h); z-index: 35; background: var(--sheet); border-bottom: 1px solid var(--border); padding: 0 16px; }
-  .tabs-m-in { display: flex; gap: 20px; overflow-x: auto; scrollbar-width: none; }
+  .tabs-m-in { display: flex; gap: 20px; overflow-x: auto; scrollbar-width: none; margin: 0 -16px; padding: 0 16px; mask-image: linear-gradient(to right, transparent, #000 16px, #000 calc(100% - 24px), transparent); -webkit-mask-image: linear-gradient(to right, transparent, #000 16px, #000 calc(100% - 24px), transparent); }
   .tabs-m-in::-webkit-scrollbar { display: none; }
   .tabs-m a { flex: none; padding: 12px 0 10px; font-size: 15px; font-weight: 500; color: var(--muted); border-bottom: 2px solid transparent; }
   .tabs-m a.on { color: var(--text); font-weight: 700; border-bottom-color: var(--brand); }
@@ -651,8 +652,9 @@ mark { background: #fff1b8; color: inherit; border-radius: 2px; padding: 0 1px; 
   .admin-table, .admin-table tbody, .admin-table tr, .admin-table td { display: block; }
   .admin-table tr { padding: 12px 0; border-bottom: 1px solid var(--rule); }
   .admin-table td, .admin-table td.r { padding: 2px 0; border: 0; text-align: left; }
-  .admin-table td[data-label]::before { content: attr(data-label); display: inline-block; width: 72px; color: var(--faint); font-size: 13px; }
-  .admin-table .ops { justify-content: flex-start; margin-top: 8px; }
+  .admin-table td[data-label] { position: relative; padding-left: 72px; }
+  .admin-table td[data-label]::before { content: attr(data-label); position: absolute; left: 0; top: 2px; color: var(--faint); font-size: 13px; }
+  .admin-table .ops { justify-content: flex-start; margin: 8px 0 0 -8px; }
 
   @media (max-width: 420px) { #share .lbl { display: none; } }
   .to-top { right: 16px; bottom: calc(16px + env(safe-area-inset-bottom)); width: 40px; height: 40px; }

@@ -372,7 +372,7 @@ function renderMenu({ view }) {
   const me = be.currentUser();
   const a = (href, label) => `<a href="${href}">${esc(label)}${icon('right', 'sm')}</a>`;
   view.innerHTML = `${pageHead('전체 메뉴')}
-    <div class="side-me" style="margin:0 0 24px">${me
+    <div class="side-me" style="margin:0 0 24px;padding:0 4px">${me
       ? `${avatarHtml(me.nickname, me.uid)}<div><b>${esc(me.nickname)}</b><small>@${esc(me.username)} · ${esc(me.grade)}${me.role === 'admin' ? ' · 운영진' : ''}</small></div><a href="#/me">내 정보</a>`
       : '<span class="logo-tile"><img src="images/logo.webp" alt=""></span><div><b>태산입시</b><small>로그인하면 글 내용을 볼 수 있습니다</small></div>'}</div>
     ${me ? '' : '<div class="grid-2" style="margin-bottom:24px"><a class="btn line" href="#/login">로그인</a><a class="btn" href="#/join">회원가입</a></div>'}
@@ -400,7 +400,7 @@ document.addEventListener('click', async (e) => {
     const v = await modal({
       title: '회원 정보',
       body: `<dl class="dl">${rows.filter((r) => r[1]).map(([k, val]) => `<div><dt>${k}</dt><dd>${esc(val)}</dd></div>`).join('')}</dl>`,
-      buttons: [...(self ? [] : [{ label: m.role === 'admin' ? '관리자 해제' : '관리자 지정', value: 'role', cls: 'line' }, { label: m.banned ? '정지 해제' : '이용 정지', value: 'ban', cls: 'danger' }]), { label: '닫기', value: null, cls: 'dark' }],
+      buttons: [{ label: '닫기', value: null, cls: 'ghost' }, ...(self ? [] : [{ label: m.role === 'admin' ? '관리자 해제' : '관리자 지정', value: 'role', cls: 'line' }, { label: m.banned ? '정지 해제' : '이용 정지', value: 'ban', cls: 'danger' }])],
     });
     if (v === 'ban' && await confirmBox(m.banned ? '정지 해제' : '이용 정지', `${m.nickname}님을 ${m.banned ? '정지 해제' : '이용 정지'}합니다.`, '확인', !m.banned)) {
       await be.setUserFlags(m.uid, { banned: !m.banned }); toast('변경했습니다');
