@@ -12,7 +12,7 @@ const JPEG_RE = /^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/;
 const DAY = 86400000;
 const LIMIT = {
   fileBytes: 5 * 1024 * 1024, images: 10, files: 5, title: 100, body: 10000, comment: 3000, source: 200,
-  thumb: 80000, commentImage: 300000, coverImage: 380000, bannerImage: 300000,
+  thumb: 80000, commentImage: 300000, coverImage: 380000, bannerImage: 300000, pollOptions: 6, pollOption: 40,
 };
 
 /* ---------------- 공통 ---------------- */
@@ -376,7 +376,7 @@ export function createApp({ store, files, idp, sms, env = {} }) {
   const excerpt = (body) => String(body || '').replace(/\s+/g, ' ').trim().slice(0, 200);
   // 비회원에게는 제목 목록만
   const guestRow = (p) => ({ id: p.id, board: p.board, category: p.category, title: p.title, nickname: p.nickname, grade: p.grade, createdAt: p.createdAt,
-    likeCount: p.likeCount, commentCount: p.commentCount, viewCount: p.viewCount || 0, pinned: !!p.pinned, approved: p.approved, imageCount: p.imageCount || 0, fileCount: p.fileCount || 0, status: p.status });
+    likeCount: p.likeCount, commentCount: p.commentCount, viewCount: p.viewCount || 0, pinned: !!p.pinned, approved: p.approved, imageCount: p.imageCount || 0, fileCount: p.fileCount || 0, hasPoll: !!p.hasPoll, status: p.status });
 
   async function getMeta(id) {
     if (!str(id, 40)) throw E.notFound('글을 찾을 수 없습니다.');
@@ -410,6 +410,27 @@ export function createApp({ store, files, idp, sms, env = {} }) {
     if (!str(b.source ?? '', LIMIT.source)) throw bad('출처는 200자까지 쓸 수 있습니다.');
     if (board === 'data' && !nonEmpty(b.source, LIMIT.source)) throw bad('자료실 글은 출처를 적어야 합니다.');
     if (!jpeg(b.thumb ?? '', LIMIT.thumb)) throw bad('미리보기 사진이 올바르지 않습니다.');
+  }
+
+  // 투표: 보기 2~6개, 기간 1~30일. 글을 올린 뒤에는 바꿀 수 없음
+  function checkPoll(x, board) {
+    if (x == null) return null;
+    if (board === 'data') throw bad('자료실 글에는 투표를 넣을 수 없습니다.');
+    const options = Array.isArray(x.options) ? x.options.map((o) => (typeof o === 'string' ? o.trim() : '')) : [];
+    if (options.length < 2 || options.length > LIMIT.pollOptions) throw bad(`투표 보기는 2~${LIMIT.pollOptions}개로 넣어 주세요.`);
+    if (options.some((o) => !o || o.length > LIMIT.pollOption)) throw bad(`투표 보기는 1~${LIMIT.pollOption}자로 적어 주세요.`);
+    if (new Set(options).size !== options.length) throw bad('같은 보기가 두 번 들어 있습니다.');
+    const days = Number(x.days);
+    if (!Number.isInteger(days) || days < 1 || days > 30) throw bad('투표 기간은 1~30일입니다.');
+    return { options, multi: x.multi === true, endsAt: now() + days * 86400000 };
+  }
+  // 결과는 투표한 사람·마감 뒤·글쓴이·관리자에게만
+  async function pollOut(p, poll, u) {
+    const [tally, mine] = await store.getMany([[`P#${p.id}`, 'POLL'], [`P#${p.id}`, `V#${u.uid}`]]);
+    const closed = now() >= poll.endsAt;
+    const show = !!mine || closed || p.uid === u.uid || isAdmin(u);
+    return { options: poll.options, multi: !!poll.multi, endsAt: poll.endsAt, closed, voters: tally?.voters || 0,
+      counts: show ? poll.options.map((_, i) => tally?.[`v${i}`] || 0) : null, mine: mine ? mine.choices : null };
   }
 
   async function deleteFiles(list, u) {
@@ -478,7 +499,9 @@ export function createApp({ store, files, idp, sms, env = {} }) {
         store.query({ index: 'gsi1', pk: `B#${p.board}`, skGt: sk, limit: 5 }).then(pick),
       ]);
     }
-    return { ...meta, ...clean(body), id, liked: !!like, bookmarked: !!mark, prev, next };
+    const b = clean(body) || {};
+    const poll = b.poll ? await pollOut(p, b.poll, u) : undefined;
+    return { ...meta, ...b, poll, id, liked: !!like, bookmarked: !!mark, prev, next };
   });
 
   on('POST', 'posts', async (ctx) => {
@@ -489,18 +512,19 @@ export function createApp({ store, files, idp, sms, env = {} }) {
     if (b.board === 'qna' && !env.qnaOpen && !isAdmin(u)) throw E.forbidden('문제풀이 게시판은 아직 열리지 않았습니다.');
     if (b.pinned && !isAdmin(u)) throw E.forbidden('공지 고정은 관리자만 할 수 있습니다.');
     checkContent(b, b.board);
+    const poll = checkPoll(b.poll, b.board);
     const images = await attachments(b.images || [], LIMIT.images, u, true);
     const fls = await attachments(b.files || [], LIMIT.files, u, false);
     const t = now(), id = newId(t);
     const meta = {
       id, board: b.board, category: b.category, title: b.title.trim(), uid: u.uid, nickname: u.nickname, grade: u.grade, createdAt: t,
       likeCount: 0, commentCount: 0, viewCount: 0, pinned: !!b.pinned, approved: b.board !== 'data' || isAdmin(u), hidden: false,
-      status: b.board === 'qna' ? 'open' : '', acceptedCommentId: '', imageCount: images.length, fileCount: fls.length, excerpt: excerpt(b.body),
+      status: b.board === 'qna' ? 'open' : '', acceptedCommentId: '', imageCount: images.length, fileCount: fls.length, excerpt: excerpt(b.body), hasPoll: !!poll,
     };
     const ix = indexPatch(meta);
     await store.transact([
       { put: { pk: `P#${id}`, sk: 'META', ...meta, ...ix.set }, ifNotExists: true },
-      { put: { pk: `P#${id}`, sk: 'BODY', body: b.body || '', thumb: b.thumb || '', images, files: fls, source: b.source || '' } },
+      { put: { pk: `P#${id}`, sk: 'BODY', body: b.body || '', thumb: b.thumb || '', images, files: fls, source: b.source || '', ...(poll ? { poll } : {}) } },
     ]);
     return { id };
   });
@@ -521,7 +545,7 @@ export function createApp({ store, files, idp, sms, env = {} }) {
     const ix = indexPatch(next);
     await store.transact([
       { update: { pk: `P#${id}`, sk: 'META', patch: { set: { title: next.title, category: next.category, approved: next.approved, imageCount: images.length, fileCount: fls.length, excerpt: excerpt(b.body), updatedAt: now(), ...ix.set }, remove: ix.remove } }, ifExists: true },
-      { put: { pk: `P#${id}`, sk: 'BODY', body: b.body || '', thumb: b.thumb || '', images, files: fls, source: b.source || '' } },
+      { put: { pk: `P#${id}`, sk: 'BODY', body: b.body || '', thumb: b.thumb || '', images, files: fls, source: b.source || '', ...(old.poll ? { poll: old.poll } : {}) } },
     ]);
     await deleteFiles(removed, u);
     return { ok: true };
@@ -581,6 +605,31 @@ export function createApp({ store, files, idp, sms, env = {} }) {
     } catch (e) { if (!(e instanceof Conflict)) throw e; } // 이미 누름/이미 취소
     const p = await getMeta(id);
     return { liked: want, likeCount: p?.likeCount || 0 };
+  });
+
+  // 투표 참여(한 사람 한 번, 바꿀 수 없음)
+  on('POST', 'posts/:id/vote', async (ctx, { id }) => {
+    const u = await active(ctx);
+    const { p } = await seePost(ctx, id);
+    const poll = (clean(await store.get(`P#${id}`, 'BODY')) || {}).poll;
+    if (!poll) throw E.notFound('투표가 없는 글입니다.');
+    if (now() >= poll.endsAt) throw bad('투표가 끝났습니다.');
+    const raw = Array.isArray(ctx.body.choices) ? ctx.body.choices : [];
+    const choices = [...new Set(raw)].filter((i) => Number.isInteger(i) && i >= 0 && i < poll.options.length).sort((a, b) => a - b);
+    if (!choices.length || choices.length !== raw.length) throw bad('보기를 골라 주세요.');
+    if (!poll.multi && choices.length > 1) throw bad('하나만 고를 수 있습니다.');
+    const add = { voters: 1 };
+    choices.forEach((i) => { add[`v${i}`] = 1; });
+    try {
+      await store.transact([
+        { put: { pk: `P#${id}`, sk: `V#${u.uid}`, choices, at: now() }, ifNotExists: true },
+        { update: { pk: `P#${id}`, sk: 'POLL', patch: { add } }, ifExists: false },
+      ]);
+    } catch (e) {
+      if (e instanceof Conflict) throw new ApiError(409, 'voted', '이미 투표했습니다.');
+      throw e;
+    }
+    return pollOut(p, poll, u);
   });
 
   // 스크랩(나만 보는 저장)

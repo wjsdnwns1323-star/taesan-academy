@@ -45,6 +45,7 @@ export async function renderPost(ctx) {
     </header>
     <div class="article-body">${linkify(post.body)}</div>
     ${post.images?.length ? `<div class="article-images">${post.images.map((im) => `<img data-file="${esc(im.id)}" alt="첨부 사진" loading="lazy">`).join('')}</div>` : ''}
+    ${post.poll ? '<section class="poll" id="poll" aria-label="투표"></section>' : ''}
     ${post.source ? `<p class="source"><b>출처</b>${esc(post.source)}</p>` : ''}
     ${files.length ? `<div class="attach-list"><div class="h">첨부 파일 ${files.length}</div>${files.map((f, i) => `<div class="attach-item">${icon('file')}<span class="nm">${esc(f.name)}</span><small>${size(f.size)}</small>
       <button type="button" class="text-btn" data-dl="${i}">${icon('download', 'sm')}내려받기</button></div>`).join('')}</div>` : ''}
@@ -72,6 +73,7 @@ export async function renderPost(ctx) {
     </section>
   </article>`;
   loadImages(view);
+  if (post.poll) drawPoll($('#poll'), post, post.poll);
   $$('.article-images img', view).forEach((img) => img.addEventListener('click', () => img.src && viewer(img.src)));
 
   // 댓글 목록(답글은 원댓글 아래)
@@ -225,6 +227,36 @@ function composer(id, placeholder, small = false) {
     <div class="composer-bar"><label>${icon('image', 'sm')}사진<input type="file" accept="image/*" hidden data-img></label><span class="sp"></span><span class="count num" data-count>0/3,000</span><button class="btn sm" data-send>등록</button></div>
   </form>`;
 }
+// 투표: 아직 안 했고 진행 중이면 고르기, 했거나 끝났으면 결과(글쓴이·관리자는 고르는 칸 옆에 인원도)
+function drawPoll(box, post, poll) {
+  const end = new Date(poll.endsAt);
+  const two = (n) => String(n).padStart(2, '0');
+  const when = poll.closed ? '마감됨' : `${end.getMonth() + 1}월 ${end.getDate()}일 ${two(end.getHours())}:${two(end.getMinutes())} 마감`;
+  const voting = !poll.mine && !poll.closed;
+  const n = (i) => poll.counts?.[i] ?? 0;
+  const pct = (i) => (poll.voters ? Math.round((n(i) / poll.voters) * 100) : 0);
+  const head = `<div class="poll-h"><b>${icon('poll', 'sm')}투표</b><span>${poll.multi ? '여러 개 선택 · ' : ''}<span class="num">${poll.voters}</span>명 참여 · ${when}</span></div>`;
+  if (voting) {
+    box.innerHTML = `${head}<form class="poll-list" novalidate>${poll.options.map((o, i) => `<label class="check poll-choice"><input type="${poll.multi ? 'checkbox' : 'radio'}" name="pv" value="${i}"><span>${esc(o)}</span>${poll.counts ? `<small class="num">${n(i)}명</small>` : ''}</label>`).join('')}
+      <div class="poll-f"><button class="btn sm" disabled>투표하기</button><small>투표한 뒤에는 바꿀 수 없습니다. 결과는 투표하면 보입니다.</small></div></form>`;
+    const f = $('form', box), btn = $('button', f);
+    f.addEventListener('change', () => { btn.disabled = !$$('input:checked', f).length; });
+    f.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const choices = $$('input:checked', f).map((x) => +x.value);
+      if (!choices.length) return;
+      btn.disabled = true;
+      try { drawPoll(box, post, await be.votePoll(post.id, choices)); toast('투표했습니다'); } catch (err) { toast(be.errorText(err)); btn.disabled = false; }
+    });
+    return;
+  }
+  box.innerHTML = `${head}<ol class="poll-list">${poll.options.map((o, i) => {
+    const mine = poll.mine?.includes(i);
+    return `<li class="${mine ? 'mine' : ''}"><div class="poll-row"><span class="o">${mine ? icon('check', 'sm') : ''}${esc(o)}</span>${poll.counts ? `<span class="n num">${n(i)}명 · ${pct(i)}%</span>` : ''}</div>
+      ${poll.counts ? `<div class="bar" role="img" aria-label="${pct(i)}%"><i style="width:${pct(i)}%"></i></div>` : ''}</li>`;
+  }).join('')}</ol>${poll.mine ? '<p class="poll-note">내가 고른 보기에 표시했습니다.</p>' : ''}`;
+}
+
 function wireComposer(form, onSend) {
   let img = '';
   const ta = $('textarea', form);

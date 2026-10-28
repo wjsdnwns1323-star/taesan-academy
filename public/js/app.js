@@ -298,7 +298,7 @@ async function renderBoard(ctx, board) {
   const read = readSet();
   const tr = (p, pin) => `<tr class="${pin ? 'pin' : ''}${read.has(p.id) ? ' read' : ''}">
     <td class="c-cat">${pin ? '<span class="tag notice">공지</span>' : tagHtml(p)}</td>
-    <td class="c-title"><a href="#/post/${esc(p.id)}"><span class="t">${word && field !== 'author' ? highlight(p.title, word) : esc(p.title)}</span>${p.imageCount ?? p.images?.length ? icon('image') : ''}${p.fileCount ?? p.files?.length ? icon('clip') : ''}${p.commentCount ? `<span class="cmt">${p.commentCount}</span>` : ''}${newBadge(p)}${p.board === 'data' && !p.approved ? '<span class="tag warn">승인 대기</span>' : ''}</a></td>
+    <td class="c-title"><a href="#/post/${esc(p.id)}"><span class="t">${word && field !== 'author' ? highlight(p.title, word) : esc(p.title)}</span>${p.hasPoll ? icon('poll') : ''}${p.imageCount ?? p.images?.length ? icon('image') : ''}${p.fileCount ?? p.files?.length ? icon('clip') : ''}${p.commentCount ? `<span class="cmt">${p.commentCount}</span>` : ''}${newBadge(p)}${p.board === 'data' && !p.approved ? '<span class="tag warn">승인 대기</span>' : ''}</a></td>
     <td class="c-author" data-uid="${admin ? esc(p.uid) : ''}">${esc(p.nickname)}<small>${esc(p.grade)}</small></td>
     <td class="r">${shortDate(p.createdAt)}</td><td class="r">${(p.viewCount || 0).toLocaleString()}</td><td class="r">${(p.likeCount || 0).toLocaleString()}</td>
     ${admin ? `<td class="c-adm" data-pid="${esc(p.id)}"><button type="button" data-hide>숨김</button><button type="button" data-del>삭제</button></td>` : ''}

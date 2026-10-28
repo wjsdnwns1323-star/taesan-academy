@@ -47,6 +47,16 @@ export async function renderWrite(ctx, editing) {
           <div class="attach" id="fls"></div>
           <label class="add-file">${icon('clip', 'sm')}파일 추가<input type="file" multiple hidden id="file-in"></label></div>
       </div>
+      ${!editing && be.has('poll') ? `<div class="form-section" id="poll-sec">
+        <div class="field"><span>투표 <small>보기 2~6개 · 올린 뒤에는 바꿀 수 없습니다</small></span>
+          <div class="poll-edit hidden" id="poll-box">
+            <div class="poll-opts" id="poll-opts"></div>
+            <button type="button" class="add-file" id="poll-add">${icon('plus', 'sm')}보기 추가</button>
+            <div class="poll-set"><label class="check"><input type="checkbox" id="poll-multi">여러 개 고를 수 있게</label>
+              <label class="poll-days">마감<select class="select sm" id="poll-days">${[1, 3, 7, 14, 30].map((d) => `<option value="${d}" ${d === 7 ? 'selected' : ''}>${d}일 뒤</option>`).join('')}</select></label></div>
+          </div>
+          <button type="button" class="add-file" id="poll-toggle" aria-expanded="false">${icon('poll', 'sm')}투표 넣기</button></div>
+      </div>` : ''}
       <p class="err" id="err"></p>
       <div class="form-actions"><span class="draft num" id="draft" aria-live="polite"></span><button type="button" class="btn line lg" data-back>취소</button><button class="btn lg" id="submit">${editing ? '수정 완료' : '등록'}</button></div>
     </form></div>`;
@@ -58,6 +68,7 @@ export async function renderWrite(ctx, editing) {
     $('#cat-label').textContent = board === 'qna' ? '과목' : '말머리';
     $('#cats').innerHTML = b.categories.map((c) => `<button type="button" role="radio" aria-checked="${c.id === cat}" class="${c.id === cat ? 'on' : ''}" data-cat="${esc(c.id)}">${esc(c.name)}</button>`).join('');
     $('#source-box').classList.toggle('hidden', board !== 'data');
+    $('#poll-sec')?.classList.toggle('hidden', board === 'data');
     const dr = $('#data-rules');
     dr.classList.toggle('hidden', board !== 'data');
     dr.innerHTML = board === 'data'
@@ -98,6 +109,26 @@ export async function renderWrite(ctx, editing) {
     }
     drawAttach();
   };
+  // 투표 보기 편집
+  const pollOn = () => !!$('#poll-box') && !$('#poll-box').classList.contains('hidden') && board !== 'data';
+  const drawOpts = (vals) => {
+    $('#poll-opts').innerHTML = vals.map((v, i) => `<div class="poll-opt"><input class="input" maxlength="40" value="${esc(v)}" placeholder="보기 ${i + 1}" aria-label="보기 ${i + 1}">
+      <button type="button" class="text-btn" data-rm="${i}" aria-label="보기 ${i + 1} 지우기" ${vals.length <= 2 ? 'disabled' : ''}>${icon('x', 'sm')}</button></div>`).join('');
+    $('#poll-add').classList.toggle('hidden', vals.length >= 6);
+  };
+  const optVals = () => $$('#poll-opts input').map((x) => x.value);
+  if ($('#poll-sec')) {
+    drawOpts(['', '']);
+    $('#poll-toggle').addEventListener('click', (e) => {
+      const open = $('#poll-box').classList.toggle('hidden') === false;
+      e.currentTarget.innerHTML = `${icon('poll', 'sm')}${open ? '투표 빼기' : '투표 넣기'}`;
+      e.currentTarget.setAttribute('aria-expanded', open);
+      if (open) $('#poll-opts input')?.focus();
+    });
+    $('#poll-add').addEventListener('click', () => { const v = optVals(); if (v.length < 6) { drawOpts([...v, '']); $$('#poll-opts input').at(-1).focus(); } });
+    $('#poll-opts').addEventListener('click', (e) => { const b = e.target.closest('[data-rm]'); if (!b) return; const v = optVals(); v.splice(+b.dataset.rm, 1); drawOpts(v); });
+  }
+
   $('#img-in').addEventListener('change', (e) => { addImages([...e.target.files]); e.target.value = ''; });
   $('#file-in').addEventListener('change', (e) => { addFiles([...e.target.files]); e.target.value = ''; });
   // 내용 칸에 사진 붙여넣기, 글쓰기 칸에 끌어 놓기(사진은 사진으로, 나머지는 첨부 파일로)
@@ -158,6 +189,13 @@ export async function renderWrite(ctx, editing) {
       if (!source) return fail('자료실 글은 출처를 적어야 합니다.', form.source);
       if (DATA_AGREES.some((_, i) => !form[`agree${i}`].checked)) return fail('자료실 규칙 확인 항목에 모두 동의해 주세요.');
     }
+    let poll = null;
+    if (pollOn()) {
+      const opts = optVals().map((v) => v.trim()).filter(Boolean);
+      if (opts.length < 2) return fail('투표 보기를 2개 이상 적어 주세요.', $$('#poll-opts input').find((x) => !x.value.trim()));
+      if (new Set(opts).size !== opts.length) return fail('같은 보기가 두 번 들어 있습니다.');
+      poll = { options: opts, multi: $('#poll-multi').checked, days: +$('#poll-days').value };
+    }
     const btn = $('#submit');
     btn.disabled = true;
     const step = (t) => { btn.textContent = t; };
@@ -188,7 +226,7 @@ export async function renderWrite(ctx, editing) {
       if (!editing && form.pinned?.checked) data.pinned = true;
       let id = post?.id;
       if (editing) await be.updatePost(id, { ...data, approved: board !== 'data' || (be.isAdmin() && !!post.approved) });
-      else id = await be.createPost({ ...data, board });
+      else id = await be.createPost({ ...data, board, ...(poll ? { poll } : {}) });
       try { if (!editing) localStorage.removeItem(DRAFT); } catch { /* 무시 */ }
       toast(board === 'data' && !be.isAdmin() ? '자료를 올렸습니다. 관리자 확인 후 공개됩니다.' : editing ? '수정했습니다' : '글을 등록했습니다');
       location.replace(`#/post/${id}`);

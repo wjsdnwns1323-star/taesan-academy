@@ -337,6 +337,7 @@ export async function toggleCommentLike(postId, cid, on) {
 export async function acceptComment(post, comment) { await api('POST', `/posts/${encodeURIComponent(post.id)}/accept`, { body: { commentId: comment.id } }); }
 
 /* ---------------- 스크랩·내 댓글·차단 ---------------- */
+export async function votePoll(postId, choices) { return api('POST', `/posts/${encodeURIComponent(postId)}/vote`, { body: { choices } }); }
 export async function toggleBookmark(postId, on) { await api('POST', `/posts/${encodeURIComponent(postId)}/bookmark`, { body: { on } }); }
 export const listBookmarks = () => get('/me/bookmarks');
 export const listMyComments = () => get('/me/comments');

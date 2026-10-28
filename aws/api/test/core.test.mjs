@@ -502,3 +502,45 @@ test('회원 차단', async () => {
   await t.ok('DELETE', '/me', { password: 'tsPass_01' }, a.token);
   assert.deepEqual(await t.store.query({ pk: `U#${a.me.uid}`, limit: 100 }), []);
 });
+
+test('투표: 한 번만, 결과 공개 시점, 마감, 수정해도 유지', async () => {
+  let clock = Date.now();
+  const t = await setup({ now: () => clock });
+  const a = await t.join('poll_a'), b = await t.join('poll_b'), c = await t.join('poll_c');
+  const poll = { options: ['수학', '영어', '국어'], multi: false, days: 3 };
+  await t.fail(400, 'POST', '/posts', post({ poll: { ...poll, options: ['하나'] } }), a.token);
+  await t.fail(400, 'POST', '/posts', post({ poll: { ...poll, options: ['같음', '같음'] } }), a.token);
+  await t.fail(400, 'POST', '/posts', post({ poll: { ...poll, days: 0 } }), a.token);
+  await t.fail(400, 'POST', '/posts', post({ poll: { ...poll, options: [{ x: 1 }, '둘'] } }), a.token);
+  await t.fail(400, 'POST', '/posts', post({ board: 'data', category: 'note', source: '직접 작성', poll }), a.token);
+  const { id } = await t.ok('POST', '/posts', post({ poll }), a.token);
+  const list = await t.ok('GET', '/posts', null, null, { board: 'talk' });
+  assert.equal(list.find((x) => x.id === id).hasPoll, true);
+  // 투표 전에는 결과가 안 보이고, 글쓴이는 보임
+  assert.equal((await t.ok('GET', `/posts/${id}`, null, b.token)).poll.counts, null);
+  assert.deepEqual((await t.ok('GET', `/posts/${id}`, null, a.token)).poll.counts, [0, 0, 0]);
+  await t.fail(400, 'POST', `/posts/${id}/vote`, { choices: [0, 1] }, b.token);
+  await t.fail(400, 'POST', `/posts/${id}/vote`, { choices: [3] }, b.token);
+  await t.fail(400, 'POST', `/posts/${id}/vote`, { choices: ['0'] }, b.token);
+  await t.fail(400, 'POST', `/posts/${id}/vote`, { choices: [] }, b.token);
+  await t.fail(401, 'POST', `/posts/${id}/vote`, { choices: [1] });
+  const r = await t.ok('POST', `/posts/${id}/vote`, { choices: [1] }, b.token);
+  assert.deepEqual(r.counts, [0, 1, 0]); assert.deepEqual(r.mine, [1]); assert.equal(r.voters, 1);
+  await t.fail(409, 'POST', `/posts/${id}/vote`, { choices: [0] }, b.token);
+  // 글을 고쳐도 투표는 그대로
+  await t.ok('PATCH', `/posts/${id}`, post({ title: '고친 제목', poll: { options: ['바꿈', '시도'], days: 30 } }), a.token);
+  const after = (await t.ok('GET', `/posts/${id}`, null, b.token)).poll;
+  assert.deepEqual(after.options, ['수학', '영어', '국어']); assert.deepEqual(after.counts, [0, 1, 0]);
+  // 마감 뒤에는 투표 불가, 결과 공개
+  clock += 3 * 86400000 + 1;
+  await t.fail(400, 'POST', `/posts/${id}/vote`, { choices: [0] }, c.token);
+  const closed = (await t.ok('GET', `/posts/${id}`, null, c.token)).poll;
+  assert.equal(closed.closed, true); assert.deepEqual(closed.counts, [0, 1, 0]);
+  // 복수 선택
+  const m = await t.ok('POST', '/posts', post({ poll: { options: ['가', '나', '다'], multi: true, days: 1 } }), a.token);
+  await t.fail(400, 'POST', `/posts/${m.id}/vote`, { choices: [2, 0, 0] }, c.token);
+  assert.deepEqual((await t.ok('POST', `/posts/${m.id}/vote`, { choices: [2, 0] }, c.token)).counts, [1, 0, 1]);
+  // 글을 지우면 투표 기록도 함께 지워짐
+  await t.ok('DELETE', `/posts/${m.id}`, null, a.token);
+  assert.equal((await t.store.query({ pk: `P#${m.id}`, limit: 10 })).length, 0);
+});

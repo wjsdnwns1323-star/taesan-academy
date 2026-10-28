@@ -12,7 +12,7 @@ const USERS = [
   { username: 'jihu_0820', realName: '정지후', gender: '여', age: 15, memberType: '학생', grade: '중3' },
 ];
 
-// [게시판, 말머리, 제목, 본문, 글쓴이, 몇 시간 전, 조회, {고정·좋아요한 사람}]
+// [게시판, 말머리, 제목, 본문, 글쓴이, 몇 시간 전, 조회, {고정·좋아요한 사람·투표}]
 const POSTS = [
   ['notice', 'notice', '태산입시 이용 안내', '태산입시는 대전 학생과 학부모가 입시 정보를 나누는 회원제 커뮤니티입니다.\n\n글을 쓰기 전에 이용규칙을 한 번 읽어 주세요. 다른 사람의 실명·학교·연락처는 올리지 않습니다.', 'admin', 30 * 24, 412],
   ['talk', 'daily', '수다 게시판에서 지켜 주세요', '서로 존댓말로 이야기해 주세요. 특정 학원·학교를 깎아내리는 글은 관리자가 숨길 수 있어요.', 'admin', 20 * 24, 188, { pinned: true }],
@@ -20,6 +20,8 @@ const POSTS = [
   ['news', 'office', '2028 대입 개편, 내신 5등급제 정리', '고1부터 내신이 5등급으로 바뀝니다. 학교 설명회에서 들은 내용을 정리해 봤어요.\n\n1등급 비율이 10%로 늘어나는 대신 변별력이 줄어서 수능 비중이 커질 거라는 이야기가 많았습니다.', 'yuseong_papa', 26, 340, { likes: ['mom_dunsan', 'noeun_mom', 'daeseong17', 'admin'] }],
   ['news', 'local', '둔산동 학원가 셔틀 노선 바뀐 곳 있나요', '이번 달부터 몇몇 학원 셔틀이 시간표를 바꿨다고 들었어요. 아시는 분 댓글 부탁드려요.', 'noeun_mom', 50, 97],
   ['talk', 'parent', '중3 겨울방학, 다들 어떻게 보내실 계획이세요?', '고입 끝나고 겨울방학이 꽤 길더라고요. 선행을 얼마나 할지, 쉬게 할지 고민입니다. 다른 집은 어떻게 하시는지 궁금해요.', 'mom_dunsan', 3, 156, { likes: ['noeun_mom', 'yuseong_papa'] }],
+  ['talk', 'parent', '겨울방학 특강, 어떤 과목 들을 예정이세요?', '학원마다 겨울 특강 안내가 오기 시작했네요. 다른 집은 어떤 과목을 신청하시는지 궁금해서 투표 올려 봐요.', 'mom_dunsan', 9, 64,
+    { likes: ['noeun_mom'], poll: { options: ['수학', '영어', '국어', '과학', '안 들어요'], multi: true, days: 7 }, votes: { noeun_mom: [0, 1], yuseong_papa: [0], daeseong17: [0, 3], jihu_0820: [1] } }],
   ['talk', 'worry', '아이가 수학을 너무 싫어해요', '중학교 때까지는 그럭저럭 했는데 고1 올라와서 수학 점수가 많이 떨어졌어요. 학원을 바꿔야 할지, 과외를 붙여야 할지 모르겠습니다.', 'yuseong_papa', 9, 203, { likes: ['mom_dunsan'] }],
   ['talk', 'daily', '기말 끝나고 다들 뭐 하세요', '시험 끝나서 친구들이랑 은행동 갔다 왔어요 ㅎㅎ 다들 고생 많으셨어요', 'daeseong17', 14, 88, { likes: ['jihu_0820'] }],
   ['talk', 'humor', '엄마가 제 시험지를 보고 한 말', '"이건 실수지?" 라고 물어보셨는데 실수가 아니었습니다…', 'jihu_0820', 31, 142, { likes: ['daeseong17', 'mom_dunsan', 'noeun_mom'] }],
@@ -74,10 +76,11 @@ export async function seedDemo({ app, store, setClock }) {
   const sorted = [...POSTS].sort((a, b) => b[5] - a[5]);
   for (const [board, category, title, body, author, hoursAgo, views, o = {}] of sorted) {
     setClock(start - hoursAgo * H);
-    const { id } = await call('POST', '/posts', { board, category, title, body, source: o.source || '', pinned: !!o.pinned, images: [], files: [] }, await as(author));
+    const { id } = await call('POST', '/posts', { board, category, title, body, source: o.source || '', pinned: !!o.pinned, images: [], files: [], ...(o.poll ? { poll: o.poll } : {}) }, await as(author));
     ids[title] = id;
     if (board === 'data' && !o.pending) await call('POST', `/posts/${id}/approve`, { ok: true }, await as('admin'));
     for (const who of o.likes || []) await call('POST', `/posts/${id}/like`, { on: true }, await as(who));
+    for (const [who, choices] of Object.entries(o.votes || {})) await call('POST', `/posts/${id}/vote`, { choices }, await as(who));
     await store.update(`P#${id}`, 'META', { set: { viewCount: views } });
   }
   const made = {};

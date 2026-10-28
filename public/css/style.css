@@ -367,6 +367,26 @@ mark { background: #fff1b8; color: inherit; border-radius: 2px; padding: 0 1px; 
 .attach-item > .icon { color: var(--faint); }
 .attach-item .nm { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .attach-item small { color: var(--faint); font-variant-numeric: tabular-nums; }
+/* 투표: 상자 없이 위아래 줄만 */
+.poll { margin: 0 0 28px; padding: 18px 0 20px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.poll-h { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 4px 12px; margin-bottom: 14px; }
+.poll-h b { font-size: 15px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; }
+.poll-h b .icon { color: var(--brand); }
+.poll-h > span { font-size: 13px; color: var(--faint); }
+.poll-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+.poll-choice { align-items: center; font-size: 15px; }
+.poll-choice span { flex: 1; min-width: 0; }
+.poll-choice small { font-size: 13px; color: var(--faint); }
+.poll-f { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; margin-top: 4px; }
+.poll-f small { font-size: 13px; color: var(--faint); }
+.poll-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: 15px; }
+.poll-row .o { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+.poll-row .n { flex: none; font-size: 13px; color: var(--muted); }
+.poll .bar { height: 6px; margin-top: 6px; border-radius: 3px; background: var(--rule); overflow: hidden; }
+.poll .bar i { display: block; height: 100%; border-radius: 3px; background: #a3acb9; }
+.poll li.mine .o { color: var(--brand); font-weight: 600; }
+.poll li.mine .bar i { background: var(--brand); }
+.poll-note { margin-top: 12px; font-size: 13px; color: var(--faint); }
 .source { font-size: 14px; color: var(--muted); margin-bottom: 24px; }
 .source b { font-weight: 600; margin-right: 6px; color: var(--text); }
 .article-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; padding: 10px 0; border-top: 1px solid var(--border); }
@@ -446,6 +466,14 @@ mark { background: #fff1b8; color: inherit; border-radius: 2px; padding: 0 1px; 
 .add-file { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 10px; margin-left: -10px; border-radius: var(--r); font-size: 14px; font-weight: 600; color: var(--brand); cursor: pointer; width: max-content; }
 .add-file:hover { background: var(--brand-50); }
 .add-file:focus-within { outline: 2px solid var(--brand); outline-offset: 2px; }
+.poll-edit { display: flex; flex-direction: column; gap: 8px; }
+.poll-opts { display: flex; flex-direction: column; gap: 8px; }
+.poll-opt { display: flex; align-items: center; gap: 4px; }
+.poll-opt .input { flex: 1; min-width: 0; }
+.poll-opt .text-btn:disabled { opacity: 0.35; cursor: default; background: none; }
+.poll-edit .add-file { align-self: flex-start; }
+.poll-set { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; margin-top: 4px; }
+.poll-days { display: inline-flex; align-items: center; gap: 8px; flex: none; white-space: nowrap; font-size: 14px; color: var(--muted); }
 .drop-on { outline: 2px dashed var(--brand); outline-offset: 6px; border-radius: var(--r); }
 
 /* 로그인·가입·찾기 */
