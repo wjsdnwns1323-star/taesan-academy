@@ -156,8 +156,7 @@ export async function renderPost(ctx) {
     const f = e.target.files[0];
     if (!f) return;
     try {
-      cimg = await be.blobToDataUrl(await be.shrinkImage(f, 900, 0.75));
-      if (cimg.length > 390000) cimg = await be.blobToDataUrl(await be.shrinkImage(f, 640, 0.6));
+      cimg = await be.imageDataUrl(f, 290000, [[900, 0.75], [800, 0.68], [640, 0.6], [480, 0.6]]);
       $('#cprev').innerHTML = `<img src="${safeImg(cimg)}" alt=""><span>사진 1장</span><button type="button" class="text-btn" id="cx">빼기</button>`;
       $('#cprev').classList.remove('hidden');
       $('#cx').onclick = () => { cimg = ''; $('#cprev').classList.add('hidden'); };

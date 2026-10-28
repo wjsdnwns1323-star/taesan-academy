@@ -2,6 +2,7 @@
 import { DATA_RULES } from './boards.js';
 import { ACADEMY_NAME, SITE_NAME, SITE_DESC, LIMITS } from './config.js';
 import { esc, icon, pageHead } from './ui.js';
+import { SERVER } from './backend.js';
 
 const DOCS = {
   rules: ['커뮤니티 이용규칙', `
@@ -45,7 +46,7 @@ const DOCS = {
     <h3>3. 보관 기간과 파기</h3>
     <ul><li>회원 탈퇴 시 실명·전화번호·나이·회원 정보를 바로 지웁니다. 작성한 글·댓글은 남으며 탈퇴 전에 직접 지울 수 있습니다.</li></ul>
     <h3>4. 처리 위탁</h3>
-    <ul><li>Google LLC(Firebase): 회원 인증과 데이터 저장</li></ul>
+    <ul>${SERVER === 'aws' ? '<li>Amazon Web Services, Inc.: 회원 인증, 휴대폰 인증 문자 발송, 데이터·파일 저장(서울 리전)</li>' : '<li>Google LLC(Firebase): 회원 인증과 데이터 저장</li>'}</ul>
     <h3>5. 회원의 권리</h3>
     <ul><li>내 정보 화면에서 내 정보를 확인하고 탈퇴할 수 있습니다.</li><li>정보를 바꾸거나 그 밖의 요청이 있으면 학원으로 연락해 주세요.</li></ul>
     <h3>6. 개인정보 보호책임자</h3>

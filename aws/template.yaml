@@ -1,0 +1,353 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >-
+  태산입시 커뮤니티 - 로그인(Cognito, 휴대폰 인증문자), 데이터(DynamoDB), 서버(Lambda + HTTP API),
+  첨부 파일(S3), 사이트(S3 + CloudFront). 배포는 aws/deploy.sh 로 합니다.
+
+Parameters:
+  DomainName:
+    Type: String
+    Default: ''
+    Description: 사이트 주소(예 taesan.uinone.net). 비워 두면 CloudFront 기본 주소만 씁니다.
+  CertificateArn:
+    Type: String
+    Default: ''
+    Description: DomainName 용 ACM 인증서 ARN(반드시 us-east-1 리전에서 발급).
+  SmsDailyMax:
+    Type: Number
+    Default: 300
+    Description: 하루에 보낼 수 있는 가입 인증문자 최대 개수(요금 보호).
+  QnaOpen:
+    Type: String
+    Default: 'false'
+    AllowedValues: ['true', 'false']
+    Description: 문제풀이 게시판 열기.
+
+Conditions:
+  HasDomain: !And
+    - !Not [!Equals [!Ref DomainName, '']]
+    - !Not [!Equals [!Ref CertificateArn, '']]
+
+Resources:
+  # ---------------- 데이터 ----------------
+  Table:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      DeletionProtectionEnabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+      AttributeDefinitions:
+        - { AttributeName: pk, AttributeType: S }
+        - { AttributeName: sk, AttributeType: S }
+        - { AttributeName: gsi1pk, AttributeType: S }
+        - { AttributeName: gsi1sk, AttributeType: S }
+        - { AttributeName: gsi2pk, AttributeType: S }
+        - { AttributeName: gsi2sk, AttributeType: S }
+        - { AttributeName: gsi3pk, AttributeType: S }
+        - { AttributeName: gsi3sk, AttributeType: S }
+        - { AttributeName: gsi4pk, AttributeType: S }
+        - { AttributeName: gsi4sk, AttributeType: S }
+      KeySchema:
+        - { AttributeName: pk, KeyType: HASH }
+        - { AttributeName: sk, KeyType: RANGE }
+      GlobalSecondaryIndexes:
+        # 게시판별 글(B#게시판) · 승인 대기(PENDING) · 숨김(HIDDEN) · 열린 신고(REPORT#open)
+        - IndexName: gsi1
+          KeySchema: [{ AttributeName: gsi1pk, KeyType: HASH }, { AttributeName: gsi1sk, KeyType: RANGE }]
+          Projection: { ProjectionType: ALL }
+        # 전체 공개 글(ALL) · 회원 목록(USERS)
+        - IndexName: gsi2
+          KeySchema: [{ AttributeName: gsi2pk, KeyType: HASH }, { AttributeName: gsi2sk, KeyType: RANGE }]
+          Projection: { ProjectionType: ALL }
+        # 회원별 글(U#회원)
+        - IndexName: gsi3
+          KeySchema: [{ AttributeName: gsi3pk, KeyType: HASH }, { AttributeName: gsi3sk, KeyType: RANGE }]
+          Projection: { ProjectionType: ALL }
+        # 게시판+말머리별 공개 글(C#게시판#말머리)
+        - IndexName: gsi4
+          KeySchema: [{ AttributeName: gsi4pk, KeyType: HASH }, { AttributeName: gsi4sk, KeyType: RANGE }]
+          Projection: { ProjectionType: ALL }
+
+  # ---------------- 첨부 파일 ----------------
+  FilesBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      OwnershipControls:
+        Rules: [{ ObjectOwnership: BucketOwnerEnforced }]
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault: { SSEAlgorithm: AES256 }
+      CorsConfiguration:
+        CorsRules:
+          - AllowedMethods: [GET, POST]
+            AllowedOrigins: ['*']
+            AllowedHeaders: ['*']
+            MaxAge: 3600
+      LifecycleConfiguration:
+        Rules:
+          - Id: abort-incomplete
+            Status: Enabled
+            AbortIncompleteMultipartUpload: { DaysAfterInitiation: 1 }
+
+  # ---------------- 로그인(휴대폰 인증) ----------------
+  SmsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: cognito-idp.amazonaws.com }
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                sts:ExternalId: !Sub '${AWS::StackName}-sms'
+                aws:SourceAccount: !Ref AWS::AccountId
+      Policies:
+        - PolicyName: sns-publish
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: sns:Publish
+                Resource: '*'
+
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      UserPoolName: !Sub '${AWS::StackName}-members'
+      UserPoolTier: LITE
+      DeletionProtection: ACTIVE
+      UsernameConfiguration:
+        CaseSensitive: false
+      Schema:
+        - Name: phone_number
+          AttributeDataType: String
+          Mutable: true
+          Required: true
+      AutoVerifiedAttributes: [phone_number]
+      SmsConfiguration:
+        SnsCallerArn: !GetAtt SmsRole.Arn
+        ExternalId: !Sub '${AWS::StackName}-sms'
+        SnsRegion: !Ref AWS::Region
+      VerificationMessageTemplate:
+        SmsMessage: '[태산입시] 인증번호는 {####} 입니다'
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: false
+      MfaConfiguration: 'OFF'
+      AccountRecoverySetting:
+        RecoveryMechanisms:
+          - { Name: verified_phone_number, Priority: 1 }
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireLowercase: false
+          RequireUppercase: false
+          RequireNumbers: false
+          RequireSymbols: false
+          TemporaryPasswordValidityDays: 7
+      UserAttributeUpdateSettings:
+        AttributesRequireVerificationBeforeUpdate: [phone_number]
+
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      UserPoolId: !Ref UserPool
+      ClientName: web
+      GenerateSecret: false
+      ExplicitAuthFlows: [ALLOW_ADMIN_USER_PASSWORD_AUTH, ALLOW_REFRESH_TOKEN_AUTH]
+      PreventUserExistenceErrors: ENABLED
+      EnableTokenRevocation: true
+      AccessTokenValidity: 60
+      IdTokenValidity: 60
+      RefreshTokenValidity: 30
+      TokenValidityUnits: { AccessToken: minutes, IdToken: minutes, RefreshToken: days }
+      ReadAttributes: [phone_number, phone_number_verified]
+      WriteAttributes: [phone_number]
+
+  # ---------------- 서버 ----------------
+  Api:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      CorsConfiguration:
+        AllowOrigins: ['*']
+        AllowHeaders: [authorization, content-type]
+        AllowMethods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+        MaxAge: 7200
+      DefaultRouteSettings:
+        ThrottlingBurstLimit: 100
+        ThrottlingRateLimit: 50
+
+  ApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: api/dist/
+      Handler: index.handler
+      Runtime: nodejs22.x
+      Architectures: [arm64]
+      MemorySize: 1024
+      Timeout: 20
+      Environment:
+        Variables:
+          TABLE: !Ref Table
+          BUCKET: !Ref FilesBucket
+          USER_POOL_ID: !Ref UserPool
+          CLIENT_ID: !Ref UserPoolClient
+          SMS_DAILY_MAX: !Ref SmsDailyMax
+          QNA_OPEN: !Ref QnaOpen
+      Policies:
+        - DynamoDBCrudPolicy: { TableName: !Ref Table }
+        - Statement:
+            - Effect: Allow
+              Action: [s3:PutObject, s3:GetObject, s3:DeleteObject]
+              Resource: !Sub '${FilesBucket.Arn}/*'
+            - Effect: Allow
+              Action:
+                - cognito-idp:AdminGetUser
+                - cognito-idp:AdminDeleteUser
+                - cognito-idp:AdminInitiateAuth
+                - cognito-idp:AdminSetUserPassword
+              Resource: !GetAtt UserPool.Arn
+      Events:
+        Api:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref Api
+            Path: /api/{proxy+}
+            Method: ANY
+
+  ApiLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${ApiFunction}'
+      RetentionInDays: 30
+
+  # ---------------- 사이트 ----------------
+  SiteBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      OwnershipControls:
+        Rules: [{ ObjectOwnership: BucketOwnerEnforced }]
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault: { SSEAlgorithm: AES256 }
+
+  SiteOac:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub '${AWS::StackName}-site'
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  # 화면 파일: 파일 주소의 ?v= 까지 구분해서 보관(새로 배포하면 새 주소)
+  SiteCachePolicy:
+    Type: AWS::CloudFront::CachePolicy
+    Properties:
+      CachePolicyConfig:
+        Name: !Sub '${AWS::StackName}-site'
+        MinTTL: 0
+        DefaultTTL: 86400
+        MaxTTL: 31536000
+        ParametersInCacheKeyAndForwardedToOrigin:
+          EnableAcceptEncodingGzip: true
+          EnableAcceptEncodingBrotli: true
+          CookiesConfig: { CookieBehavior: none }
+          HeadersConfig: { HeaderBehavior: none }
+          QueryStringsConfig: { QueryStringBehavior: all }
+
+  Distribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Comment: !Sub '${AWS::StackName} site'
+        HttpVersion: http2and3
+        IPV6Enabled: true
+        PriceClass: PriceClass_200
+        DefaultRootObject: index.html
+        Aliases: !If [HasDomain, [!Ref DomainName], !Ref AWS::NoValue]
+        ViewerCertificate: !If
+          - HasDomain
+          - { AcmCertificateArn: !Ref CertificateArn, SslSupportMethod: sni-only, MinimumProtocolVersion: TLSv1.2_2021 }
+          - { CloudFrontDefaultCertificate: true }
+        Origins:
+          - Id: site
+            DomainName: !GetAtt SiteBucket.RegionalDomainName
+            OriginAccessControlId: !GetAtt SiteOac.Id
+            S3OriginConfig: { OriginAccessIdentity: '' }
+          - Id: api
+            DomainName: !Sub '${Api}.execute-api.${AWS::Region}.amazonaws.com'
+            CustomOriginConfig:
+              OriginProtocolPolicy: https-only
+              OriginSSLProtocols: [TLSv1.2]
+        DefaultCacheBehavior:
+          TargetOriginId: site
+          ViewerProtocolPolicy: redirect-to-https
+          Compress: true
+          CachePolicyId: !Ref SiteCachePolicy
+          ResponseHeadersPolicyId: 67f7725c-6f97-4210-82d7-5512b31e9d03 # Managed-SecurityHeadersPolicy
+        CacheBehaviors:
+          - PathPattern: /api/*
+            TargetOriginId: api
+            ViewerProtocolPolicy: https-only
+            Compress: true
+            AllowedMethods: [GET, HEAD, OPTIONS, PUT, PATCH, POST, DELETE]
+            CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad # Managed-CachingDisabled
+            OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac # Managed-AllViewerExceptHostHeader
+
+  SiteBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref SiteBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: cloudfront.amazonaws.com }
+            Action: s3:GetObject
+            Resource: !Sub '${SiteBucket.Arn}/*'
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub 'arn:aws:cloudfront::${AWS::AccountId}:distribution/${Distribution}'
+
+Outputs:
+  SiteUrl:
+    Value: !Sub 'https://${Distribution.DomainName}'
+  SiteDomain:
+    Value: !GetAtt Distribution.DomainName
+  ApiUrl:
+    Value: !Sub 'https://${Api}.execute-api.${AWS::Region}.amazonaws.com'
+  DistributionId:
+    Value: !Ref Distribution
+  SiteBucketName:
+    Value: !Ref SiteBucket
+  FilesBucketName:
+    Value: !Ref FilesBucket
+  TableName:
+    Value: !Ref Table
+  UserPoolId:
+    Value: !Ref UserPool
+  UserPoolClientId:
+    Value: !Ref UserPoolClient

@@ -222,14 +222,14 @@ async function renderBoard(ctx, board) {
   const since = period ? Date.now() - +period * 86400000 : 0;
   const k = word.toLowerCase();
   const hits = rows.filter((p) => (virtual || board === 'notice' || !p.pinned) && p.createdAt >= since && (!k || (field === 'author' ? (p.nickname || '').toLowerCase().includes(k)
-    : (field === 'all' ? `${p.title} ${p.body || ''}` : p.title).toLowerCase().includes(k))));
+    : (field === 'all' ? `${p.title} ${p.excerpt ?? p.body ?? ''}` : p.title).toLowerCase().includes(k))));
   const pages = Math.max(1, Math.ceil(hits.length / per));
   const list = hits.slice((page - 1) * per, page * per);
   $('#bt-count').innerHTML = `${word ? `'${esc(word)}' 검색 결과 ` : ''}<b class="num">${hits.length.toLocaleString()}</b>건`;
 
   const tr = (p, pin) => `<tr class="${pin ? 'pin' : ''}">
     <td class="c-cat">${pin ? '<span class="tag notice">공지</span>' : tagHtml(p)}</td>
-    <td class="c-title"><a href="#/post/${esc(p.id)}"><span class="t">${esc(p.title)}</span>${p.images?.length ? icon('image') : ''}${p.files?.length ? icon('clip') : ''}${p.commentCount ? `<span class="cmt">${p.commentCount}</span>` : ''}${p.board === 'data' && !p.approved ? '<span class="tag warn">승인 대기</span>' : ''}</a></td>
+    <td class="c-title"><a href="#/post/${esc(p.id)}"><span class="t">${esc(p.title)}</span>${p.imageCount ?? p.images?.length ? icon('image') : ''}${p.fileCount ?? p.files?.length ? icon('clip') : ''}${p.commentCount ? `<span class="cmt">${p.commentCount}</span>` : ''}${p.board === 'data' && !p.approved ? '<span class="tag warn">승인 대기</span>' : ''}</a></td>
     <td class="c-author" data-uid="${admin ? esc(p.uid) : ''}">${esc(p.nickname)}<small>${esc(p.grade)}</small></td>
     <td>${shortDate(p.createdAt)}</td><td>${(p.viewCount || 0).toLocaleString()}</td><td>${(p.likeCount || 0).toLocaleString()}</td>
     ${admin ? `<td class="c-adm" data-pid="${esc(p.id)}"><button type="button" data-hide>숨김</button><button type="button" data-del>삭제</button></td>` : ''}
@@ -272,7 +272,7 @@ async function renderSearch(ctx) {
   const rows = await be.listPosts({ limit: 500 });
   if (!ctx.alive()) return;
   const k = word.toLowerCase();
-  const hits = rows.filter((p) => `${p.title} ${p.body || ''}`.toLowerCase().includes(k));
+  const hits = rows.filter((p) => `${p.title} ${p.excerpt ?? p.body ?? ''}`.toLowerCase().includes(k));
   $('#res').innerHTML = `<p class="hint" style="margin-bottom:12px">'${esc(word)}' 검색 결과 <b class="num" style="color:var(--g900)">${hits.length}</b>건</p>`
     + (hits.length ? `<div class="list">${hits.map(listItemHtml).join('')}</div>` : empty('검색 결과가 없습니다', 'search'));
 }

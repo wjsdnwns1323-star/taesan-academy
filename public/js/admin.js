@@ -21,7 +21,7 @@ export async function renderAdmin(ctx) {
 async function usersTab(ctx, box) {
   const users = (await be.listUsers()).sort((a, b) => b.createdAt - a.createdAt);
   if (!ctx.alive()) return;
-  const privs = new Map(await Promise.all(users.map(async (u) => [u.id, await be.getPrivate(u.id).catch(() => null)])));
+  const privs = new Map(await Promise.all(users.map(async (u) => [u.id, u.priv !== undefined ? u.priv : await be.getPrivate(u.id).catch(() => null)])));
   if (!ctx.alive()) return;
   box.innerHTML = `<div class="toolbar"><input class="input" id="uf" placeholder="아이디·닉네임·이름·휴대폰 검색" aria-label="회원 검색"></div>
     <p class="hint" style="margin-bottom:12px">회원 <b class="num" style="color:var(--g900)">${users.length}</b>명 · 개인정보는 학원 업무에만 사용하고 외부로 옮기지 마세요.</p>
@@ -117,9 +117,10 @@ async function coverTab(ctx, box) {
   f.file.addEventListener('change', async () => {
     const file = f.file.files[0];
     if (!file) return;
-    image = await be.blobToDataUrl(await be.shrinkImage(file, 1800, 0.8));
-    if (image.length > 900000) image = await be.blobToDataUrl(await be.shrinkImage(file, 1400, 0.7));
-    f.noimg.checked = false; pv();
+    try {
+      image = await be.imageDataUrl(file, 370000, [[1800, 0.8], [1600, 0.72], [1400, 0.68], [1200, 0.62], [1000, 0.6]]);
+      f.noimg.checked = false; pv(); $('#cerr').textContent = '';
+    } catch (err) { $('#cerr').textContent = be.errorText(err); }
   });
   f.addEventListener('submit', async (e) => {
     e.preventDefault();

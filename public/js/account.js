@@ -88,13 +88,19 @@ export function renderJoin(ctx) {
   $('#agree-all').addEventListener('change', (e) => agrees.forEach((n) => { if (!f[n].closest('.hidden')) f[n].checked = e.target.checked; }));
   $('#send-code').addEventListener('click', async (e) => {
     const phone = f.phone.value.replace(/\s/g, '');
-    if (!PHONE_RE.test(phone)) { $('#err').textContent = '휴대폰 번호를 확인해 주세요. 예) 010-1234-5678'; f.phone.focus(); return; }
+    const username = f.username.value.trim().toLowerCase();
+    const [problem, el] = !be.USERNAME_RE.test(username) ? ['아이디는 영문 소문자·숫자·밑줄(_) 4~20자로 정해 주세요.', f.username]
+      : f.password.value.length < 8 ? ['비밀번호는 8자 이상이어야 합니다.', f.password]
+      : f.password.value !== f.password2.value ? ['비밀번호 확인이 일치하지 않습니다.', f.password2]
+      : !PHONE_RE.test(phone) ? ['휴대폰 번호를 확인해 주세요. 예) 010-1234-5678', f.phone]
+      : ['', null];
+    if (problem) { $('#err').textContent = problem; el.focus(); return; }
     const b = e.currentTarget; b.disabled = true; b.textContent = '보내는 중';
     try {
-      await be.sendPhoneCode(phone, 'recaptcha-box');
+      await be.sendPhoneCode({ phone, username, password: f.password.value, boxId: 'recaptcha-box' });
       $('#code-box').classList.remove('hidden');
       $('#code-msg').textContent = be.DEMO ? '체험 모드 인증번호: 123456' : '문자로 받은 6자리 숫자를 입력해 주세요.';
-      $('#err').textContent = ''; b.textContent = '다시 받기'; f.phone.readOnly = true; f.code.focus();
+      $('#err').textContent = ''; b.textContent = '다시 받기'; f.phone.readOnly = true; f.username.readOnly = true; f.password.readOnly = true; f.password2.readOnly = true; f.code.focus();
       setTimeout(() => { b.disabled = false; }, 30000);
     } catch (err) { $('#err').textContent = be.errorText(err); b.disabled = false; b.textContent = '인증번호 받기'; }
   });
