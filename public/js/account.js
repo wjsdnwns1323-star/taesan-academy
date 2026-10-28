@@ -35,6 +35,7 @@ function cooldown(btn, sec, label = '다시 받기') {
   const tick = () => { btn.textContent = `${label} (${n})`; if (n-- <= 0) { clearInterval(t); btn.disabled = false; btn.textContent = label; } };
   const t = setInterval(tick, 1000);
   tick();
+  return t;
 }
 
 /* ---------------- 로그인 ---------------- */
@@ -89,7 +90,8 @@ export function renderJoin(ctx) {
         <div class="field"><label class="lbl" for="j-phone">휴대폰 번호<span class="req">*</span></label>
           <div class="inline"><input id="j-phone" name="phone" inputmode="tel" autocomplete="tel" placeholder="010-0000-0000"><button type="button" class="btn line" id="send-code">인증번호 받기</button></div>
           <small>한 번호로 한 계정만 만들 수 있습니다.</small></div>
-        <div class="field hidden" id="code-box"><label class="lbl" for="j-code">인증번호<span class="req">*</span></label><input id="j-code" name="code" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="6자리 숫자"><small id="code-msg"></small></div>
+        <div class="field hidden" id="code-box"><label class="lbl" for="j-code">인증번호<span class="req">*</span></label><input id="j-code" name="code" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="6자리 숫자"><small id="code-msg"></small>
+          <button type="button" class="text-btn" id="unlock" style="align-self:flex-start;margin-left:-10px">아이디·비밀번호·번호 다시 입력</button></div>
         <div id="recaptcha-box"></div>
       </div>
       <div class="form-section">
@@ -110,12 +112,12 @@ export function renderJoin(ctx) {
           <div class="field"><label class="lbl" for="g-phone">보호자 휴대폰<span class="req">*</span></label><div class="inline"><input id="g-phone" name="guardianPhone" inputmode="tel" placeholder="010-0000-0000"><button type="button" class="btn line" id="g-send">인증번호</button></div></div>
         </div>
         <div class="field hidden" id="g-code-box"><label class="lbl" for="g-code">보호자 인증번호<span class="req">*</span></label><input id="g-code" name="guardianCode" inputmode="numeric" maxlength="6" placeholder="6자리 숫자"><small id="g-msg"></small></div>`
-    : '<label class="check"><input type="checkbox" name="guardianConsent">[필수] 만 14세 미만으로, 보호자(법정대리인)의 동의를 받았습니다.</label>'}
+    : '<label class="check"><input type="checkbox" name="guardianConsent"><span>[필수] 만 14세 미만으로, 보호자(법정대리인)의 동의를 받았습니다.</span></label>'}
       </div>
       <div class="agree">
-        <label class="check"><input type="checkbox" id="agree-all"><b>전체 동의</b></label>
-        <label class="check"><input type="checkbox" name="agreeRules">[필수] <a href="#/rules" target="_blank">커뮤니티 이용규칙</a>에 동의합니다</label>
-        <label class="check"><input type="checkbox" name="agreePrivacy">[필수] <a href="#/privacy" target="_blank">개인정보 수집·이용</a>에 동의합니다 (이름·휴대폰·성별·나이·구분·학년, 회원 관리 목적, 탈퇴할 때까지 보관)</label>
+        <label class="check"><input type="checkbox" id="agree-all"><span><b>전체 동의</b></span></label>
+        <label class="check"><input type="checkbox" name="agreeRules"><span>[필수] <a href="#/rules" target="_blank">커뮤니티 이용규칙</a>에 동의합니다</span></label>
+        <label class="check"><input type="checkbox" name="agreePrivacy"><span>[필수] <a href="#/privacy" target="_blank">개인정보 수집·이용</a>에 동의합니다 (이름·휴대폰·성별·나이·구분·학년, 회원 관리 목적, 탈퇴할 때까지 보관)</span></label>
       </div>
       <p class="err" id="err" role="alert"></p>
       <button class="btn lg block" id="join-btn">가입하기</button>
@@ -154,7 +156,7 @@ export function renderJoin(ctx) {
       $('#err').textContent = '';
       ['phone', 'username', 'password', 'password2'].forEach((n) => { f[n].readOnly = true; });
       f.code.focus();
-      cooldown(b, 30);
+      clearInterval(b._t); b._t = cooldown(b, 30);
     } catch (err) { $('#err').textContent = be.errorText(err); b.disabled = false; b.textContent = '인증번호 받기'; }
   });
   $('#g-send')?.addEventListener('click', async (e) => {
@@ -170,6 +172,12 @@ export function renderJoin(ctx) {
       $('#err').textContent = ''; f.guardianPhone.readOnly = true; f.guardianCode.focus();
       cooldown(b, 30, '다시');
     } catch (err) { $('#err').textContent = be.errorText(err); b.disabled = false; }
+  });
+  $('#unlock').addEventListener('click', () => {
+    ['phone', 'username', 'password', 'password2'].forEach((n) => { f[n].readOnly = false; });
+    f.code.value = ''; $('#code-box').classList.add('hidden');
+    const b = $('#send-code'); clearInterval(b._t); b.disabled = false; b.textContent = '인증번호 받기';
+    f.username.focus();
   });
   f.age.addEventListener('input', () => $('#guardian-box').classList.toggle('hidden', !(+f.age.value > 0 && +f.age.value < 14)));
   f.addEventListener('submit', async (e) => {
@@ -308,7 +316,7 @@ export async function renderMe(ctx) {
   const { view, q } = ctx;
   const me = be.currentUser();
   const extra = be.has('listMyComments');
-  const tabs = [['info', '내 정보'], ['posts', '내가 쓴 글'], ...(extra ? [['comments', '내 댓글'], ['bookmarks', '스크랩'], ['blocks', '차단한 회원']] : []), ['settings', '계정 설정']];
+  const tabs = [['info', '내 정보'], ['posts', '내 글'], ...(extra ? [['comments', '내 댓글'], ['bookmarks', '스크랩'], ['blocks', '차단']] : []), ['settings', '설정']];
   const tab = tabs.some(([id]) => id === q.get('tab')) ? q.get('tab') : 'info';
   view.innerHTML = `${pageHead('내 정보', { desc: `@${esc(me.username)} · ${esc(me.grade)}${me.role === 'admin' ? ' · 운영진' : ''}` })}
     <nav class="tabs" style="margin-bottom:8px">${tabs.map(([id, n]) => `<a href="#/me?tab=${id}" class="${id === tab ? 'on' : ''}"${id === tab ? ' aria-current="page"' : ''}>${n}</a>`).join('')}</nav>

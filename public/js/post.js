@@ -31,6 +31,7 @@ export async function renderPost(ctx) {
   const files = post.files || [];
   const visibleCount = comments.filter((c) => !c.deleted).length;
 
+  dispatchEvent(new CustomEvent('tsc:board', { detail: post.board }));
   view.innerHTML = `<article class="article">
     <header class="article-head">
       <nav class="crumb"><a href="${boardHref(post.board)}">${esc(board?.name || '게시판')}</a>${icon('right')}${tagHtml(post)} ${status}</nav>
@@ -38,8 +39,7 @@ export async function renderPost(ctx) {
       <div class="article-meta">
         <span class="who">${avatarHtml(post.nickname, post.uid)}<b data-uid="${admin ? esc(post.uid) : ''}">${esc(post.nickname)}</b><span>${esc(post.grade)}</span>
           ${!mine && canReply ? `<button type="button" class="text-btn" id="author-menu" aria-label="${esc(post.nickname)}님 메뉴" aria-haspopup="menu" style="height:24px;padding:0 4px">${icon('more', 'sm')}</button>` : ''}</span>
-        <i class="sep"></i><span class="num">${dateTime(post.createdAt)}${post.updatedAt ? ' (수정됨)' : ''}</span>
-        <i class="sep"></i><span>조회 <span class="num">${(post.viewCount || 0).toLocaleString()}</span></span>
+        <i class="sep"></i><span class="when"><span class="num">${dateTime(post.createdAt)}${post.updatedAt ? ' (수정됨)' : ''}</span><i class="sep"></i><span>조회 <span class="num">${(post.viewCount || 0).toLocaleString()}</span></span></span>
       </div>
       ${pending}${hiddenNote}
     </header>
@@ -47,23 +47,24 @@ export async function renderPost(ctx) {
     ${post.images?.length ? `<div class="article-images">${post.images.map((im) => `<img data-file="${esc(im.id)}" alt="첨부 사진" loading="lazy">`).join('')}</div>` : ''}
     ${post.source ? `<p class="source"><b>출처</b>${esc(post.source)}</p>` : ''}
     ${files.length ? `<div class="attach-list"><div class="h">첨부 파일 ${files.length}</div>${files.map((f, i) => `<div class="attach-item">${icon('file')}<span class="nm">${esc(f.name)}</span><small>${size(f.size)}</small>
-      <button type="button" class="btn sm line" data-dl="${i}">${icon('download', 'sm')}내려받기</button></div>`).join('')}</div>` : ''}
+      <button type="button" class="text-btn" data-dl="${i}">${icon('download', 'sm')}내려받기</button></div>`).join('')}</div>` : ''}
     ${post.board === 'data' ? `<p class="hint" style="margin-bottom:24px">내려받은 자료는 개인 학습에만 써 주세요. ${esc(DATA_RULES[5])}</p>` : ''}
     <div class="article-actions">
       <button type="button" class="like-btn ${liked ? 'on' : ''}" id="like" aria-pressed="${liked}">${icon('heart', 'sm')}좋아요 <span class="num">${post.likeCount || 0}</span></button>
       ${canMark ? `<button type="button" class="like-btn ${post.bookmarked ? 'on' : ''}" id="mark" aria-pressed="${!!post.bookmarked}">${icon('bookmark', 'sm')}스크랩</button>` : ''}
-      <button type="button" class="text-btn" id="share">${icon('link', 'sm')}링크 복사</button>
-      <span class="sp"></span>
-      ${mine ? `<a class="text-btn" href="#/edit/${esc(post.id)}">수정</a>` : ''}
-      ${admin ? `<button type="button" class="text-btn" id="hide">${post.hidden ? '다시 공개' : '숨김'}</button>` : ''}
-      ${mine || admin ? '<button type="button" class="text-btn danger" id="del">삭제</button>' : ''}
-      ${mine ? '' : '<button type="button" class="text-btn" id="report">신고</button>'}
+      <button type="button" class="text-btn" id="share" aria-label="링크 복사">${icon('link', 'sm')}<span class="lbl">링크 복사</span></button>
+      <span class="tools">
+        ${mine ? `<a class="text-btn" href="#/edit/${esc(post.id)}">수정</a>` : ''}
+        ${admin ? `<button type="button" class="text-btn" id="hide">${post.hidden ? '다시 공개' : '숨김'}</button>` : ''}
+        ${mine || admin ? '<button type="button" class="text-btn danger" id="del">삭제</button>' : ''}
+        ${mine ? '' : '<button type="button" class="text-btn" id="report">신고</button>'}
+      </span>
     </div>
     ${post.prev || post.next ? `<nav class="post-nav" aria-label="이전·다음 글">
       ${post.next ? `<a href="#/post/${esc(post.next.id)}"><span>${icon('up', 'sm')}다음 글</span><span class="t">${esc(post.next.title)}</span><time>${shortDate(post.next.createdAt)}</time></a>` : ''}
       ${post.prev ? `<a href="#/post/${esc(post.prev.id)}"><span>${icon('down', 'sm')}이전 글</span><span class="t">${esc(post.prev.title)}</span><time>${shortDate(post.prev.createdAt)}</time></a>` : ''}
     </nav>` : ''}
-    <div style="display:flex;justify-content:flex-end;padding:12px 0"><a class="btn line sm" href="${boardHref(post.board)}">${icon('list', 'sm')}목록</a></div>
+    <div style="display:flex;justify-content:flex-end;padding:8px 0;margin-right:-10px"><a class="text-btn" href="${boardHref(post.board)}">${icon('list', 'sm')}목록</a></div>
     <section class="comments" aria-label="댓글">
       <h2 class="comments-h">댓글<span class="num">${visibleCount}</span></h2>
       <div id="clist"></div>

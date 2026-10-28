@@ -1,7 +1,7 @@
 // 관리자: 회원 관리(정보 열람·정지·권한), 글 관리(승인·신고·숨김·삭제), 배너(표지) 편집
 import * as be from './backend.js';
 import { BOARDS } from './boards.js';
-import { esc, $, $$, ago, fullDate, toast, icon, empty, pageHead, tagHtml, safeImg, safeLink, confirmBox, dday } from './ui.js';
+import { esc, $, $$, ago, fullDate, toast, icon, empty, pageHead, tagHtml, safeImg, safeLink, confirmBox, dday, resetBanners } from './ui.js';
 
 export async function renderAdmin(ctx) {
   const { view, q } = ctx;
@@ -159,7 +159,7 @@ async function eventsTab(ctx, box) {
       <form class="inline" id="tf" style="max-width:640px"><input class="input" name="text" maxlength="100" placeholder="예: 11월 고입 설명회 신청을 받습니다"><input class="input" name="link" maxlength="300" placeholder="링크(선택)" style="max-width:180px"><button class="btn line">추가</button></form>
       ${texts.length ? `<table class="admin-table" style="margin-top:12px"><tbody>${texts.map((t) => `<tr data-id="${esc(t.id)}"><td>${esc(t.text)}${safeLink(t.link) ? `<span class="sub">${esc(t.link)}</span>` : ''}</td><td><div class="ops"><button type="button" class="btn sm danger" data-del>삭제</button></div></td></tr>`).join('')}</tbody></table>` : ''}
     </section></div>`;
-  const reload = () => ctx.go(`#/admin?tab=events&r=${Date.now()}`);
+  const reload = () => { resetBanners(); ctx.go(`#/admin?tab=events&r=${Date.now()}`); };
   $('#ef').addEventListener('submit', async (e) => {
     e.preventDefault();
     const f = e.target;

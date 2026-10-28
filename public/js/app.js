@@ -114,15 +114,14 @@ function renderChrome(page, arg, q) {
   const tabs = [['home', '홈', '#/'], ['rec', '인기글', '#/community/rec'], ['all', '전체글', '#/community/all'],
     ...COMMUNITY_TABS.slice(1).map((t) => [t.id, t.name, `#/community/${t.id}`]), ...(QNA_OPEN ? [['qna', '문제풀이', '#/community/qna']] : []),
     ['data', '자료실', '#/study'], ['notice', '공지', '#/notices'], ...(admin ? [['admin', '관리자', '#/admin']] : [])];
-  $('#lnb').innerHTML = tabs.map(([k, n, h]) => `<a href="${h}" class="${k === key ? 'on' : ''}">${n}</a>`).join('');
-  $('#lnb .on')?.scrollIntoView({ inline: 'center', block: 'nearest' });
+  $('#lnb').innerHTML = tabs.map(([k, n, h]) => `<a href="${h}" data-k="${k}" class="${k === key ? 'on' : ''}">${n}</a>`).join('');
+  showTab();
 
   const curCat = q.get('category') || '';
-  const link = (k, label, href, ic, extra = '') => `<a class="side-link${k === key ? ' on' : ''}" href="${href}"${k === key ? ' aria-current="page"' : ''}>${icon(ic)}${esc(label)}${extra}</a>`;
+  const link = (k, label, href, ic, extra = '') => `<a class="side-link${k === key ? ' on' : ''}" href="${href}" data-k="${k}"${k === key ? ' aria-current="page"' : ''}>${icon(ic)}${esc(label)}${extra}</a>`;
   const board = (b) => link(b, BOARDS[b].name, boardHref(b), BOARD_ICON[b])
     + (b === key ? BOARDS[b].categories.map((c) => `<a class="side-link sub${c.id === curCat ? ' on' : ''}" href="${boardHref(b)}?category=${encodeURIComponent(c.id)}">${esc(c.name)}</a>`).join('') : '');
   $('#side').innerHTML = `
-    <div class="side-profile"><span class="logo-tile"><img src="images/logo.webp" alt=""></span><div><b>${esc(SITE_NAME)}</b><span>운영 태산학원 · 대전</span></div></div>
     ${me ? `<div class="side-me">${avatarHtml(me.nickname, me.uid)}<div><b>${esc(me.nickname)}</b><small>${esc(me.grade)}${me.role === 'admin' ? ' · 운영진' : ''}</small></div><a href="#/me">내 정보</a></div>
       <div class="side-actions"><a class="btn wide" href="${writeHref}">${icon('pen', 'sm')}글쓰기</a></div>`
     : '<div class="side-actions"><a class="btn" href="#/join">회원가입</a><a class="btn line" href="#/login">로그인</a></div>'}
@@ -136,6 +135,19 @@ function renderChrome(page, arg, q) {
     </nav>`;
   if (admin) refreshQueue();
 }
+
+// 모바일 게시판 탭: 현재 탭을 가운데로, 없으면 맨 앞으로
+function showTab() {
+  const on = $('#lnb .on');
+  if (on) on.scrollIntoView({ inline: 'center', block: 'nearest' });
+  else $('#lnb').scrollLeft = 0;
+}
+// 글 보기 화면: 글이 속한 게시판을 메뉴에 표시
+addEventListener('tsc:board', (e) => {
+  const k = CSS.escape(String(e.detail || ''));
+  $$(`#lnb a[data-k="${k}"], #side .side-link[data-k="${k}"]`).forEach((a) => a.classList.add('on'));
+  showTab();
+});
 
 async function refreshBell() {
   if (!be.currentUser()) return;
@@ -166,13 +178,11 @@ document.addEventListener('keydown', (e) => {
 });
 
 /* ---------------- 홈 ---------------- */
-// 글 상자는 늘 같은 줄 수(옆 상자와 높이를 맞춤)
+// 묶음마다 최대 5줄
 const SLOTS = 5;
 function rowsBox(list, none, opts) {
-  const rows = list.slice(0, SLOTS).map((p, i) => rowHtml(p, opts?.rank ? i + 1 : 0, opts)).join('');
-  const blank = '<div class="row blank" aria-hidden="true"></div>';
-  if (!list.length) return `<div class="row"><span class="t" style="color:var(--muted)">${esc(none)}</span></div>${blank.repeat(SLOTS - 1)}`;
-  return rows + blank.repeat(Math.max(0, SLOTS - list.length));
+  if (!list.length) return `<div class="row"><span class="t" style="color:var(--muted)">${esc(none)}</span></div>`;
+  return list.slice(0, SLOTS).map((p, i) => rowHtml(p, opts?.rank ? i + 1 : 0, opts)).join('');
 }
 
 async function renderHome(ctx) {
@@ -211,7 +221,7 @@ async function renderHome(ctx) {
     return `<div class="event${n === 0 ? ' today' : n <= 14 ? ' soon' : ''}"><span class="d">${d}</span><span class="t">${title}</span><time class="num">${+m}월 ${+dd}일</time></div>`;
   };
   $('#h-events').innerHTML = `<div class="events">${events.slice(0, SLOTS).map(ev).join('')
-    || `<div class="event"><span class="d">-</span><span class="t" style="color:var(--muted)">${be.isAdmin() ? '관리자 화면에서 일정을 올려 주세요' : '다가오는 일정이 없습니다'}</span><span></span></div>`}${'<div class="event blank" aria-hidden="true"></div>'.repeat(Math.max(0, SLOTS - Math.max(1, Math.min(SLOTS, events.length))))}</div>`;
+    || `<div class="row"><span class="t" style="color:var(--muted)">${be.isAdmin() ? '관리자 화면에서 일정을 올려 주세요' : '다가오는 일정이 없습니다'}</span></div>`}</div>`;
 }
 
 // 최근 7일 글 중 좋아요·댓글이 많은 순

@@ -187,7 +187,9 @@ export function dday(date) {
 
 // 관리자가 정한 배너(표지)·상단 안내 문구는 한 번만 불러옵니다
 let bannerCache = null;
-export function getBanners(listFn) { bannerCache = bannerCache || listFn().catch(() => []); return bannerCache; }
+export function getBanners(listFn) { bannerCache = bannerCache || listFn().catch(() => { bannerCache = null; return []; }); return bannerCache; }
+// 관리자가 표지·일정·안내 문구를 바꾸면 다시 불러오게
+export function resetBanners() { bannerCache = null; }
 
 export const fab = (href) => `<a class="fab" href="${href}" aria-label="글쓰기">${icon('pen')}</a>`;
 
