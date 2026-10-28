@@ -33,16 +33,21 @@ const E = {
   notFound: (m = '찾을 수 없습니다.') => new ApiError(404, 'not-found', m),
 };
 
+// 0~35를 고르게(252 이상은 버려 치우침 없앰)
 const rnd = (n) => {
-  const b = new Uint8Array(n);
-  globalThis.crypto.getRandomValues(b);
-  return Array.from(b, (x) => (x % 36).toString(36)).join('');
+  let out = '';
+  while (out.length < n) {
+    const b = new Uint8Array(n * 2);
+    globalThis.crypto.getRandomValues(b);
+    for (const x of b) if (x < 252 && out.length < n) out += (x % 36).toString(36);
+  }
+  return out;
 };
 // 시간순으로 정렬되는 짧은 ID(같은 밀리초에 여러 개를 만들어도 만든 순서대로)
 let lastT = 0, seq = 0;
 export function newId(t = Date.now()) {
   if (t <= lastT) { t = lastT; seq += 1; } else { lastT = t; seq = 0; }
-  return t.toString(36).padStart(9, '0') + (seq % 1296).toString(36).padStart(2, '0') + rnd(4);
+  return t.toString(36).padStart(9, '0') + (seq % 1296).toString(36).padStart(2, '0') + rnd(8);
 }
 const pad = (t) => String(t).padStart(13, '0');
 const str = (v, max) => typeof v === 'string' && v.length <= max;
@@ -75,8 +80,8 @@ export function createApp({ store, files, idp, sms, env = {} }) {
   }
   async function user(ctx) { const u = await me(ctx); if (!u) throw E.login(); return u; }
   async function active(ctx) { const u = await user(ctx); if (u.banned) throw E.banned(); return u; }
-  async function admin(ctx) { const u = await user(ctx); if (u.role !== 'admin') throw E.admin(); return u; }
-  const isAdmin = (u) => u?.role === 'admin';
+  async function admin(ctx) { const u = await user(ctx); if (u.role !== 'admin' || u.banned) throw E.admin(); return u; }
+  const isAdmin = (u) => u?.role === 'admin' && !u.banned;
   // 내가 차단한 회원(글·댓글을 가림)
   async function blocksOf(ctx, u) {
     if (!u) return new Set();
@@ -152,16 +157,17 @@ export function createApp({ store, files, idp, sms, env = {} }) {
     await sms.send(e164, `[태산입시] ${childName} 학생의 회원가입 보호자 동의 인증번호: ${code}. 동의하시면 학생에게 알려 주세요.`);
     return { sent: true };
   });
+  // 인증번호 확인: 시도 횟수를 먼저 1 올리고(5번 넘으면 거절) 올린 결과로 비교. 동시에 여러 번 넣어도 5번까지만 확인됨
+  async function useOtp(key, e164, code, msg) {
+    const wrong = () => new ApiError(400, 'invalid-code', msg);
+    let otp;
+    try { otp = await store.update(key, 'OTP', { add: { tries: 1 } }, { ifBelow: { tries: 5 } }); } catch (e) { if (e instanceof Conflict) throw wrong(); throw e; }
+    if (!otp || otp.exp < now() || otp.hash !== await sha256(`${e164}:${code}`)) throw wrong();
+    await store.del(key, 'OTP');
+  }
   async function checkGuardian(phone, code) {
     const e164 = toE164(phone);
-    const otp = await store.get(`OTP#guardian#${e164}`, 'OTP');
-    const wrong = () => new ApiError(400, 'invalid-code', '보호자 인증번호가 맞지 않거나 시간이 지났어요.');
-    if (!otp || otp.exp < now() || otp.tries >= 5) throw wrong();
-    if (otp.hash !== await sha256(`${e164}:${code}`)) {
-      await store.update(`OTP#guardian#${e164}`, 'OTP', { add: { tries: 1 } }).catch(() => {});
-      throw wrong();
-    }
-    await store.del(`OTP#guardian#${e164}`, 'OTP');
+    await useOtp(`OTP#guardian#${e164}`, e164, code, '보호자 인증번호가 맞지 않거나 시간이 지났어요.');
   }
 
   // 2단계: 인증번호 확인 → 회원 정보 저장 → 로그인
@@ -170,6 +176,9 @@ export function createApp({ store, files, idp, sms, env = {} }) {
     const a = checkAccount(b);
     const code = String(b.code || '');
     if (!/^[0-9]{6}$/.test(code)) throw bad('휴대폰 인증번호 6자리를 입력해 주세요.');
+    // 인증번호를 받은 번호(가입 시작 때 적은 번호)와 같아야 함
+    const sentTo = await idp.phoneOf(a.username);
+    if (!sentTo || sentTo !== a.e164) throw bad('인증번호를 받은 휴대폰 번호와 다릅니다. 번호를 확인하거나 처음부터 다시 해 주세요.');
     const memberType = b.memberType;
     if (!['학생', '학부모'].includes(memberType)) throw bad('학생인지 학부모인지 선택해 주세요.');
     const grade = memberType === '학부모' ? '학부모' : b.grade;
@@ -194,7 +203,8 @@ export function createApp({ store, files, idp, sms, env = {} }) {
       guardian = { guardianConsent: true, guardianName: gName, guardianPhone: gPhone, guardianAt: now() };
     }
 
-    const { sub } = await idp.confirm(a.username, code);
+    const { sub, phone: verified } = await idp.confirm(a.username, code);
+    if (verified !== a.e164) { await idp.remove(a.username).catch(() => {}); throw bad('인증번호를 받은 휴대폰 번호와 다릅니다. 처음부터 다시 해 주세요.'); }
     const t = now();
     const nickname = a.username;
     const role = env.demo && a.username === 'admin' ? 'admin' : 'member'; // 체험 모드에서만 아이디 admin 이 관리자
@@ -275,14 +285,7 @@ export function createApp({ store, files, idp, sms, env = {} }) {
     const code = String(ctx.body.code || '');
     if (!PHONE_RE.test(phone) || !/^[0-9]{6}$/.test(code)) throw bad('휴대폰 번호와 인증번호 6자리를 확인해 주세요.');
     const e164 = toE164(phone);
-    const otp = await store.get(`OTP#findid#${e164}`, 'OTP');
-    const wrong = () => new ApiError(400, 'invalid-code', '인증번호가 맞지 않거나 시간이 지났어요.');
-    if (!otp || otp.exp < now() || otp.tries >= 5) throw wrong();
-    if (otp.hash !== await sha256(`${e164}:${code}`)) {
-      await store.update(`OTP#findid#${e164}`, 'OTP', { add: { tries: 1 } }).catch(() => {});
-      throw wrong();
-    }
-    await store.del(`OTP#findid#${e164}`, 'OTP');
+    await useOtp(`OTP#findid#${e164}`, e164, code, '인증번호가 맞지 않거나 시간이 지났어요.');
     const ph = await store.get(`PHONE#${e164}`, 'PHONE');
     const prof = ph ? await store.get(`U#${ph.uid}`, 'PROFILE') : null;
     return { username: prof?.username || null, createdAt: prof?.createdAt || null };
@@ -306,8 +309,8 @@ export function createApp({ store, files, idp, sms, env = {} }) {
     const priv = await store.get(`U#${u.uid}`, 'PRIVATE');
     const mine = await store.query({ pk: `U#${u.uid}`, limit: 5000 });
     const keys = [...mine.map((x) => [x.pk, x.sk]), [`NICK#${u.nickname}`, 'NICK']];
-    if (ctx.auth.phone) keys.push([`PHONE#${ctx.auth.phone}`, 'PHONE']);
-    else if (priv?.phone) keys.push([`PHONE#${toE164(priv.phone)}`, 'PHONE']);
+    const phones = [...new Set([ctx.auth.phone, priv?.phone && toE164(priv.phone)].filter(Boolean))];
+    for (const ph of await store.getMany(phones.map((x) => [`PHONE#${x}`, 'PHONE']))) if (ph?.uid === u.uid) keys.push([ph.pk, ph.sk]);
     await store.delMany(keys);
     await idp.remove(u.username);
     return { ok: true };
@@ -1021,6 +1024,7 @@ export function createDemoIdp(store, { now = Date.now } = {}) {
   const tokens = (a) => ({ idToken: `demo.${enc({ sub: a.sub, username: a.username, phone: a.phone, exp: now() + 3600000 })}`, refreshToken: `demo-r.${enc({ username: a.username })}`, expiresIn: 3600, sub: a.sub });
   return {
     async status(username) { const a = await get(username); return !a ? 'none' : a.confirmed ? 'confirmed' : 'unconfirmed'; },
+    async phoneOf(username) { return (await get(username))?.phone || null; },
     async remove(username) { await store.del(`IDP#${username}`, 'IDP'); },
     async signUp({ username, password, phone }) {
       if (await get(username)) throw new ApiError(409, 'username-taken', '이미 쓰고 있는 아이디입니다.');

@@ -570,3 +570,48 @@ test('댓글 @아이디 언급 알림, 나를 차단한 사람에게는 알림 �
   await t.ok('POST', `/posts/${id}/comments`, { body: '@ment_c 숨긴 글' }, a.token);
   assert.equal((await notes(c)).length, 1);
 });
+
+test('보안: 가입 확인은 인증번호를 받은 번호로만, 탈퇴하면 번호 잠금 풀림', async () => {
+  const t = await setup();
+  const base = { password: 'tsPass_01', realName: '홍길동', gender: '여', age: 45, memberType: '학부모', childGrade: '고2', agreeRules: true, agreePrivacy: true };
+  await t.ok('POST', '/auth/start', { username: 'sec_evil', password: 'tsPass_01', phone: '010-1111-1111' });
+  // 다른 사람 번호로 확인 → 거절, 그 번호는 잠기지 않음
+  await t.fail(400, 'POST', '/auth/confirm', { ...base, username: 'sec_evil', phone: '010-2222-2222', code: '123456' });
+  assert.equal(await t.store.get('PHONE#+821022222222', 'PHONE'), null);
+  await t.ok('POST', '/auth/start', { username: 'sec_victim', password: 'tsPass_01', phone: '010-2222-2222' });
+  // 만 14세 미만: 보호자 번호를 자기 번호로 넣으면 거절(본인 번호가 고정되므로)
+  await t.ok('POST', '/auth/start', { username: 'sec_kid', password: 'tsPass_01', phone: '010-4444-5555' });
+  await t.ok('POST', '/auth/guardian/start', { phone: '010-4444-5555', childName: '어린이' });
+  const kid = { ...base, username: 'sec_kid', code: '123456', age: 12, memberType: '학생', grade: '중1', childGrade: '', guardianName: '엄마', guardianPhone: '010-4444-5555', guardianCode: '123456' };
+  await t.fail(400, 'POST', '/auth/confirm', { ...kid, phone: '010-7777-8888' });
+  await t.fail(400, 'POST', '/auth/confirm', { ...kid, phone: '010-4444-5555' });
+  // 정상 가입 뒤 탈퇴하면 같은 번호로 다시 가입 가능
+  const r = await t.ok('POST', '/auth/confirm', { ...base, username: 'sec_evil', phone: '010-1111-1111', code: '123456' });
+  await t.ok('DELETE', '/me', { password: 'tsPass_01' }, r.idToken);
+  assert.equal(await t.store.get('PHONE#+821011111111', 'PHONE'), null);
+  await t.ok('POST', '/auth/start', { username: 'sec_again', password: 'tsPass_01', phone: '010-1111-1111' });
+});
+
+test('보안: 인증번호를 동시에 많이 넣어도 5번까지만 확인', async () => {
+  const t = await setup({ demo: false });
+  await t.ok('POST', '/auth/find-id/start', { phone: '010-1212-3434' });
+  const real = t.texts.at(-1).text.match(/(\d{6})/)[1];
+  const guesses = Array.from({ length: 30 }, (_, i) => String(100000 + i)).filter((g) => g !== real);
+  guesses.splice(20, 0, real);
+  const rs = await Promise.all(guesses.map((code) => t.call('POST', '/auth/find-id/confirm', { phone: '010-1212-3434', code })));
+  assert.equal(rs.filter((r) => r.status === 200).length, 0);
+  assert.equal((await t.call('POST', '/auth/find-id/confirm', { phone: '010-1212-3434', code: real })).status, 400);
+});
+
+test('보안: 정지된 관리자는 관리자 기능을 쓸 수 없음', async () => {
+  const t = await setup();
+  const owner = await t.join('admin');
+  const rogue = await t.join('sec_rogue');
+  const sock = await t.join('sec_sock');
+  await t.ok('PATCH', `/users/${rogue.me.uid}`, { role: 'admin' }, owner.token);
+  await t.ok('GET', '/users', null, rogue.token, { private: '1' });
+  await t.ok('PATCH', `/users/${rogue.me.uid}`, { banned: true }, owner.token);
+  await t.fail(403, 'GET', '/users', null, rogue.token, { private: '1' });
+  await t.fail(403, 'GET', `/users/${sock.me.uid}/private`, null, rogue.token);
+  await t.fail(403, 'PATCH', `/users/${sock.me.uid}`, { role: 'admin' }, rogue.token);
+});

@@ -171,6 +171,12 @@ export function createCognitoIdp({ poolId, clientId, region, client }) {
         return u.UserStatus === 'UNCONFIRMED' ? 'unconfirmed' : 'confirmed';
       } catch (e) { if (e.name === 'UserNotFoundException') return 'none'; throw e; }
     },
+    // 가입 시작 때 적어 인증번호를 보낸 번호
+    async phoneOf(username) {
+      try {
+        return attr(await client.send(new AdminGetUserCommand({ UserPoolId: poolId, Username: username })), 'phone_number') || null;
+      } catch (e) { if (e.name === 'UserNotFoundException') return null; throw e; }
+    },
     async remove(username) {
       try { await client.send(new AdminDeleteUserCommand({ UserPoolId: poolId, Username: username })); } catch (e) { if (e.name !== 'UserNotFoundException') throw e; }
     },
