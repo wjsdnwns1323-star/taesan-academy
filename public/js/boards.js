@@ -7,61 +7,61 @@ export const BOARDS = {
   news: {
     name: '소식',
     categories: [
-      { id: 'admission-news', name: '입시뉴스', icon: '📰', bg: '#e7ecfb' },
-      { id: 'office', name: '교육청·대학 발표', icon: '🏛️', bg: '#eceff4' },
-      { id: 'event', name: '설명회·행사', icon: '📅', bg: '#e3f2ec' },
-      { id: 'local', name: '대전 교육소식', icon: '📍', bg: '#fdeaea' },
+      { id: 'admission-news', name: '입시뉴스' },
+      { id: 'office', name: '교육청·대학 발표' },
+      { id: 'event', name: '설명회·행사' },
+      { id: 'local', name: '대전 교육소식' },
     ],
   },
   talk: {
     name: '수다',
     categories: [
-      { id: 'daily', name: '일상', icon: '☀️', bg: '#fff3cf' },
-      { id: 'parent', name: '학부모 수다', icon: '☕', bg: '#f1e9e1' },
-      { id: 'worry', name: '고민상담', icon: '🩹', bg: '#fff1c9' },
-      { id: 'humor', name: '유머', icon: '😄', bg: '#e8e4fb' },
+      { id: 'daily', name: '일상' },
+      { id: 'parent', name: '학부모 수다' },
+      { id: 'worry', name: '고민상담' },
+      { id: 'humor', name: '유머' },
     ],
   },
   school: {
     name: '학교',
     categories: [
-      { id: 'life', name: '학교생활', icon: '🏫', bg: '#e1efe4' },
-      { id: 'exam', name: '내신·시험', icon: '📝', bg: '#e1ecfb' },
-      { id: 'info', name: '학교 정보', icon: 'ℹ️', bg: '#eceff4' },
-      { id: 'transfer', name: '고입·배정', icon: '🧭', bg: '#e6e6f5' },
+      { id: 'life', name: '학교생활' },
+      { id: 'exam', name: '내신·시험' },
+      { id: 'info', name: '학교 정보' },
+      { id: 'transfer', name: '고입·배정' },
     ],
   },
   admission: {
     name: '입시',
     categories: [
-      { id: 'susi', name: '수시', icon: '🎯', bg: '#e7ecfb' },
-      { id: 'jeongsi', name: '정시·수능', icon: '📚', bg: '#e2f3e5' },
-      { id: 'career', name: '진로', icon: '🎓', bg: '#e6e6f5' },
-      { id: 'method', name: '공부법', icon: '✏️', bg: '#fdf0de' },
+      { id: 'susi', name: '수시' },
+      { id: 'jeongsi', name: '정시·수능' },
+      { id: 'career', name: '진로' },
+      { id: 'method', name: '공부법' },
     ],
   },
   qna: {
     name: '문제풀이',
-    categories: SUBJECTS.map((s) => ({ id: s, name: s, icon: '❓', bg: '#fde8da' })),
+    categories: SUBJECTS.map((s) => ({ id: s, name: s })),
   },
   data: {
     name: '자료실',
     categories: [
-      { id: 'note', name: '정리노트', icon: '📒', bg: '#fff3cf' },
-      { id: 'worksheet', name: '자작 문제·학습지', icon: '📝', bg: '#e1ecfb' },
-      { id: 'admission', name: '입시 자료', icon: '🎓', bg: '#e6e6f5' },
-      { id: 'school', name: '학교 안내문', icon: '🏫', bg: '#e1efe4' },
-      { id: 'etc', name: '기타', icon: '📎', bg: '#eef0f2' },
+      { id: 'note', name: '정리노트' },
+      { id: 'worksheet', name: '자작 문제·학습지' },
+      { id: 'admission', name: '입시 자료' },
+      { id: 'school', name: '학교 안내문' },
+      { id: 'etc', name: '기타' },
     ],
   },
   notice: {
     name: '공지',
-    categories: [{ id: 'notice', name: '공지', icon: '📢', bg: '#fde3d3' }],
+    categories: [{ id: 'notice', name: '공지' }],
   },
 };
 
 export const COMMUNITY_TABS = [
-  { id: 'rec', name: '추천' },
+  { id: 'rec', name: '인기글' },
   { id: 'news', name: '소식' },
   { id: 'talk', name: '수다' },
   { id: 'school', name: '학교' },
@@ -72,7 +72,7 @@ export const WRITE_BOARDS = ['news', 'talk', 'school', 'admission', 'data'];
 
 export function category(board, id) {
   const b = BOARDS[board];
-  return b?.categories.find((c) => c.id === id) || { id, name: id || b?.name || '', icon: '💬', bg: '#eef0f2' };
+  return b?.categories.find((c) => c.id === id) || { id, name: id || b?.name || '' };
 }
 
 // 자료실 규칙(글쓰기 화면·자료실 상단·규칙 페이지에서 같이 씁니다)

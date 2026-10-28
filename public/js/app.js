@@ -1,9 +1,9 @@
-// 화면 이동(해시 주소)과 홈·커뮤니티·자료실·검색·알림·메뉴 화면
+// 화면 이동(해시 주소), 머리글·왼쪽 메뉴, 홈·게시판·검색·알림·메뉴 화면
 import * as be from './backend.js';
-import { BOARDS, COMMUNITY_TABS, GRADES, SUBJECTS, DATA_RULES, category } from './boards.js';
-import { SITE_NAME, SITE_DESC, ACADEMY_NAME, QNA_OPEN } from './config.js';
+import { BOARDS, COMMUNITY_TABS, category } from './boards.js';
+import { SITE_NAME, QNA_OPEN } from './config.js';
 import {
-  esc, $, $$, ago, toast, topBar, topEnd, backBar, refreshBell, itemHtml, qcardHtml, recCardHtml, fab, bindDots, ICON, bannerSlot, fillBanner, getBanners, safeLink,
+  esc, $, $$, toast, icon, BOARD_ICON, empty, pageHead, tagHtml, rowHtml, listItemHtml, shortDate, ago, fullDate, getBanners, safeLink, safeImg, fab, modal, confirmBox,
 } from './ui.js';
 import { renderPost } from './post.js';
 import { renderWrite } from './write.js';
@@ -13,33 +13,44 @@ import { renderDoc } from './docs.js';
 
 const view = $('#view');
 const PUBLIC = new Set(['login', 'join', 'rules', 'privacy', 'data-rules']);
+const GUEST_OK = new Set(['home', 'menu', 'community', 'study', 'notices', 'search']);
+
+const BOARD_DESC = {
+  news: '입시 뉴스와 교육청·대학 발표, 설명회 일정',
+  talk: '학생도 학부모도 편하게 이야기해요',
+  school: '대전 학교생활·내신·고입 배정 이야기',
+  admission: '수시·정시와 진로, 공부법',
+  data: '직접 만들었거나 허락받은 자료만 공개됩니다',
+  notice: '운영 안내',
+  qna: '문제 풀이 질문과 답변',
+  all: '모든 게시판의 새 글',
+  rec: '최근 7일 동안 반응이 많았던 글',
+};
 
 function parse() {
   const raw = location.hash.replace(/^#\/?/, '');
   const [path, qs] = raw.split('?');
   return { parts: path.split('/').filter(Boolean), q: new URLSearchParams(qs || '') };
 }
+const boardHref = (b) => (b === 'data' ? '#/study' : b === 'notice' ? '#/notices' : `#/community/${b}`);
+const currentKey = (page, arg) => (page === 'home' ? 'home' : page === 'study' ? 'data' : page === 'notices' ? 'notice' : page === 'community' ? (arg || 'rec') : page === 'admin' ? 'admin' : '');
 
 let seq = 0;
 async function route() {
   const my = ++seq;
   const { parts, q } = parse();
   const [page = 'home', arg] = parts;
-  const nav = { home: 'home', study: 'study', community: 'community', menu: 'menu' }[page] || (page === 'post' ? 'community' : '');
-  $$('#bottom-nav a').forEach((a) => a.classList.toggle('on', a.dataset.nav === nav));
-  const tab = page === 'home' ? 'home' : page === 'study' ? 'study' : page === 'community' ? arg : '';
-  try { renderSide(location.hash || '#/'); } catch (e) { console.error(e); }
-  const mt = page === 'home' ? 'home' : page === 'study' ? 'study' : page === 'notices' ? 'notices' : page === 'community' ? (arg || 'rec') : '';
-  $$('#m-tabs a').forEach((a) => a.classList.toggle('on', a.dataset.t === mt));
-  window.scrollTo(0, 0);
   const user = be.currentUser();
-  // 비회원: 홈·게시판 목록(제목)은 볼 수 있고, 글 내용·글쓰기 등은 로그인 필요
-  if (!user && !PUBLIC.has(page) && !['home', 'menu', 'community', 'study', 'notices', 'search'].includes(page)) {
-    if (page === 'post') toast('로그인하면 글 내용을 볼 수 있어요');
+  if (!user && !PUBLIC.has(page) && !GUEST_OK.has(page)) {
+    if (page === 'post') toast('로그인하면 글 내용을 볼 수 있습니다');
     location.hash = `#/login?next=${encodeURIComponent(location.hash)}`;
     return;
   }
-  view.innerHTML = '<div class="loading">불러오는 중…</div>';
+  document.body.className = `page-${page}`;
+  $('#layout').classList.toggle('wide', ['login', 'join'].includes(page));
+  renderChrome(page, arg, q);
+  window.scrollTo(0, 0);
+  view.innerHTML = '<div class="loading">불러오는 중</div>';
   const ctx = { view, q, arg, alive: () => my === seq, go: (h) => { location.hash = h; } };
   try {
     switch (page) {
@@ -57,45 +68,86 @@ async function route() {
       case 'me': await renderMe(ctx); break;
       case 'admin': await renderAdmin(ctx); break;
       case 'rules': case 'privacy': case 'data-rules': renderDoc(ctx, page); break;
-      default: view.innerHTML = `${backBar('페이지 없음')}<div class="empty">없는 페이지입니다.</div>`;
+      default: view.innerHTML = `${pageHead('페이지를 찾을 수 없습니다')}${empty('주소가 바뀌었거나 삭제된 페이지입니다', 'info')}`;
     }
   } catch (e) {
     console.error(e);
-    if (ctx.alive()) view.innerHTML = `${backBar('오류')}<div class="empty">${esc(be.errorText(e))}</div>`;
+    if (ctx.alive()) view.innerHTML = `${pageHead('문제가 생겼습니다')}${empty(be.errorText(e), 'alert')}`;
   }
   if (ctx.alive()) refreshBell();
 }
 
 document.addEventListener('click', (e) => {
-  if (e.target.closest('[data-back]')) {
-    if (history.length > 1) history.back(); else location.hash = '#/';
-  }
+  if (e.target.closest('[data-back]')) { if (history.length > 1) history.back(); else location.hash = '#/'; }
+});
+
+/* ---------------- 머리글·모바일 탭·왼쪽 메뉴 ---------------- */
+function renderChrome(page, arg, q) {
+  const me = be.currentUser();
+  const admin = be.isAdmin();
+  const key = currentKey(page, arg);
+
+  $('#gnb-nav').innerHTML = me
+    ? `<a href="#/notifications" aria-label="알림">${icon('bell')}<i class="dot hidden" data-bell></i></a>
+       ${admin ? `<a href="#/admin" class="admin-link">${icon('shield')}관리자</a>` : ''}
+       <a href="#/me">${esc(me.nickname)}님</a>
+       <a class="btn" href="#/write?board=${['news', 'talk', 'school', 'admission', 'data'].includes(key) ? key : 'talk'}">${icon('pen', 'sm')}글쓰기</a>`
+    : '<a href="#/login">로그인</a><a class="btn" href="#/join">회원가입</a>';
+  $('#gnb-m').innerHTML = `<a href="#/search" aria-label="검색">${icon('search')}</a>
+    ${me ? `<a href="#/notifications" aria-label="알림">${icon('bell')}<i class="dot hidden" data-bell></i></a>` : `<a href="#/login" aria-label="로그인">${icon('user')}</a>`}
+    <a href="#/menu" aria-label="전체 메뉴">${icon('menu')}</a>`;
+
+  const tabs = [['home', '홈', '#/'], ['rec', '인기글', '#/community/rec'], ['all', '전체글', '#/community/all'],
+    ...COMMUNITY_TABS.slice(1).map((t) => [t.id, t.name, `#/community/${t.id}`]), ...(QNA_OPEN ? [['qna', '문제풀이', '#/community/qna']] : []),
+    ['data', '자료실', '#/study'], ['notice', '공지', '#/notices'], ...(admin ? [['admin', '관리자', '#/admin']] : [])];
+  $('#lnb').innerHTML = tabs.map(([k, n, h]) => `<a href="${h}" class="${k === key ? 'on' : ''}${k === 'admin' ? ' admin-link' : ''}">${n}</a>`).join('');
+  $('#lnb .on')?.scrollIntoView({ inline: 'center', block: 'nearest' });
+
+  const curCat = q.get('category') || '';
+  const link = (k, label, href, ic) => `<a class="side-link${k === key && !curCat ? ' on' : k === key ? ' on' : ''}" href="${href}">${icon(ic)}${esc(label)}</a>`;
+  const board = (b) => link(b, BOARDS[b].name, boardHref(b), BOARD_ICON[b])
+    + (b === key ? BOARDS[b].categories.map((c) => `<a class="side-link sub${c.id === curCat ? ' on' : ''}" href="${boardHref(b)}?category=${encodeURIComponent(c.id)}">${esc(c.name)}</a>`).join('') : '');
+  $('#side').innerHTML = `<div class="side-card">
+      <div class="side-profile"><span class="logo-tile"><img src="images/logo.webp" alt=""></span><div><b>${esc(SITE_NAME)}</b><span>운영 태산학원</span></div></div>
+      <div class="side-stats">${me ? `<span>${esc(me.nickname)}</span><b>${esc(me.grade)}</b>` : '<span>회원 전용 커뮤니티</span><b>대전</b>'}</div>
+      ${me ? `<a class="btn" href="#/write?board=${['news', 'talk', 'school', 'admission', 'data'].includes(key) ? key : 'talk'}">글쓰기</a><a class="btn line" href="#/me">내 정보</a>`
+    : '<a class="btn" href="#/join">회원가입</a><a class="btn line" href="#/login">로그인</a>'}
+    </div>
+    <nav class="side-menu">
+      ${link('all', '전체글', '#/community/all', 'list')}${link('rec', '인기글', '#/community/rec', 'flame')}
+      <h4>입시 정보</h4>${board('news')}${board('admission')}
+      <h4>이야기</h4>${board('talk')}${board('school')}${QNA_OPEN ? board('qna') : ''}
+      <h4>자료</h4>${board('data')}
+      <h4>안내</h4>${link('notice', '공지사항', '#/notices', 'megaphone')}${link('rules', '이용규칙', '#/rules', 'file')}${link('privacy', '개인정보 처리방침', '#/privacy', 'lock')}
+      ${admin ? `<h4>관리</h4>${link('admin', '관리자', '#/admin', 'shield')}` : ''}
+    </nav>`;
+}
+
+async function refreshBell() {
+  if (!be.currentUser()) return;
+  try {
+    const on = await be.hasUnread();
+    $$('[data-bell]').forEach((d) => d.classList.toggle('hidden', !on));
+  } catch { /* 알림 확인 실패는 무시 */ }
+}
+
+$('#gnb-search').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const v = e.target.q.value.trim();
+  if (v) location.hash = `#/search?q=${encodeURIComponent(v)}`;
 });
 
 /* ---------------- 홈 ---------------- */
-function renderWelcome({ view }) {
-  view.innerHTML = `<div class="hero"><img class="hero-logo" src="images/logo.webp" alt="태산학원"><h1>${esc(SITE_NAME)}</h1>
-    <p>${esc(SITE_DESC)}</p>
-    <div class="btns"><a class="btn" href="#/login" style="display:grid;place-items:center">로그인</a>
-    <a class="btn gray" href="#/join" style="display:grid;place-items:center">회원가입</a></div></div>
-    <div class="card"><h3>🔒 회원 전용 커뮤니티</h3><p>글과 자료는 가입한 회원만 볼 수 있어요. 실명·전화번호·성별·나이는 관리자만 볼 수 있고 다른 회원에게는 아이디(닉네임)와 학생/학부모 구분만 보여요.</p></div>
-    <div class="card"><h3>💬 이런 걸 할 수 있어요</h3><p>최신 입시 소식 · 학부모·학생 수다 · 대전 학교 이야기 · 입시 정보 · 자료실 · 좋아요 · 댓글 · 사진·파일 올리기</p></div>
-    <div class="menu-list"><a href="#/rules">커뮤니티 이용규칙</a><a href="#/privacy">개인정보 처리방침</a></div>`;
-}
-
 async function renderHome(ctx) {
   const { view } = ctx;
-  const me = be.currentUser();
-  const boards = ['news', 'talk', 'school', 'admission'];
-  const box = (id, title, href) => `<section class="box"><header class="box-h"><h2>${title}</h2><a href="${href}">더 보기 ›</a></header><div class="rows" id="${id}"><div class="loading">불러오는 중…</div></div></section>`;
-  view.innerHTML = `${topBar(SITE_NAME)}${topEnd}${bannerSlot()}
-    ${me ? `<div class="home-head"><h1>${esc(me.nickname)}님, 반가워요</h1><p>${esc(me.grade)} · 대전 입시 소식을 한곳에서 확인하세요</p></div>`
-      : `<div class="home-head guest"><h1>대전 입시 정보, 태산입시에서</h1><p>글 제목은 누구나 볼 수 있어요. 내용을 보고 글을 쓰려면 가입해 주세요.</p></div>`}
-    <section class="box"><div class="rows" id="h-notice"></div></section>
-    ${box('h-hot', '지금 인기 있는 글', '#/community/rec')}
-    <div class="box-grid">${boards.map((b) => box(`h-${b}`, `최신 ${BOARDS[b].name}`, `#/community/${b}`)).join('')}</div>
-    ${box('h-data', '새로 올라온 자료', '#/study')}
-    ${emojiRow()}`;
+  const boards = ['news', 'admission', 'talk', 'school'];
+  const panel = (id, title, href) => `<section class="panel"><header class="panel-h"><h2>${title}</h2><a href="${href}">전체 보기${icon('right', 'sm')}</a></header><div id="${id}"><div class="loading">불러오는 중</div></div></section>`;
+  view.innerHTML = `<div class="home">
+    <section class="home-notice" id="h-notice"></section>
+    ${panel('h-hot', '인기글', '#/community/rec')}
+    <div class="home-grid">${boards.map((b) => panel(`h-${b}`, BOARDS[b].name, boardHref(b))).join('')}</div>
+    ${panel('h-data', '자료실 새 자료', '#/study')}
+  </div>`;
   const [notices, recent, data, ...per] = await Promise.all([
     be.listPosts({ board: 'notice', limit: 3 }),
     be.listPosts({ limit: 100 }),
@@ -103,349 +155,215 @@ async function renderHome(ctx) {
     ...boards.map((b) => be.listPosts({ board: b, limit: 5 })),
   ]);
   if (!ctx.alive()) return;
-  fillBanner(getBanners(be.listBanners));
-  const empty = '<div class="empty" style="padding:20px">올라온 글이 없어요</div>';
-  $('#h-notice').innerHTML = notices.map(rowHtml).join('') || '<a class="row" href="#/rules"><span class="tag t-notice">공지</span><span class="t">커뮤니티 이용규칙을 꼭 읽어 주세요</span></a>';
-  $('#h-hot').innerHTML = hot(recent).slice(0, 5).map(rowHtml).join('') || empty;
-  boards.forEach((b, i) => { $(`#h-${b}`).innerHTML = per[i].map(rowHtml).join('') || empty; });
-  $('#h-data').innerHTML = data.map(rowHtml).join('') || empty;
-}
-
-// [말머리] 제목 …… 날짜 (DSchool 스타일 한 줄)
-function rowHtml(p) {
-  const c = p.board === 'notice' ? '공지' : category(p.board, p.category).name;
-  const d = new Date(p.createdAt);
-  const date = Date.now() - p.createdAt < 86400000 ? `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
-    : `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
-  return `<a class="row" href="#/post/${p.id}"><span class="tag t-${p.board}">${esc(c)}</span><span class="t">${esc(p.title)}</span>
-    ${p.commentCount ? `<em>[${p.commentCount}]</em>` : ''}<time>${date}</time></a>`;
+  const none = empty('등록된 글이 없습니다');
+  $('#h-notice').innerHTML = notices.map((p) => rowHtml(p)).join('')
+    || `<a class="row" href="#/rules"><span class="tag notice">공지</span><span class="t">커뮤니티 이용규칙을 확인해 주세요</span></a>`;
+  $('#h-hot').innerHTML = hot(recent).slice(0, 5).map((p, i) => rowHtml(p, i + 1)).join('') || none;
+  boards.forEach((b, i) => { $(`#h-${b}`).innerHTML = per[i].filter((p) => !p.pinned).map((p) => rowHtml(p)).join('') || none; });
+  $('#h-data').innerHTML = data.map((p) => rowHtml(p)).join('') || none;
 }
 
 // 최근 7일 글 중 좋아요·댓글이 많은 순
 function hot(list) {
   const week = Date.now() - 7 * 86400000;
-  const score = (p) => (p.likeCount || 0) * 2 + (p.commentCount || 0) + (p.createdAt > week ? 3 : 0);
-  return list.filter((p) => p.board !== 'notice').sort((a, b) => score(b) - score(a) || b.createdAt - a.createdAt);
+  const score = (p) => (p.likeCount || 0) * 2 + (p.commentCount || 0) + (p.viewCount || 0) / 20 + (p.createdAt > week ? 3 : 0);
+  return list.filter((p) => p.board !== 'notice' && !p.pinned).sort((a, b) => score(b) - score(a) || b.createdAt - a.createdAt);
 }
 
-function fillNotices(notices) {
-  const s = $('#notice-slider');
-  if (!s) return;
-  s.innerHTML = notices.length
-    ? notices.map((n) => `<a class="notice-card" href="#/post/${n.id}">📢 <span>${esc(n.title)}</span>${ICON.chevron}</a>`).join('')
-    : `<a class="notice-card" href="#/rules">📢 <span>커뮤니티 이용규칙을 꼭 읽어 주세요</span>${ICON.chevron}</a>`;
-  bindDots(s, $('#notice-dots'));
-}
-
-function emojiRow() {
-  const pick = [['news', 'admission-news'], ['news', 'event'], ['talk', 'parent'], ['talk', 'worry'], ['school', 'exam'], ['school', 'transfer'], ['admission', 'susi'], ['admission', 'jeongsi']];
-  return `<div class="emoji-row">${pick.map(([b, c]) => {
-    const x = category(b, c);
-    return `<a href="#/community/${b}?category=${c}"><span style="background:${x.bg}">${x.icon}</span>${esc(x.name)}</a>`;
-  }).join('')}</div>`;
-}
-
-/* ---------------- 커뮤니티 ---------------- */
-function tabsHtml(on) {
-  return `<nav class="tabs">${[...COMMUNITY_TABS, ...(QNA_OPEN ? [{ id: 'qna', name: '문제풀이' }] : [])].map((t) => `<a href="#/community/${t.id}" class="${t.id === on ? 'on' : ''}">${t.name}</a>`).join('')}</nav>`;
-}
-
+/* ---------------- 게시판 ---------------- */
 async function renderCommunity(ctx, tab) {
-  if (tab === 'all') return renderBoardTable(ctx, 'all', { board: 'all', category: '' }, () => '#/community/all');
-  if (tab !== 'rec' && (!BOARDS[tab] || ['data', 'notice'].includes(tab) || (tab === 'qna' && !QNA_OPEN))) tab = 'rec';
-  if (tab !== 'rec') return renderBoard(ctx, tab);
-  const { view } = ctx;
-  view.innerHTML = `${topBar('커뮤니티')}${tabsHtml('rec')}${topEnd}${bannerSlot()}
-    <div class="slider" id="notice-slider"></div><div class="dots" id="notice-dots"></div>
-    <div class="sec-title"><h2>추천 게시글</h2><p>좋아요와 댓글이 많은 글을 골랐어요</p></div>
-    <div class="slider" id="rec-slider"><div class="loading" style="width:100%">불러오는 중…</div></div><div class="dots" id="rec-dots"></div>
-    <div class="sec-title"><h2>최신 글</h2></div><div class="post-list" id="latest"></div>
-    ${emojiRow()}${fab('#/write?board=talk')}`;
-  const [notices, recent] = await Promise.all([be.listPosts({ board: 'notice', limit: 5 }), be.listPosts({ limit: 100 })]);
-  if (!ctx.alive()) return;
-  fillBanner(getBanners(be.listBanners));
-  fillNotices(notices);
-  const top = hot(recent).slice(0, 10);
-  const pages = [];
-  for (let i = 0; i < top.length; i += 2) pages.push(top.slice(i, i + 2));
-  $('#rec-slider').innerHTML = pages.length
-    ? pages.map((pg) => `<div class="rec-page">${pg.map(recCardHtml).join('')}</div>`).join('')
-    : '<div class="empty" style="width:100%">올라온 글이 없어요</div>';
-  bindDots($('#rec-slider'), $('#rec-dots'));
-  const latest = recent.filter((p) => p.board !== 'notice').slice(0, 10);
-  $('#latest').innerHTML = latest.map((p) => (p.board === 'qna' ? qcardHtml(p) : itemHtml(p))).join('') || '<div class="empty">올라온 글이 없어요</div>';
+  if (tab === 'all' || tab === 'rec') return renderBoard(ctx, tab);
+  if (!BOARDS[tab] || ['data', 'notice'].includes(tab) || (tab === 'qna' && !QNA_OPEN)) return renderBoard(ctx, 'rec');
+  return renderBoard(ctx, tab);
 }
 
-// 게시판 목록(소통해요·공부해요·문제풀이·자료실·공지)
 async function renderBoard(ctx, board) {
   const { view, q } = ctx;
-  const b = BOARDS[board];
-  const filter = { board, category: q.get('category') || '', grade: q.get('grade') || '', status: q.get('status') || '' };
-  const href = (patch) => {
-    const n = { ...filter, ...patch };
-    const qs = new URLSearchParams(Object.entries(n).filter(([k, v]) => v && k !== 'board')).toString();
-    const base = board === 'data' ? '#/study' : board === 'notice' ? '#/notices' : `#/community/${board}`;
-    return base + (qs ? `?${qs}` : '');
-  };
-  const gradeSel = `<select class="pill-select${filter.grade ? ' set' : ''}" data-f="grade" aria-label="학년">
-    <option value="">${board === 'qna' ? '학년' : '전 학년'}</option>${GRADES.map((g) => `<option ${g === filter.grade ? 'selected' : ''}>${g}</option>`).join('')}</select>`;
-  let filters = '';
-  if (board === 'qna') {
-    filters = `<div class="chips">${gradeSel}
-      <select class="pill-select${filter.category ? ' set' : ''}" data-f="category" aria-label="과목"><option value="">과목</option>
-        ${SUBJECTS.map((s) => `<option ${s === filter.category ? 'selected' : ''}>${s}</option>`).join('')}</select>
-      <select class="pill-select${filter.status ? ' set' : ''}" data-f="status" aria-label="상태"><option value="">상태</option>
-        <option value="open" ${filter.status === 'open' ? 'selected' : ''}>답변 기다리는 중</option>
-        <option value="solved" ${filter.status === 'solved' ? 'selected' : ''}>해결</option></select></div>`;
-  } else if (board !== 'notice') {
-    filters = `<div class="chips">${gradeSel}<a class="chip ${filter.category ? '' : 'on'}" href="${href({ category: '' })}">전체</a>
-      ${b.categories.map((c) => `<a class="chip ${c.id === filter.category ? 'on' : ''}" href="${href({ category: c.id })}">${esc(c.name)}</a>`).join('')}</div>`;
-  }
-  return renderBoardTable(ctx, board, filter, href);
-  const head = board === 'data'
-    ? `${topBar('입시 자료실')}${topEnd}<div class="rules compact"><h3>⚠️ 자료실 규칙 — 꼭 지켜 주세요</h3><ol>${DATA_RULES.slice(0, 3).map((r) => `<li>${esc(r)}</li>`).join('')}</ol>
-       <p style="margin:8px 0 0;font-size:14px"><a href="#/data-rules" style="color:var(--warn);font-weight:700">자료실 규칙 전체 보기 ›</a></p></div>`
-    : board === 'notice' ? backBar('공지사항') : `${topBar('커뮤니티')}${tabsHtml(board)}${topEnd}`;
-  const canWrite = board !== 'notice' || be.isAdmin();
-  view.innerHTML = `${head}${board === 'notice' ? '' : bannerSlot()}${filters}<div class="post-list" id="pins"></div><div class="post-list" id="list"><div class="loading">불러오는 중…</div></div>
-    <button class="more hidden" id="more">더 보기</button>
-    ${canWrite ? fab(`#/write?board=${board}${filter.category ? `&category=${encodeURIComponent(filter.category)}` : ''}`) : ''}`;
-  $$('select[data-f]', view).forEach((s) => s.addEventListener('change', () => ctx.go(href({ [s.dataset.f]: s.value }))));
+  const virtual = board === 'all' || board === 'rec';
+  const b = virtual ? { name: board === 'all' ? '전체글' : '인기글', categories: [] } : BOARDS[board];
+  const cat = q.get('category') || '';
+  const per = [15, 30, 50].includes(+q.get('n')) ? +q.get('n') : 15;
+  const page = Math.max(1, +q.get('p') || 1);
+  const word = (q.get('q') || '').trim(), field = q.get('f') || 'title', period = q.get('d') || '';
+  const admin = be.isAdmin();
+  const writable = !virtual && (board !== 'notice' || admin);
+  const writeHref = `#/write?board=${board}${cat ? `&category=${encodeURIComponent(cat)}` : ''}`;
+  const base = virtual ? `#/community/${board}` : boardHref(board);
+  const qs = (patch) => { const u = new URLSearchParams(q); Object.entries(patch).forEach(([k, v]) => (v ? u.set(k, v) : u.delete(k))); const s = u.toString(); return s ? `${base}?${s}` : base; };
 
-  let after = null;
-  const list = $('#list'), more = $('#more');
-  const load = async () => {
-    more.disabled = true;
-    const rows = await be.listPosts({ ...filter, limit: 20, after });
-    if (!ctx.alive()) return;
-    if (!after) list.innerHTML = '';
-    list.insertAdjacentHTML('beforeend', rows.filter((p) => board === 'notice' || !p.pinned).map((p) => (board === 'qna' ? qcardHtml(p) : itemHtml(p))).join(''));
-    if (!list.children.length) list.innerHTML = `<div class="empty">${board === 'data' ? '올라온 글이 없어요' : '올라온 글이 없어요'}</div>`;
-    after = rows.length ? rows[rows.length - 1].id : after;
-    more.classList.toggle('hidden', rows.length < 20);
-    more.disabled = false;
-  };
-  more.addEventListener('click', load);
-  if (board !== 'notice') {
-    fillBanner(getBanners(be.listBanners));
-    be.listPosts({ board, pinned: true, limit: 10 }).then((ns) => { if (ctx.alive()) $('#pins').innerHTML = ns.map(itemHtml).join(''); }).catch(() => {});
-  }
-  await load();
-}
+  view.innerHTML = `${pageHead(b.name, { desc: BOARD_DESC[board], actions: writable ? `<a class="btn" href="${writeHref}">${icon('pen', 'sm')}글쓰기</a>` : '' })}
+    ${board === 'data' ? `<div class="notice-box">${icon('info')}<div>자료실에는 직접 만들었거나 배포 허락을 받은 자료만 올릴 수 있으며, 관리자 확인 후 공개됩니다. <a href="#/data-rules">자료실 규칙</a></div></div>` : ''}
+    ${b.categories.length && board !== 'notice' ? `<nav class="tabs" style="margin-top:${board === 'data' ? 16 : 0}px">
+      <a href="${qs({ category: '', p: '' })}" class="${cat ? '' : 'on'}">전체</a>${b.categories.map((c) => `<a href="${qs({ category: c.id, p: '' })}" class="${c.id === cat ? 'on' : ''}">${esc(c.name)}</a>`).join('')}</nav>` : ''}
+    <div class="board-tools"><div class="left" id="bt-count"></div>
+      <div class="right">${!virtual && board !== 'notice' ? `<label class="check"><input type="checkbox" id="hide-n" ${q.get('hn') ? 'checked' : ''}>공지 숨기기</label>` : ''}
+        <select class="select sm" id="per" aria-label="한 쪽에 보일 글 수">${[15, 30, 50].map((n) => `<option value="${n}" ${n === per ? 'selected' : ''}>${n}개씩</option>`).join('')}</select></div></div>
+    <table class="bt"><colgroup><col style="width:104px"><col><col style="width:140px"><col style="width:104px"><col style="width:64px"><col style="width:64px">${admin ? '<col style="width:112px">' : ''}</colgroup>
+      <thead><tr><th>말머리</th><th>제목</th><th>작성자</th><th>작성일</th><th>조회</th><th>좋아요</th>${admin ? '<th>관리</th>' : ''}</tr></thead>
+      <tbody id="bt-body"><tr><td colspan="7" class="loading">불러오는 중</td></tr></tbody></table>
+    <div class="board-foot"><div class="pager" id="pager"></div>
+      <form class="board-search" id="bt-search">
+        <select class="select" name="d" aria-label="기간"><option value="">전체 기간</option><option value="7" ${period === '7' ? 'selected' : ''}>1주</option><option value="30" ${period === '30' ? 'selected' : ''}>1개월</option><option value="365" ${period === '365' ? 'selected' : ''}>1년</option></select>
+        <select class="select" name="f" aria-label="검색 범위"><option value="title">제목</option><option value="all" ${field === 'all' ? 'selected' : ''}>제목+내용</option><option value="author" ${field === 'author' ? 'selected' : ''}>작성자</option></select>
+        <input class="input" name="q" value="${esc(word)}" placeholder="검색어 입력" aria-label="검색어">
+        <button class="btn line" aria-label="검색">${icon('search', 'sm')}</button></form></div>
+    ${writable ? fab(writeHref) : ''}`;
+  $('#per').addEventListener('change', (e) => ctx.go(qs({ n: e.target.value === '15' ? '' : e.target.value, p: '' })));
+  $('#hide-n')?.addEventListener('change', (e) => ctx.go(qs({ hn: e.target.checked ? '1' : '', p: '' })));
+  $('#bt-search').addEventListener('submit', (e) => { e.preventDefault(); const f = e.target; ctx.go(qs({ q: f.q.value.trim(), f: f.f.value === 'title' ? '' : f.f.value, d: f.d.value, p: '' })); });
 
-// 데스크탑: 네이버 카페식 표(말머리·제목·작성자·작성일·조회수·좋아요) + 쪽 번호 + 아래 검색
-const fmtDate = (t) => { const d = new Date(t); return Date.now() - t < 86400000 ? `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}` : `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}.`; };
-const ICONS = { news: '📰', talk: '☕', school: '🏫', admission: '🎓', data: '📚', notice: '📢', qna: '❓' };
-async function renderBoardTable(ctx, board, filter, href) {
-  const { view, q } = ctx;
-  const all = board === 'all';
-  const b = all ? { name: '전체글', categories: [] } : BOARDS[board];
-  const per = +(q.get('n') || 15), page = +(q.get('p') || 1), word = (q.get('q') || '').trim(), field = q.get('f') || 'title', period = q.get('d') || '';
-  const catName = filter.category ? ` · ${category(board, filter.category).name}` : '';
-  view.innerHTML = `<div class="bt-head"><h1>${ICONS[board] || '📋'} ${esc(b.name)}${board === 'all' ? '보기' : ' 게시판'}${esc(catName)}</h1>
-      <div class="bt-tools"><label><input type="checkbox" id="hide-n" ${q.get('hn') ? 'checked' : ''}> 공지 숨기기</label>
-      <select id="per">${[15, 30, 50].map((n) => `<option value="${n}" ${n === per ? 'selected' : ''}>${n}개씩</option>`).join('')}</select></div></div>
-    ${board === 'data' ? '<p class="bt-note">자료실에는 직접 만들었거나 배포 허락을 받은 자료만 올릴 수 있어요. 관리자 확인 후 공개돼요. <a href="#/data-rules">자료실 규칙 보기</a></p>' : ''}
-    ${board === 'notice' || board === 'all' ? '' : `<div class="bt-cats"><a class="${filter.category ? '' : 'on'}" href="${href({ category: '' })}">전체</a>${b.categories.map((c) => `<a class="${c.id === filter.category ? 'on' : ''}" href="${href({ category: c.id })}">${esc(c.name)}</a>`).join('')}</div>`}
-    <table class="bt"><colgroup><col style="width:92px"><col><col style="width:150px"><col style="width:110px"><col style="width:70px"><col style="width:70px">${be.isAdmin() ? '<col style="width:96px">' : ''}</colgroup>
-      <thead><tr><th>말머리</th><th>제목</th><th>작성자</th><th>작성일</th><th>조회수</th><th>좋아요</th>${be.isAdmin() ? '<th>관리</th>' : ''}</tr></thead><tbody id="bt-body"><tr><td colspan="6" class="loading">불러오는 중…</td></tr></tbody></table>
-    <div class="bt-foot"><div class="pager" id="pager"></div>
-      <form class="bt-search" id="bt-search"><select name="d"><option value="">전체기간</option><option value="7" ${period === '7' ? 'selected' : ''}>1주</option><option value="30" ${period === '30' ? 'selected' : ''}>1개월</option><option value="365" ${period === '365' ? 'selected' : ''}>1년</option></select>
-        <select name="f"><option value="title">제목만</option><option value="all" ${field === 'all' ? 'selected' : ''}>제목+내용</option><option value="author" ${field === 'author' ? 'selected' : ''}>글작성자</option></select>
-        <input name="q" value="${esc(word)}" placeholder="검색어를 입력해주세요"><button aria-label="검색"><svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.8-4.8"/></svg></button></form></div>
-    ${!all && (board !== 'notice' || be.isAdmin()) ? fab(`#/write?board=${board}${filter.category ? `&category=${encodeURIComponent(filter.category)}` : ''}`) : ''}`;
-  const qs = (patch) => { const u = new URLSearchParams(q); Object.entries(patch).forEach(([k, v]) => (v ? u.set(k, v) : u.delete(k))); return `#/${board === 'data' ? 'study' : board === 'notice' ? 'notices' : `community/${board}`}?${u}`; };
-  $('#per').addEventListener('change', (e) => ctx.go(qs({ n: e.target.value, p: '' })));
-  $('#hide-n').addEventListener('change', (e) => ctx.go(qs({ hn: e.target.checked ? '1' : '' })));
-  $('#bt-search').addEventListener('submit', (e) => { e.preventDefault(); const f = e.target; ctx.go(qs({ q: f.q.value.trim(), f: f.f.value, d: f.d.value, p: '' })); });
-  const [notices, rows] = await Promise.all([
-    [],
-    be.listPosts(all ? { limit: 500 } : { board, category: filter.category, limit: 500 }).then((r) => (all ? r.filter((p) => p.board !== 'notice') : r)),
-  ]);
+  let rows;
+  if (board === 'rec') rows = hot(await be.listPosts({ limit: 300 })).filter((p) => p.createdAt > Date.now() - 30 * 86400000).slice(0, 100);
+  else if (board === 'all') rows = (await be.listPosts({ limit: 500 })).filter((p) => p.board !== 'notice');
+  else rows = await be.listPosts({ board, category: cat, limit: 500 });
   if (!ctx.alive()) return;
-  notices.push(...(board === 'notice' || all || q.get('hn') ? [] : rows.filter((p) => p.pinned)));
+
+  const pins = virtual || board === 'notice' || q.get('hn') ? [] : rows.filter((p) => p.pinned);
   const since = period ? Date.now() - +period * 86400000 : 0;
   const k = word.toLowerCase();
-  const hits = rows.filter((p) => (all || !p.pinned) && p.createdAt >= since && (!k || (field === 'author' ? p.nickname.toLowerCase().includes(k)
-    : (field === 'all' ? `${p.title} ${p.body}` : p.title).toLowerCase().includes(k))));
+  const hits = rows.filter((p) => (virtual || board === 'notice' || !p.pinned) && p.createdAt >= since && (!k || (field === 'author' ? (p.nickname || '').toLowerCase().includes(k)
+    : (field === 'all' ? `${p.title} ${p.body || ''}` : p.title).toLowerCase().includes(k))));
   const pages = Math.max(1, Math.ceil(hits.length / per));
   const list = hits.slice((page - 1) * per, page * per);
-  const admin = be.isAdmin();
-  const tr = (p, pin) => `<tr class="${pin ? 'pin' : ''}"><td><span class="tag ${pin ? 't-notice fill' : `t-${p.board}`}">${pin ? '공지' : esc(category(p.board, p.category).name)}</span></td>
-    <td class="tt"><a href="#/post/${p.id}">${esc(p.title)}${p.images?.length ? ' <i class="ico">🖼</i>' : ''}${p.files?.length ? ' <i class="ico">📎</i>' : ''}${p.commentCount ? ` <em>[${p.commentCount}]</em>` : ''}${p.board === 'data' && !p.approved ? ' <span class="badge pending">승인 대기</span>' : ''}</a></td>
-    <td class="au" data-uid="${esc(p.uid)}">${esc(p.nickname)} <small>${esc(p.grade)}</small></td><td data-au="${esc(p.nickname)} · ">${fmtDate(p.createdAt)}</td><td>${(p.viewCount || 0).toLocaleString()}</td><td>${(p.likeCount || 0).toLocaleString()}</td>${admin ? `<td class="adm" data-pid="${esc(p.id)}"><button data-hide>숨김</button><button data-del>삭제</button></td>` : ''}</tr>`;
-  $('#bt-body').innerHTML = (page === 1 ? notices.map((p) => tr(p, true)).join('') : '') + list.map((p) => tr(p, board === 'notice')).join('')
-    || '<tr><td colspan="7" class="empty">올라온 글이 없어요</td></tr>';
+  $('#bt-count').innerHTML = `${word ? `'${esc(word)}' 검색 결과 ` : ''}<b class="num">${hits.length.toLocaleString()}</b>건`;
+
+  const tr = (p, pin) => `<tr class="${pin ? 'pin' : ''}">
+    <td class="c-cat">${pin ? '<span class="tag notice">공지</span>' : tagHtml(p)}</td>
+    <td class="c-title"><a href="#/post/${esc(p.id)}"><span class="t">${esc(p.title)}</span>${p.images?.length ? icon('image') : ''}${p.files?.length ? icon('clip') : ''}${p.commentCount ? `<span class="cmt">${p.commentCount}</span>` : ''}${p.board === 'data' && !p.approved ? '<span class="tag warn">승인 대기</span>' : ''}</a></td>
+    <td class="c-author" data-uid="${admin ? esc(p.uid) : ''}">${esc(p.nickname)}<small>${esc(p.grade)}</small></td>
+    <td>${shortDate(p.createdAt)}</td><td>${(p.viewCount || 0).toLocaleString()}</td><td>${(p.likeCount || 0).toLocaleString()}</td>
+    ${admin ? `<td class="c-adm" data-pid="${esc(p.id)}"><button type="button" data-hide>숨김</button><button type="button" data-del>삭제</button></td>` : ''}
+    <td class="m-meta">${esc(p.nickname)} · ${shortDate(p.createdAt)} · 조회 ${(p.viewCount || 0).toLocaleString()}${p.likeCount ? ` · 좋아요 ${p.likeCount}` : ''}</td></tr>`;
+  $('#bt-body').innerHTML = (page === 1 ? pins.map((p) => tr(p, true)).join('') : '') + list.map((p) => tr(p, board === 'notice')).join('')
+    || `<tr><td colspan="7" class="empty">${icon('inbox')}<p>${word ? '검색 결과가 없습니다' : '등록된 글이 없습니다'}</p></td></tr>`;
+
+  // 쪽 번호(10쪽씩)
+  const start = Math.floor((page - 1) / 10) * 10 + 1, end = Math.min(pages, start + 9);
+  $('#pager').innerHTML = pages > 1 ? `${start > 1 ? `<a href="${qs({ p: String(start - 1) })}" aria-label="이전">${icon('left', 'sm')}</a>` : ''}
+    ${Array.from({ length: end - start + 1 }, (_, i) => start + i).map((n) => `<a class="${n === page ? 'on' : ''}" href="${qs({ p: n === 1 ? '' : String(n) })}">${n}</a>`).join('')}
+    ${end < pages ? `<a href="${qs({ p: String(end + 1) })}" aria-label="다음">${icon('right', 'sm')}</a>` : ''}` : '';
+
   if (admin) {
-    $('table.bt').classList.add('with-adm');
     $('#bt-body').addEventListener('click', async (e) => {
-      const cell = e.target.closest('td.adm');
+      const cell = e.target.closest('td.c-adm');
       if (!cell) return;
-      const p = [...notices, ...rows].find((x) => x.id === cell.dataset.pid);
+      const p = rows.find((x) => x.id === cell.dataset.pid);
       try {
-        if (e.target.closest('[data-hide]') && confirm(`'${p.title}' 글을 숨길까요? 관리자 → 글 관리에서 다시 보이게 할 수 있어요.`)) { await be.setHidden(p, true); cell.closest('tr').remove(); toast('숨겼어요'); }
-        if (e.target.closest('[data-del]') && confirm(`'${p.title}' 글을 삭제할까요? 되돌릴 수 없어요.`)) { await be.deletePost(p); cell.closest('tr').remove(); toast('삭제했어요'); }
+        if (e.target.closest('[data-hide]') && await confirmBox('글 숨기기', `'${p.title}' 글을 숨깁니다. 관리자 화면의 글 관리에서 다시 공개할 수 있습니다.`, '숨기기')) {
+          await be.setHidden(p, true); cell.closest('tr').remove(); toast('글을 숨겼습니다');
+        }
+        if (e.target.closest('[data-del]') && await confirmBox('글 삭제', `'${p.title}' 글을 삭제합니다. 삭제한 글은 되돌릴 수 없습니다.`, '삭제', true)) {
+          await be.deletePost(p); cell.closest('tr').remove(); toast('글을 삭제했습니다');
+        }
       } catch (err) { toast(be.errorText(err)); }
     });
   }
-  $('#pager').innerHTML = Array.from({ length: Math.min(pages, 10) }, (_, i) => `<a class="${i + 1 === page ? 'on' : ''}" href="${qs({ p: String(i + 1) })}">${i + 1}</a>`).join('');
 }
 
 /* ---------------- 검색 ---------------- */
 async function renderSearch(ctx) {
   const { view, q } = ctx;
   const word = (q.get('q') || '').trim();
-  view.innerHTML = `${backBar('검색')}<form class="search-box" id="sf"><input class="input" name="q" placeholder="제목·내용으로 찾기" value="${esc(word)}" autofocus>
-    <button class="btn small dark">검색</button></form><div class="post-list" id="res"></div>`;
-  $('#sf').addEventListener('submit', (e) => { e.preventDefault(); ctx.go(`#/search?q=${encodeURIComponent(e.target.q.value.trim())}`); });
-  if (!word) { $('#res').innerHTML = '<div class="empty">찾고 싶은 낱말을 넣어 주세요</div>'; return; }
-  const rows = await be.listPosts({ limit: 400 });
+  view.innerHTML = `${pageHead('검색')}
+    <form class="inline" id="sf" style="max-width:560px"><input class="input" name="q" placeholder="제목·내용 검색" value="${esc(word)}" aria-label="검색어"><button class="btn">검색</button></form>
+    <div class="section" id="res" style="margin-top:24px"></div>`;
+  $('#sf').addEventListener('submit', (e) => { e.preventDefault(); const v = e.target.q.value.trim(); if (v) ctx.go(`#/search?q=${encodeURIComponent(v)}`); });
+  if (!word) { $('#res').innerHTML = empty('찾을 단어를 입력해 주세요', 'search'); return; }
+  const rows = await be.listPosts({ limit: 500 });
   if (!ctx.alive()) return;
   const k = word.toLowerCase();
-  const hits = rows.filter((p) => `${p.title} ${p.body}`.toLowerCase().includes(k));
-  $('#res').innerHTML = hits.length ? hits.map((p) => (p.board === 'qna' ? qcardHtml(p) : itemHtml(p))).join('')
-    : `<div class="empty">'${esc(word)}' 검색 결과가 없어요<br><small>최근 글 400개 안에서 찾았어요</small></div>`;
+  const hits = rows.filter((p) => `${p.title} ${p.body || ''}`.toLowerCase().includes(k));
+  $('#res').innerHTML = `<p class="hint" style="margin-bottom:12px">'${esc(word)}' 검색 결과 <b class="num" style="color:var(--g900)">${hits.length}</b>건</p>`
+    + (hits.length ? `<div class="list">${hits.map(listItemHtml).join('')}</div>` : empty('검색 결과가 없습니다', 'search'));
 }
 
 /* ---------------- 알림 ---------------- */
 async function renderNotifications(ctx) {
   const { view } = ctx;
-  view.innerHTML = `${backBar('알림')}<div id="nl"><div class="loading">불러오는 중…</div></div>`;
+  view.innerHTML = `${pageHead('알림')}<div id="nl"><div class="loading">불러오는 중</div></div>`;
   const list = await be.listNotifications();
   if (!ctx.alive()) return;
   const text = (n) => ({
-    comment: ['💬', `<b>${esc(n.fromName)}</b>님이 내 글에 댓글을 남겼어요: ${esc(n.text)}`],
-    accepted: ['✅', `<b>${esc(n.fromName)}</b>님이 내 답변을 채택했어요: ${esc(n.text)}`],
-    approved: ['📗', `자료가 승인되어 공개됐어요: ${esc(n.text)}`],
-    rejected: ['⚠️', `자료실 규칙에 맞지 않아 자료가 삭제됐어요: ${esc(n.text)}`],
-  }[n.type] || ['🔔', esc(n.text)]);
-  $('#nl').innerHTML = list.length ? list.map((n) => {
-    const [ic, t] = text(n);
-    return `<a class="notif ${n.read ? '' : 'unread'}" href="${n.type === 'rejected' ? '#/study' : `#/post/${esc(n.postId)}`}"><span class="ic">${ic}</span><div><p>${t}</p><small>${ago(n.createdAt)}</small></div></a>`;
-  }).join('') : '<div class="empty">새 알림이 없어요</div>';
+    comment: ['chat', `<b>${esc(n.fromName)}</b>님이 댓글을 남겼습니다`, n.text],
+    accepted: ['check', `<b>${esc(n.fromName)}</b>님이 답변을 채택했습니다`, n.text],
+    approved: ['check', '자료가 승인되어 공개되었습니다', n.text],
+    rejected: ['alert', '자료실 규칙에 맞지 않아 자료가 삭제되었습니다', n.text],
+  }[n.type] || ['bell', '알림', n.text]);
+  $('#nl').innerHTML = list.length ? `<div class="list">${list.map((n) => {
+    const [ic, t, sub] = text(n);
+    return `<a class="list-item ${n.read ? '' : 'unread'}" href="${n.type === 'rejected' ? '#/study' : `#/post/${esc(n.postId)}`}">${icon(ic)}<div class="main"><p>${t}</p>
+      <div class="m"><span>${esc(sub)}</span><span>${ago(n.createdAt)}</span></div></div></a>`;
+  }).join('')}</div>` : empty('새 알림이 없습니다', 'bell');
   be.markRead(list).catch(() => {});
 }
 
 /* ---------------- 전체 메뉴 ---------------- */
 function renderMenu({ view }) {
   const me = be.currentUser();
-  view.innerHTML = `${topBar('전체 메뉴')}${topEnd}
-    <div class="card">${me
-      ? `<div class="profile"><span class="avatar">${esc(me.nickname[0])}</span><div><b>${esc(me.nickname)}</b><br><small style="color:var(--sub)">${esc(me.grade)} · @${esc(me.username)}${me.role === 'admin' ? ' · 관리자' : ''}</small></div></div>`
-      : '<h3>로그인하고 함께해요</h3><p>글·댓글·자료는 회원만 볼 수 있어요.</p><div style="display:flex;gap:8px;margin-top:12px"><a class="btn small" href="#/login" style="display:grid;place-items:center">로그인</a><a class="btn small gray" href="#/join" style="display:grid;place-items:center">회원가입</a></div>'}</div>
-    <div class="menu-list">
-      <div class="group">커뮤니티</div>
-      ${COMMUNITY_TABS.slice(1).map((t) => `<a href="#/community/${t.id}">${t.name}</a>`).join('')}${QNA_OPEN ? '<a href="#/community/qna">문제풀이</a>' : ''}<a href="#/study">자료실</a><a href="#/notices">공지사항</a>
-      ${me ? `<div class="group">내 활동</div><a href="#/me">내 정보·내가 쓴 글</a><a href="#/notifications">알림</a>` : ''}
-      ${me?.role === 'admin' ? '<div class="group">관리</div><a href="#/admin">관리자 화면</a><a href="#/write?board=notice">공지 쓰기</a>' : ''}
-      <div class="group">안내</div><a href="#/rules">커뮤니티 이용규칙</a><a href="#/data-rules">자료실 규칙</a><a href="#/privacy">개인정보 처리방침</a>
-      ${me ? '<button id="logout" style="color:var(--danger)">로그아웃</button>' : ''}
-    </div>`;
-  $('#logout')?.addEventListener('click', async () => { await be.signOut(); toast('로그아웃했어요'); location.hash = '#/'; });
+  const a = (href, label) => `<a href="${href}">${esc(label)}${icon('right', 'sm')}</a>`;
+  view.innerHTML = `${pageHead('전체 메뉴')}
+    <div class="side-card" style="margin-bottom:24px">${me
+      ? `<div class="side-profile"><span class="avatar">${esc(me.nickname[0])}</span><div><b>${esc(me.nickname)}</b><span>@${esc(me.username)} · ${esc(me.grade)}${me.role === 'admin' ? ' · 관리자' : ''}</span></div></div>`
+      : '<div class="side-profile"><span class="logo-tile"><img src="images/logo.webp" alt=""></span><div><b>태산입시</b><span>로그인하면 글 내용을 볼 수 있습니다</span></div></div><div class="grid-2"><a class="btn line" href="#/login">로그인</a><a class="btn" href="#/join">회원가입</a></div>'}</div>
+    <div class="menu-group"><h2>게시판</h2>${a('#/community/rec', '인기글')}${a('#/community/all', '전체글')}${COMMUNITY_TABS.slice(1).map((t) => a(`#/community/${t.id}`, t.name)).join('')}${QNA_OPEN ? a('#/community/qna', '문제풀이') : ''}${a('#/study', '자료실')}${a('#/notices', '공지사항')}</div>
+    ${me ? `<div class="menu-group"><h2>내 활동</h2>${a('#/me', '내 정보')}${a('#/notifications', '알림')}</div>` : ''}
+    ${me?.role === 'admin' ? `<div class="menu-group"><h2>관리</h2>${a('#/admin?tab=users', '회원 관리')}${a('#/admin?tab=posts', '글 관리')}${a('#/admin?tab=cover', '배너')}${a('#/write?board=notice', '공지 쓰기')}</div>` : ''}
+    <div class="menu-group"><h2>안내</h2>${a('#/rules', '이용규칙')}${a('#/data-rules', '자료실 규칙')}${a('#/privacy', '개인정보 처리방침')}
+      ${me ? '<button type="button" id="logout" style="color:var(--g600)">로그아웃</button>' : ''}</div>`;
+  $('#logout')?.addEventListener('click', async () => { await be.signOut(); toast('로그아웃했습니다'); location.hash = '#/'; });
 }
 
-/* ---------------- 데스크탑 왼쪽 메뉴(카페 정보·게시판 목록) ---------------- */
-let sideTab = 'info';
-function renderSide(hash) {
-  const side = $('#side');
-  const me = be.currentUser();
-  const login = $('#u-login');
-  if (login) { login.textContent = me ? '내 정보' : '로그인'; login.href = me ? '#/me' : '#/login'; }
-  // 관리자 전용 링크(위 줄)
-  $$('#u-links .u-adm').forEach((a) => a.remove());
-  if (be.isAdmin() && login) {
-    login.insertAdjacentHTML('beforebegin', '<a class="u-adm" href="#/admin?tab=users">회원 관리</a><a class="u-adm" href="#/admin?tab=posts">글 관리</a><a class="u-adm" href="#/admin?tab=cover">배너</a>');
-  }
-  $$('#m-tabs .u-adm').forEach((a) => a.remove());
-  if (be.isAdmin()) $('#m-tabs')?.insertAdjacentHTML('beforeend', '<a class="u-adm" href="#/admin?tab=users">회원 관리</a><a class="u-adm" href="#/admin?tab=posts">글 관리</a><a class="u-adm" href="#/admin?tab=cover">배너</a>');
-  const cur = hash.split('&')[0];
-  const link = (href, label, icon = '📄', sub = false) => `<a class="s-link${sub ? ' sub' : ''}${cur === href || cur.startsWith(`${href}?`) || cur === href.split('?')[0] + '?' + (href.split('?')[1] || '') ? ' on' : ''}" href="${href}"><i>${sub ? '└' : icon}</i>${esc(label)}</a>`;
-  const board = (b, icon) => {
-    const base = b === 'data' ? '#/study' : `#/community/${b}`;
-    return link(base, BOARDS[b].name + ' 게시판', icon) + BOARDS[b].categories.map((c) => link(`${base}?category=${encodeURIComponent(c.id)}`, c.name, '', true)).join('');
-  };
-  const info = `<div class="s-info"><img src="images/logo.png" alt="">
-      <div><b>태산학원</b> <small class="mgr">매니저</small><br><span>2026.10.13. 개설</span><br><a href="#/rules">커뮤니티 소개</a></div></div>
-    <div class="s-stat"><span>🌱 새싹 커뮤니티</span><span>${me ? `${esc(me.grade)} 회원` : '회원 전용'}</span></div>
-    ${me ? '<a class="s-btn dark" href="#/write?board=talk">글쓰기</a><a class="s-btn" href="#/notifications">내소식</a>'
-      : '<a class="s-btn dark" href="#/join">커뮤니티 가입하기</a><a class="s-btn" href="#/login">로그인</a>'}`;
-  const mine = me ? `<div class="s-info"><span class="avatar">${esc(me.nickname[0])}</span><div><b>${esc(me.nickname)}</b>${me.role === 'admin' ? ' <small class="mgr">관리자</small>' : ''}<br><span>@${esc(me.username)} · ${esc(me.grade)}</span></div></div>
-      <a class="s-btn dark" href="#/me">내가 쓴 글·내 정보</a><a class="s-btn" href="#/notifications">알림</a>${me.role === 'admin' ? '<a class="s-btn" href="#/admin">관리자 화면</a>' : ''}<button class="s-btn" id="s-logout">로그아웃</button>`
-    : '<p class="s-empty">로그인하면 내 활동을 볼 수 있어요.</p><a class="s-btn dark" href="#/login">로그인</a>';
-  side.innerHTML = `<div class="s-tabs"><button data-st="info" class="${sideTab === 'info' ? 'on' : ''}">카페정보</button><button data-st="mine" class="${sideTab === 'mine' ? 'on' : ''}">나의활동</button></div>
-    <div class="s-card">${sideTab === 'info' ? info : mine}</div>
-    <form class="s-search" id="s-search"><input name="q" aria-label="검색어"><button>검색</button></form>
-    <nav class="s-menu">
-      ${link('#/community/all', '전체글보기', '📋')}${link('#/community/rec', '인기글', '🔥')}
-      <h4>입시 정보</h4>${board('news', '📰')}${board('admission', '🎓')}
-      <h4>우리들 이야기</h4>${board('talk', '☕')}${board('school', '🏫')}
-      ${QNA_OPEN ? `<h4>공부</h4>${board('qna', '❓')}` : ''}
-      <h4>자료</h4>${board('data', '📚')}
-      <h4>안내</h4>${link('#/notices', '공지사항', '📢')}${link('#/rules', '이용규칙', '📌')}${link('#/data-rules', '자료실 규칙', '⚠️')}${link('#/privacy', '개인정보 처리방침', '🔒')}
-    </nav>`;
-  $$('[data-st]', side).forEach((b) => b.addEventListener('click', () => { sideTab = b.dataset.st; renderSide(location.hash || '#/'); }));
-  $('#s-search', side).addEventListener('submit', (e) => { e.preventDefault(); location.hash = `#/search?q=${encodeURIComponent(e.target.q.value.trim())}`; });
-  $('#s-logout', side)?.addEventListener('click', async () => { await be.signOut(); location.hash = '#/'; });
-}
-
-/* ---------------- 관리자: 작성자 누르면 회원 정보 ---------------- */
+/* ---------------- 관리자: 작성자를 누르면 회원 정보 ---------------- */
 document.addEventListener('click', async (e) => {
   const el = e.target.closest('[data-uid]');
   if (!el || !be.isAdmin() || !el.dataset.uid) return;
   e.preventDefault();
   try {
     const m = await be.getMember(el.dataset.uid);
-    if (!m) { toast('탈퇴했거나 없는 회원이에요'); return; }
+    if (!m) { toast('탈퇴했거나 없는 회원입니다'); return; }
     const p = m.priv || {};
     const rows = [['아이디', `@${m.username}`], ['닉네임', m.nickname], ['구분', p.memberType || m.grade], ['학년', p.childGrade ? `자녀 ${p.childGrade}` : m.grade],
       ['실명', p.realName], ['휴대폰', p.phone], ['성별', p.gender], ['나이', p.age ? `${p.age}세` : ''], ['보호자 동의', p.guardianConsent ? '예' : ''],
-      ['가입일', m.createdAt ? new Date(m.createdAt).toLocaleDateString('ko-KR') : ''], ['권한', m.role === 'admin' ? '관리자' : '회원'], ['상태', m.banned ? '이용 정지' : '정상']];
-    const box = document.createElement('div');
-    box.className = 'modal';
-    box.innerHTML = `<div class="modal-card"><div class="modal-h"><b>회원 정보</b><button data-x aria-label="닫기">✕</button></div>
-      <div class="profile" style="margin-bottom:12px"><span class="avatar">${esc((m.nickname || '?')[0])}</span><div><b>${esc(m.nickname)}</b><br><small>@${esc(m.username)}</small></div></div>
-      <table class="table">${rows.filter((r) => r[1]).map(([k, v]) => `<tr><th>${k}</th><td>${esc(v)}</td></tr>`).join('')}</table>
-      <div class="btns" style="display:flex;gap:8px;margin-top:14px">${m.uid === be.currentUser().uid ? '' : `<button class="btn small gray" data-ban>${m.banned ? '정지 해제' : '이용 정지'}</button><button class="btn small gray" data-role>${m.role === 'admin' ? '관리자 해제' : '관리자 지정'}</button>`}
-      <a class="btn small" href="#/admin?tab=users" style="display:grid;place-items:center">회원 관리</a></div></div>`;
-    document.body.appendChild(box);
-    box.addEventListener('click', async (ev) => {
-      if (ev.target === box || ev.target.closest('[data-x]') || ev.target.closest('a')) { box.remove(); return; }
-      try {
-        if (ev.target.closest('[data-ban]') && confirm(`${m.nickname}님을 ${m.banned ? '정지 해제' : '이용 정지'}할까요?`)) { await be.setUserFlags(m.uid, { banned: !m.banned }); toast('바꿨어요'); box.remove(); }
-        if (ev.target.closest('[data-role]') && confirm(`${m.nickname}님을 ${m.role === 'admin' ? '일반 회원으로' : '관리자로'} 바꿀까요?`)) { await be.setUserFlags(m.uid, { role: m.role === 'admin' ? 'member' : 'admin' }); toast('바꿨어요'); box.remove(); }
-      } catch (err) { toast(be.errorText(err)); }
+      ['가입일', m.createdAt ? fullDate(m.createdAt) : ''], ['권한', m.role === 'admin' ? '관리자' : '회원'], ['상태', m.banned ? '이용 정지' : '정상']];
+    const self = m.uid === be.currentUser().uid;
+    const v = await modal({
+      title: '회원 정보',
+      body: `<dl class="dl">${rows.filter((r) => r[1]).map(([k, val]) => `<div><dt>${k}</dt><dd>${esc(val)}</dd></div>`).join('')}</dl>`,
+      buttons: [...(self ? [] : [{ label: m.role === 'admin' ? '관리자 해제' : '관리자 지정', value: 'role', cls: 'line' }, { label: m.banned ? '정지 해제' : '이용 정지', value: 'ban', cls: 'danger' }]), { label: '닫기', value: null }],
     });
+    if (v === 'ban' && await confirmBox(m.banned ? '정지 해제' : '이용 정지', `${m.nickname}님을 ${m.banned ? '정지 해제' : '이용 정지'}합니다.`, '확인', !m.banned)) {
+      await be.setUserFlags(m.uid, { banned: !m.banned }); toast('변경했습니다');
+    }
+    if (v === 'role' && await confirmBox('권한 변경', `${m.nickname}님을 ${m.role === 'admin' ? '일반 회원으로' : '관리자로'} 변경합니다.`)) {
+      await be.setUserFlags(m.uid, { role: m.role === 'admin' ? 'member' : 'admin' }); toast('변경했습니다');
+    }
   } catch (err) { toast(be.errorText(err)); }
 });
 
-/* ---------------- 상단 안내 띠·검색·맨위로 ---------------- */
-// 관리자가 정한 표지(제목·부제·배경 사진) 적용
-export async function applyCover() {
+/* ---------------- 표지·상단 안내 띠·맨 위로 ---------------- */
+async function applyCover() {
   const c = (await getBanners(be.listBanners)).find((b) => b.id === 'cover');
-  const el = $('.cover');
-  if (!c || !el) return;
-  if (c.text) $('b', el).textContent = c.text;
-  if (c.sub) $('span', el).textContent = c.sub;
-  const img = safeImgUrl(c.image);
-  el.style.backgroundImage = img ? `linear-gradient(90deg, rgba(10,25,70,.55), rgba(10,25,70,.25)), url("${img}")` : '';
-  el.style.backgroundSize = img ? 'cover' : '';
-  el.style.backgroundPosition = img ? 'center' : '';
+  if (!c) return;
+  if (c.text) $('#cover-title').textContent = c.text;
+  if (c.sub) $('#cover-sub').textContent = c.sub;
+  const img = safeImg(c.image);
+  $('#cover').style.backgroundImage = img ? `linear-gradient(90deg, rgba(14, 26, 54, 0.82), rgba(14, 26, 54, 0.4)), url("${img}")` : '';
 }
-const safeImgUrl = (s) => (/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(s || '') ? s : '');
 
 async function startTopline() {
   const items = (await getBanners(be.listBanners)).filter((b) => b.kind === 'text' && b.text);
   if (!items.length) return;
   let i = 0;
-  const bar = $('#topline'), a = $('#tl-text');
-  const show = () => { const b = items[i]; a.textContent = b.text; a.href = safeLink(b.link) || '#/'; };
+  const a = $('#tl-text');
+  const show = () => { a.textContent = items[i].text; a.href = safeLink(items[i].link) || '#/'; };
   show();
-  bar.classList.remove('hidden');
-  bar.addEventListener('click', (e) => { const d = e.target.closest('[data-tl]'); if (d) { i = (i + +d.dataset.tl + items.length) % items.length; show(); } });
-  setInterval(() => { i = (i + 1) % items.length; show(); }, 5000);
+  $('#topline').classList.remove('hidden');
+  $('#topline').addEventListener('click', (e) => { const d = e.target.closest('[data-tl]'); if (d) { i = (i + +d.dataset.tl + items.length) % items.length; show(); } });
+  if (items.length > 1) setInterval(() => { i = (i + 1) % items.length; show(); }, 6000);
 }
+
 $('#to-top').addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
-window.addEventListener('scroll', () => $('#to-top').classList.toggle('show', window.scrollY > 400), { passive: true });
+window.addEventListener('scroll', () => $('#to-top').classList.toggle('show', window.scrollY > 600), { passive: true });
 
 /* ---------------- 시작 ---------------- */
 window.addEventListener('hashchange', route);
@@ -453,10 +371,9 @@ be.init().then(() => {
   route();
   startTopline().catch(() => {});
   applyCover().catch(() => {});
-  // 로그인·로그아웃하면 지금 화면을 다시 그립니다
-  be.onUser(() => { if (!be.currentUser() || ['login', 'join'].includes(parse().parts[0])) route(); });
+  be.onUser(() => { if (!be.currentUser() || ['login', 'join'].includes(parse().parts[0])) route(); else renderChrome(parse().parts[0] || 'home', parse().parts[1], parse().q); });
 }).catch((e) => {
   console.error(e);
-  view.innerHTML = `<div class="empty">사이트를 불러오지 못했습니다.<br>${esc(be.errorText(e))}</div>`;
+  view.innerHTML = empty(`사이트를 불러오지 못했습니다. ${be.errorText(e)}`, 'alert');
 });
-if (be.DEMO) setTimeout(() => toast('체험 모드: 데이터가 이 브라우저에만 저장돼요'), 800);
+if (be.DEMO) setTimeout(() => toast('체험 모드: 데이터가 이 브라우저에만 저장됩니다'), 800);

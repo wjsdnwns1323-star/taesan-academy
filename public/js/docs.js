@@ -1,11 +1,11 @@
 // 이용규칙·자료실 규칙·개인정보 처리방침
 import { DATA_RULES } from './boards.js';
 import { ACADEMY_NAME, SITE_NAME, SITE_DESC, LIMITS } from './config.js';
-import { esc, backBar } from './ui.js';
+import { esc, icon, pageHead } from './ui.js';
 
 const DOCS = {
   rules: ['커뮤니티 이용규칙', `
-    <p>${SITE_NAME}은 ${ACADEMY_NAME}가 운영하는 ${SITE_DESC}입니다. 모두가 편하게 쓸 수 있도록 아래 규칙을 지켜 주세요.</p>
+    <p>${SITE_NAME}는 ${ACADEMY_NAME}이 운영하는 대전 학생·학부모 커뮤니티입니다. 서로 편하게 쓸 수 있도록 아래 규칙을 지켜 주세요.</p>
     <h3>하면 안 되는 것</h3>
     <ol>
       <li>욕설·비방·조롱, 특정 학생·선생님·학교를 겨냥한 저격 글</li>
@@ -24,7 +24,7 @@ const DOCS = {
     <h3>올릴 수 있는 사진·파일</h3>
     <ul><li>사진: 글 하나에 ${LIMITS.images}장까지(자동으로 줄여서 저장)</li><li>파일: 글 하나에 ${LIMITS.files}개, 1개당 ${LIMITS.fileMB}MB까지</li></ul>`],
   'data-rules': ['자료실 규칙', `
-    <div class="rules"><h3>⚠️ 자료실은 규칙이 엄격합니다</h3><ol>${DATA_RULES.map((r) => `<li>${esc(r)}</li>`).join('')}</ol></div>
+    <div class="notice-box warn">${icon('alert')}<div><b>자료실 규칙</b><ol>${DATA_RULES.map((r) => `<li>${esc(r)}</li>`).join('')}</ol></div></div>
     <h3>올릴 수 있는 자료 예시</h3>
     <ul><li>내가 직접 정리한 필기·요약 노트</li><li>내가 직접 만든 문제·학습지</li><li>학교·교육청이 누구나 볼 수 있게 공개한 안내문(출처 표기)</li><li>입시 정보를 내 말로 정리한 글</li></ul>
     <h3>올릴 수 없는 자료 예시</h3>
@@ -34,7 +34,7 @@ const DOCS = {
       <li>규칙 위반 자료는 삭제되고 작성자에게 알림이 갑니다. 반복하면 이용이 정지됩니다.</li>
       <li>공개된 자료도 저작권자 요청이나 신고가 있으면 바로 내립니다.</li></ol>`],
   privacy: ['개인정보 처리방침', `
-    <p>${ACADEMY_NAME}(이하 '학원')는 ${SITE_NAME} 회원의 개인정보를 아래와 같이 처리합니다.</p>
+    <p>${ACADEMY_NAME}(이하 '학원')은 ${SITE_NAME} 회원의 개인정보를 아래와 같이 처리합니다.</p>
     <h3>1. 수집하는 항목과 목적</h3>
     <ul><li>필수: 아이디, 비밀번호(암호화 저장), 실명, 휴대전화 번호, 성별, 나이, 학생·학부모 구분과 (자녀) 학년</li>
       <li>목적: 회원 확인과 관리, 커뮤니티 운영(부정 이용 방지·신고 처리), 학원 안내 연락</li>
@@ -47,12 +47,12 @@ const DOCS = {
     <h3>4. 처리 위탁</h3>
     <ul><li>Google LLC(Firebase): 회원 인증과 데이터 저장</li></ul>
     <h3>5. 회원의 권리</h3>
-    <ul><li>내 정보 화면에서 언제든 내 정보를 보고 고치거나 탈퇴할 수 있습니다.</li><li>그 밖의 요청은 학원으로 연락 주세요.</li></ul>
+    <ul><li>내 정보 화면에서 내 정보를 확인하고 탈퇴할 수 있습니다.</li><li>정보를 바꾸거나 그 밖의 요청이 있으면 학원으로 연락해 주세요.</li></ul>
     <h3>6. 개인정보 보호책임자</h3>
     <ul><li>${ACADEMY_NAME} (문의: 학원 대표번호)</li></ul>`],
 };
 
 export function renderDoc({ view }, key) {
   const [title, html] = DOCS[key];
-  view.innerHTML = `${backBar(title)}<div class="doc">${html}</div>`;
+  view.innerHTML = `${pageHead(title)}<div class="doc">${html}</div>`;
 }
