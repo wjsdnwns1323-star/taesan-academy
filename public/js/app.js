@@ -355,6 +355,7 @@ async function renderNotifications(ctx) {
   const text = (n) => ({
     comment: ['chat', `<b>${esc(n.fromName)}</b>님이 내 글에 댓글을 남겼습니다`, n.text],
     reply: ['reply', `<b>${esc(n.fromName)}</b>님이 내 댓글에 답글을 남겼습니다`, n.text],
+    mention: ['at', `<b>${esc(n.fromName)}</b>님이 댓글에서 나를 불렀습니다`, n.text],
     accepted: ['check', `<b>${esc(n.fromName)}</b>님이 내 답변을 채택했습니다`, n.text],
     approved: ['check', '올린 자료가 승인되어 공개되었습니다', n.text],
     rejected: ['alert', '자료실 규칙에 맞지 않아 자료가 삭제되었습니다', n.text],

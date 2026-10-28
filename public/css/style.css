@@ -430,6 +430,9 @@ mark { background: #fff1b8; color: inherit; border-radius: 2px; padding: 0 1px; 
 .composer textarea { width: 100%; min-height: 60px; max-height: 240px; border: 0; resize: none; font-size: 15px; line-height: 1.6; padding: 4px 0; background: transparent; }
 .composer textarea:focus { outline: none; }
 .composer-bar { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+.mention-sug { display: flex; flex-wrap: wrap; gap: 2px; margin: 2px 0 0 -10px; }
+.mention-sug .text-btn { color: var(--brand); font-weight: 600; }
+.mention { color: var(--brand); font-weight: 600; }
 .composer-bar .sp { flex: 1; }
 .composer-bar label { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px; border-radius: var(--r-chip); font-size: 13px; color: var(--muted); cursor: pointer; }
 .composer-bar label:hover { background: var(--raised); color: var(--text); }
@@ -522,7 +525,8 @@ mark { background: #fff1b8; color: inherit; border-radius: 2px; padding: 0 1px; 
 .list-item p { font-size: 14px; color: var(--text); }
 .list-item .m { margin-top: 4px; font-size: 13px; color: var(--faint); display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; }
 .list-item .m .q { color: var(--muted); max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.list-item.unread { background: var(--brand-50); }
+.list-item.unread > .icon { color: var(--brand); }
+.list-item.unread .main > p:first-child::after { content: ''; display: inline-block; width: 6px; height: 6px; margin-left: 6px; border-radius: 50%; background: var(--negative); vertical-align: 2px; }
 .list-item .side-btn { flex: none; align-self: center; }
 
 /* 전체 메뉴(모바일) */

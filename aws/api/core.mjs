@@ -7,6 +7,8 @@ export const BOARDS = ['news', 'talk', 'school', 'admission', 'qna', 'data', 'no
 export const GRADES = ['학부모', '중1', '중2', '중3', '고1', '고2', '고3', 'N수', '기타'];
 const CHILD_GRADES = ['', '중1', '중2', '중3', '고1', '고2', '고3', 'N수'];
 export const USERNAME_RE = /^[a-z0-9_]{4,20}$/;
+// 댓글의 @아이디(메일 주소 a@b 는 빼고)
+export const MENTION_RE = /(?:^|[^a-z0-9_@])@([a-z0-9_]{4,20})(?![a-z0-9_])/g;
 const PHONE_RE = /^01[0-9]-?[0-9]{3,4}-?[0-9]{4}$/;
 const JPEG_RE = /^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/;
 const DAY = 86400000;
@@ -446,6 +448,8 @@ export function createApp({ store, files, idp, sms, env = {} }) {
 
   async function notify(to, from, type, post, text) {
     if (!to || to === from.uid) return;
+    // 나를 차단한 회원에게는 알리지 않음
+    if (await store.get(`U#${to}`, `BLK#${from.uid}`).catch(() => null)) return;
     const t = now(), id = newId(t);
     await store.put({ pk: `U#${to}`, sk: `N#${id}`, id, to, from: from.uid, fromName: from.nickname, type, postId: post.id,
       text: String(text || '').slice(0, 80), read: false, createdAt: t, ttl: Math.floor(t / 1000) + 180 * 86400 }).catch(() => {});
@@ -728,6 +732,14 @@ export function createApp({ store, files, idp, sms, env = {} }) {
     ]);
     if (parent) await notify(parent.uid, u, 'reply', p, body);
     if (!parent || parent.uid !== p.uid) await notify(p.uid, u, 'comment', p, body);
+    // @아이디 언급: 5명까지, 이미 알림을 받은 사람은 빼고. 공개된 글에서만
+    const names = [...new Set([...body.matchAll(MENTION_RE)].map((m) => m[1]))].slice(0, 5);
+    if (names.length && visible(p)) {
+      const told = new Set([u.uid, p.uid, parent?.uid]);
+      for (const x of await store.getMany(names.map((n) => [`NICK#${n}`, 'NICK']))) {
+        if (x?.uid && !told.has(x.uid)) { told.add(x.uid); await notify(x.uid, u, 'mention', p, body); }
+      }
+    }
     return { id: cid };
   });
 

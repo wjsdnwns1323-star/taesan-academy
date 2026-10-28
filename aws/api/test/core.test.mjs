@@ -544,3 +544,29 @@ test('투표: 한 번만, 결과 공개 시점, 마감, 수정해도 유지', as
   await t.ok('DELETE', `/posts/${m.id}`, null, a.token);
   assert.equal((await t.store.query({ pk: `P#${m.id}`, limit: 10 })).length, 0);
 });
+
+test('댓글 @아이디 언급 알림, 나를 차단한 사람에게는 알림 없음', async () => {
+  const t = await setup();
+  const a = await t.join('ment_a'), b = await t.join('ment_b'), c = await t.join('ment_c'), d = await t.join('ment_d');
+  const { id } = await t.ok('POST', '/posts', post(), a.token);
+  const notes = async (x) => t.ok('GET', '/notifications', null, x.token);
+  // c, d 언급(메일 주소·없는 아이디·글쓴이 중복은 무시)
+  await t.ok('POST', `/posts/${id}/comments`, { body: '@ment_c @ment_d 같이 가요 @ment_a @nobody_here test@ment_c.com' }, b.token);
+  assert.deepEqual((await notes(a)).map((n) => n.type), ['comment']);
+  assert.deepEqual((await notes(c)).map((n) => n.type), ['mention']);
+  assert.deepEqual((await notes(d)).map((n) => n.type), ['mention']);
+  // d 가 b 를 차단하면 b 의 언급 알림이 가지 않음
+  await t.ok('POST', '/me/blocks', { uid: b.me.uid }, d.token);
+  await t.ok('POST', `/posts/${id}/comments`, { body: '@ment_d 다시 불러요' }, b.token);
+  assert.equal((await notes(d)).length, 1);
+  // a 가 b 를 차단하면 내 글 댓글 알림도 없음
+  await t.ok('POST', '/me/blocks', { uid: b.me.uid }, a.token);
+  await t.ok('POST', `/posts/${id}/comments`, { body: '또 댓글' }, b.token);
+  assert.equal((await notes(a)).length, 2); // 차단 전 댓글 2개만
+  // 숨긴 글에서는 언급 알림 없음
+  const admin = await t.join('ment_admin');
+  await t.store.update(`U#${admin.me.uid}`, 'PROFILE', { set: { role: 'admin' } });
+  await t.ok('POST', `/posts/${id}/hide`, { hidden: true }, (await t.ok('POST', '/auth/login', { username: 'ment_admin', password: 'tsPass_01' })).idToken);
+  await t.ok('POST', `/posts/${id}/comments`, { body: '@ment_c 숨긴 글' }, a.token);
+  assert.equal((await notes(c)).length, 1);
+});

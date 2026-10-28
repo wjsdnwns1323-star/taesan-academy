@@ -49,6 +49,7 @@ const P = {
   left: '<path d="m15 18-6-6 6-6"/>',
   x: '<path d="M18 6 6 18M6 6l12 12"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
+  at: '<circle cx="12" cy="12" r="4"/><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8"/>',
   poll: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
   info: '<circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01"/>',
   alert: '<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 17h.01"/>',
@@ -204,6 +205,14 @@ export function loadImages(root) {
 
 export function linkify(text) {
   return esc(text).replace(/https?:\/\/[^\s<]+/g, (u) => `<a href="${u}" target="_blank" rel="noopener noreferrer nofollow">${u}</a>`);
+}
+// 댓글의 @아이디 강조(링크 글자 안은 건드리지 않음)
+export function mentionify(html) {
+  let inLink = false;
+  return html.split(/(<[^>]+>)/).map((part) => {
+    if (part.startsWith('<')) { inLink = /^<a\b/i.test(part) || (inLink && !/^<\/a>/i.test(part)); return part; }
+    return inLink ? part : part.replace(/(^|[^a-z0-9_@&])@([a-z0-9_]{4,20})(?![a-z0-9_])/g, '$1<span class="mention">@$2</span>');
+  }).join('');
 }
 
 // 대화상자: html 본문, 버튼 [{label, value, cls}] → 누른 버튼의 value (닫으면 null)

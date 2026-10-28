@@ -3,7 +3,7 @@ import * as be from './backend.js';
 import { BOARDS, DATA_RULES } from './boards.js';
 import {
   esc, $, $$, ago, dateTime, shortDate, toast, icon, empty, pageHead, tagHtml, loadImages, linkify, size, safeImg, modal, confirmBox,
-  avatarHtml, viewer, pop, copyText, markReadPost,
+  avatarHtml, viewer, pop, copyText, markReadPost, mentionify,
 } from './ui.js';
 
 const boardHref = (b) => (b === 'data' ? '#/study' : b === 'notice' ? '#/notices' : `#/community/${b}`);
@@ -22,6 +22,8 @@ export async function renderPost(ctx) {
   const board = BOARDS[post.board];
   const canReply = be.has('editComment');
   const canMark = be.has('toggleBookmark');
+  // @ 뒤에 고를 아이디: 글쓴이와 댓글 쓴 사람(나 빼고)
+  const people = () => (canReply ? [...new Set([post.nickname, ...comments.filter((c) => !c.deleted && !c.blocked).map((c) => c.nickname)])].filter((n) => n && n !== me.nickname) : []);
 
   const status = post.board === 'qna' ? (post.status === 'solved' ? '<span class="tag ok">해결</span>' : '<span class="tag brand">답변 대기</span>') : '';
   const pending = post.board === 'data' && !post.approved && !post.hidden
@@ -87,7 +89,7 @@ export async function renderPost(ctx) {
       ${ghost ? `<span class="avatar" aria-hidden="true">${icon(c.blocked ? 'ban' : 'chat', 'sm')}</span>` : avatarHtml(c.nickname, c.uid)}
       <div>
         ${ghost ? '' : `<div class="comment-head"><b data-uid="${admin ? esc(c.uid) : ''}">${esc(c.nickname)}</b><span>${esc(c.grade)}</span>${c.uid === post.uid ? '<span class="tag brand">작성자</span>' : ''}${accepted ? '<span class="tag ok">채택</span>' : ''}<span class="num">${ago(c.createdAt)}${c.editedAt ? ' · 수정됨' : ''}</span></div>`}
-        <div class="comment-body">${c.deleted ? '삭제된 댓글입니다.' : c.blocked ? '차단한 회원의 댓글입니다.' : linkify(c.body)}</div>
+        <div class="comment-body">${c.deleted ? '삭제된 댓글입니다.' : c.blocked ? '차단한 회원의 댓글입니다.' : mentionify(linkify(c.body))}</div>
         ${!ghost && safeImg(c.image) ? `<img class="cimg" src="${safeImg(c.image)}" alt="댓글 사진" loading="lazy">` : ''}
         ${ghost ? '' : `<div class="comment-tools">
           <button type="button" class="text-btn ${c.liked ? 'on' : ''}" data-clike aria-pressed="${!!c.liked}" aria-label="댓글 좋아요">${icon('heart', 'sm')}<span class="num">${c.likeCount || 0}</span></button>
@@ -185,7 +187,7 @@ export async function renderPost(ctx) {
         if (slot.innerHTML) { slot.innerHTML = ''; return; }
         $$('#clist [data-slot]').forEach((s) => { s.innerHTML = ''; });
         slot.innerHTML = `<p class="reply-to">${esc(c.nickname)}님에게 답글</p>${composer('rform', '답글을 남겨 주세요', true)}`;
-        wireComposer($('#rform', slot), async (body, image) => { const id = await be.addComment(post, body, image, c.id); reload(id); });
+        wireComposer($('#rform', slot), async (body, image) => { const id = await be.addComment(post, body, image, c.id); reload(id); }, people);
         $('#rform textarea', slot).focus();
       } else if (e.target.closest('[data-cedit]')) {
         const bodyEl = $('.comment-body', el);
@@ -195,7 +197,7 @@ export async function renderPost(ctx) {
         const f = $('form', bodyEl);
         const ta = $('textarea', f);
         ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length);
-        $('[data-cancel]', f).onclick = () => { bodyEl.innerHTML = linkify(c.body); };
+        $('[data-cancel]', f).onclick = () => { bodyEl.innerHTML = mentionify(linkify(c.body)); };
         f.addEventListener('submit', async (ev) => {
           ev.preventDefault();
           const v = ta.value.trim();
@@ -216,7 +218,7 @@ export async function renderPost(ctx) {
     } catch (err) { toast(be.errorText(err)); }
   });
 
-  wireComposer($('#cform'), async (body, image) => { const id = await be.addComment(post, body, image); reload(id); });
+  wireComposer($('#cform'), async (body, image) => { const id = await be.addComment(post, body, image); reload(id); }, people);
 }
 
 // 댓글 입력 상자(사진 1장, 글자 수)
@@ -224,6 +226,7 @@ function composer(id, placeholder, small = false) {
   return `<form class="composer${small ? ' small' : ''}" id="${id}">
     <div class="composer-prev hidden" data-prev></div>
     <textarea name="body" rows="2" maxlength="3000" placeholder="${esc(placeholder)}" aria-label="${small ? '답글' : '댓글'}"></textarea>
+    <div class="mention-sug hidden" data-sug aria-label="부를 회원"></div>
     <div class="composer-bar"><label>${icon('image', 'sm')}사진<input type="file" accept="image/*" hidden data-img></label><span class="sp"></span><span class="count num" data-count>0/3,000</span><button class="btn sm" data-send>등록</button></div>
   </form>`;
 }
@@ -257,9 +260,29 @@ function drawPoll(box, post, poll) {
   }).join('')}</ol>${poll.mine ? '<p class="poll-note">내가 고른 보기에 표시했습니다.</p>' : ''}`;
 }
 
-function wireComposer(form, onSend) {
+// names(): @ 뒤에 고를 수 있는 아이디(이 글에 글·댓글을 쓴 사람)
+function wireComposer(form, onSend, names = () => []) {
   let img = '';
   const ta = $('textarea', form);
+  const sug = $('[data-sug]', form);
+  const showSug = () => {
+    const m = /(?:^|[^a-z0-9_@])@([a-z0-9_]{0,20})$/.exec(ta.value.slice(0, ta.selectionStart));
+    const list = m ? names().filter((n) => n.startsWith(m[1]) && n !== m[1]).slice(0, 5) : [];
+    sug.innerHTML = list.map((n) => `<button type="button" class="text-btn" data-n="${esc(n)}">@${esc(n)}</button>`).join('');
+    sug.classList.toggle('hidden', !list.length);
+  };
+  sug.addEventListener('mousedown', (e) => e.preventDefault());
+  sug.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-n]');
+    if (!b) return;
+    const before = ta.value.slice(0, ta.selectionStart).replace(/@[a-z0-9_]{0,20}$/, `@${b.dataset.n} `);
+    ta.value = before + ta.value.slice(ta.selectionStart);
+    ta.selectionStart = ta.selectionEnd = before.length;
+    ta.focus();
+    ta.dispatchEvent(new Event('input'));
+  });
+  ta.addEventListener('keyup', (e) => { if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) showSug(); });
+  ta.addEventListener('keydown', (e) => { if (e.key === 'Escape') sug.classList.add('hidden'); });
   const prev = $('[data-prev]', form);
   $('[data-img]', form).addEventListener('change', async (e) => {
     const f = e.target.files[0];
@@ -274,6 +297,7 @@ function wireComposer(form, onSend) {
   ta.addEventListener('input', () => {
     ta.style.height = 'auto'; ta.style.height = `${Math.min(240, ta.scrollHeight)}px`;
     $('[data-count]', form).textContent = `${ta.value.length.toLocaleString()}/3,000`;
+    showSug();
   });
   // Ctrl+Enter 로 등록
   ta.addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) form.requestSubmit(); });
