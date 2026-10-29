@@ -295,7 +295,7 @@ async function renderBoard(ctx, board) {
   const writeHref = `#/write?board=${board}${cat ? `&category=${encodeURIComponent(cat)}` : ''}`;
   const base = virtual ? `#/community/${board}` : boardHref(board);
   const qs = (patch) => { const u = new URLSearchParams(q); Object.entries(patch).forEach(([k, v]) => (v ? u.set(k, v) : u.delete(k))); const s = u.toString(); return s ? `${base}?${s}` : base; };
-  const cols = `<colgroup><col style="width:80px"><col><col style="width:100px"><col style="width:58px"><col style="width:46px"><col style="width:50px">${admin ? '<col style="width:68px">' : ''}</colgroup>`;
+  const cols = `<colgroup><col style="width:74px"><col><col style="width:96px"><col style="width:52px"><col style="width:42px"><col style="width:50px">${admin ? '<col style="width:62px">' : ''}</colgroup>`;
 
   view.innerHTML = `${pageHead(b.name, { desc: BOARD_DESC[board], actions: writable ? `<a class="btn" href="${writeHref}">${icon('pen', 'sm')}글쓰기</a>` : '' })}
     ${board === 'data' ? `<div class="notice-box" style="margin-bottom:16px">${icon('info')}<div>직접 만들었거나 배포 허락을 받은 자료만 올릴 수 있고, 관리자가 확인한 뒤 공개됩니다. <a href="#/data-rules">자료실 규칙</a></div></div>` : ''}
