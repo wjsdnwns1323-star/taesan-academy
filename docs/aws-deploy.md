@@ -14,6 +14,10 @@
 
 표, 사용자 풀, 파일 버킷은 실수로 지워지지 않게 삭제 보호를 걸어 두었습니다.
 
+## 0. 준비(요금 알림)
+
+배포 전에 콘솔 **Billing and Cost Management → 예산(Budgets) → 예산 생성 → 월 비용 예산** 에서 월 1만 원(예: 8달러) 정도로 만들고 알림 이메일을 넣습니다. 생각보다 요금이 나오면 바로 메일이 옵니다.
+
 ## 1. 처음 배포
 
 1. AWS 콘솔에 로그인한 뒤 오른쪽 위 리전을 **아시아 태평양(서울) ap-northeast-2**로 바꿉니다.
@@ -22,7 +26,6 @@
 
 ```bash
 git clone https://github.com/wjsdnwns1323-star/taesan-academy.git && cd taesan-academy
-git checkout claude/unione-repository-add-issue-iuzriw   # main에 합치기 전이라면
 bash aws/deploy.sh
 ```
 
@@ -58,7 +61,8 @@ bash aws/scripts/create-admin.sh qwer
 DOMAIN=taesan.uinone.net CERT_ARN=arn:aws:acm:us-east-1:123456789012:certificate/... bash aws/deploy.sh
 ```
 
-4. DNS에서 `taesan` 레코드를 지금의 GitHub Pages 대신 **CNAME → 배포 결과의 `xxxx.cloudfront.net`** 으로 바꿉니다. 바꾸고 나면 GitHub 저장소 Settings → Pages 의 사용자 도메인은 비워 두어도 됩니다.
+4. DNS에서 `taesan` 레코드를 지금의 GitHub Pages 대신 **CNAME → 배포 결과의 `xxxx.cloudfront.net`** 으로 바꿉니다.
+5. 새 주소에서 가입·로그인·글쓰기·사진 올리기가 되면, GitHub 저장소 **Settings → Pages** 의 사용자 도메인을 비우고 Pages를 끕니다(그 뒤로는 화면도 AWS에서만 나갑니다).
 
 ## 5. 화면만 다시 올리기
 
