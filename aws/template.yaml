@@ -9,6 +9,10 @@ Parameters:
     Type: String
     Default: ''
     Description: 사이트 주소(예 taesan.uinone.net). 비워 두면 CloudFront 기본 주소만 씁니다.
+  SiteOrigin:
+    Type: String
+    Default: 'https://taesan.uinone.net'
+    Description: 서버(API)·파일 버킷을 부를 수 있는 사이트 주소(https://로 시작). CloudFront 주소에서는 /api 로 같은 주소를 부르므로 따로 넣지 않아도 됩니다.
   CertificateArn:
     Type: String
     Default: ''
@@ -93,7 +97,7 @@ Resources:
       CorsConfiguration:
         CorsRules:
           - AllowedMethods: [GET, POST]
-            AllowedOrigins: ['*']
+            AllowedOrigins: [!Ref SiteOrigin, 'https://*.cloudfront.net']
             AllowedHeaders: ['*']
             MaxAge: 3600
       LifecycleConfiguration:
@@ -185,7 +189,7 @@ Resources:
     Type: AWS::Serverless::HttpApi
     Properties:
       CorsConfiguration:
-        AllowOrigins: ['*']
+        AllowOrigins: [!Ref SiteOrigin]
         AllowHeaders: [authorization, content-type]
         AllowMethods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
         MaxAge: 7200
@@ -329,7 +333,7 @@ Resources:
         SecurityHeadersConfig:
           ContentSecurityPolicy:
             Override: true
-            ContentSecurityPolicy: "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.amazonaws.com; font-src 'self'; connect-src 'self' https://*.amazonaws.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
+            ContentSecurityPolicy: !Sub "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://${FilesBucket.RegionalDomainName}; font-src 'self'; connect-src 'self' https://${FilesBucket.RegionalDomainName}; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
           StrictTransportSecurity: { Override: true, AccessControlMaxAgeSec: 31536000, IncludeSubdomains: false, Preload: false }
           ContentTypeOptions: { Override: true }
           FrameOptions: { Override: true, FrameOption: DENY }

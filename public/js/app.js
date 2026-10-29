@@ -13,6 +13,9 @@ import { renderAdmin } from './admin.js';
 import { renderDoc } from './docs.js';
 import { mountAds } from './ads.js';
 
+// 다른 사이트가 이 화면을 몰래 감싸(iframe) 엉뚱한 버튼을 누르게 하는 것 막기(GitHub Pages는 막는 머리말을 보낼 수 없음)
+if (window.top !== window.self) { document.documentElement.style.display = 'none'; try { window.top.location.replace(location.href); } catch { /* 감싼 쪽이 막음 */ } }
+
 const view = $('#view');
 const AUTH_PAGES = new Set(['login', 'join', 'find-id', 'reset-password']);
 const PUBLIC = new Set([...AUTH_PAGES, 'rules', 'privacy', 'data-rules']);

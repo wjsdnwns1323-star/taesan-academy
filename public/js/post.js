@@ -106,7 +106,7 @@ export async function renderPost(ctx) {
     || '<p class="hint" style="padding:16px 0">첫 댓글을 남겨 보세요.</p>';
   $$('#clist img.cimg').forEach((img) => img.addEventListener('click', () => viewer(img.src)));
   // 알림에서 들어오면 그 댓글로
-  if (location.hash.includes('c=')) $(`#c-${new URLSearchParams(location.hash.split('?')[1]).get('c')}`)?.scrollIntoView({ block: 'center' });
+  if (location.hash.includes('c=')) document.getElementById(`c-${new URLSearchParams(location.hash.split('?')[1]).get('c')}`)?.scrollIntoView({ block: 'center' });
 
   // 좋아요·스크랩·공유
   let isLiked = liked, count = post.likeCount || 0, busy = false;
