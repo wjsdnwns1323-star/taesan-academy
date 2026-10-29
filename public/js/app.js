@@ -24,7 +24,7 @@ const BOARD_DESC = {
   talk: '학생도 학부모도 편하게 이야기해요',
   school: '대전 학교생활·내신·고입 배정 이야기',
   admission: '수시·정시와 진로, 공부법',
-  data: '직접 만들었거나 허락받은 자료만 공개됩니다',
+  data: '정리노트, 직접 만든 문제·학습지, 입시 자료',
   notice: '운영 안내',
   qna: '문제 풀이 질문과 답변',
   all: '모든 게시판의 새 글',
@@ -132,18 +132,18 @@ function renderChrome(page, arg, q) {
     ${admin ? `<div class="ls-group">${item(['admin', '관리자', '#/admin', 'settings', '<span class="count num" data-queue></span>'])}</div>` : ''}
     <div class="ls-foot"><a href="#/rules">이용규칙</a><a href="#/data-rules">자료실 규칙</a><a href="#/privacy"><b>개인정보 처리방침</b></a></div>`;
 
-  // 오른쪽: 로그인·내 정보, 광고, 댓글 많은 글, 공지
+  // 오른쪽: 로그인·내 정보, 광고, 댓글 많은 글, 공지 (홈은 가운데에 광고가 있어 아래 글자 광고는 뺌)
   $('#side').innerHTML = `
     <section class="card me-box">${me
     ? `<div class="me-name"><b>${esc(me.nickname)}</b>님<small>${esc(me.grade)}${me.role === 'admin' ? ' · 운영진' : ''}</small></div>
        <nav class="me-links"><a href="#/me">내 정보</a><a href="#/me?tab=posts">내 글</a><a href="#/notifications">알림<i class="dot hidden" data-bell></i></a>${admin ? '<a href="#/admin">관리자<span class="count num" data-queue></span></a>' : ''}</nav>
        <a class="btn soft block me-write" href="${writeHref}">${icon('pen', 'sm')}글쓰기</a>`
-    : `<p>태산입시 회원이 되면 모든 글과 자료를 볼 수 있어요.</p><a class="btn soft block lg" href="#/login">${icon('user', 'sm')}로그인</a>
+    : `<p>글 내용과 자료는 회원만 볼 수 있어요.</p><a class="btn soft block lg" href="#/login">${icon('user', 'sm')}로그인</a>
        <nav class="me-links"><a href="#/find-id">아이디 찾기</a><a href="#/reset-password">비밀번호 찾기</a><a class="join" href="#/join">회원가입</a></nav>`}</section>
     <div class="ad-slot" data-ad="rail" data-off="4"></div>
     <section class="card side-box"><h2 class="box-h">댓글이 많은 글</h2><ol class="mini" id="side-hot"><li class="none">불러오는 중</li></ol></section>
     <section class="card side-box side-notice"><h2 class="box-h"><a href="#/notices">공지사항</a><a class="more" href="#/notices" aria-label="공지사항 더보기">${icon('right', 'sm')}</a></h2><ul class="mini" id="side-notice"></ul></section>
-    <div class="ad-slot" data-ad="note" data-off="6"></div>`;
+    ${page === 'home' ? '' : '<div class="ad-slot" data-ad="note" data-off="6"></div>'}`;
   fillSide();
   if (admin) refreshQueue();
 }
@@ -235,7 +235,7 @@ async function renderHome(ctx) {
     <div class="ad-slot" data-ad="line" data-off="2"></div>
     <section class="card panel feed"><header class="panel-h"><h2>${icon('list')}<a href="#/community/all">새 글</a><small id="feed-stats"></small></h2><a class="more" href="#/community/all" aria-label="전체글 보기">${icon('right', 'sm')}</a></header><div class="panel-b" id="h-new">${'<div class="row"><span class="skeleton" style="width:70%"></span></div>'.repeat(8)}</div></section>
     <div class="home-two">${boards.map((b) => panel(`h-${b}`, BOARDS[b].name, boardHref(b), { ic: BOARD_ICON[b] })).join('')}</div>
-    <div class="home-two">${panel('h-notice', '공지사항', '#/notices', { ic: 'megaphone' })}${panel('h-data', '자료실 새 자료', '#/study', { ic: 'book' })}</div>
+    <div class="home-two">${panel('h-notice', '공지사항', '#/notices', { ic: 'megaphone' })}${panel('h-data', '자료실', '#/study', { ic: 'book' })}</div>
   </div>`;
   applyCover();
   mountAds();

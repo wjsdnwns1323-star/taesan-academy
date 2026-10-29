@@ -168,7 +168,7 @@ body:not(.page-home) #view { background: #fff; border: 1px solid var(--card-line
 .mini .none { padding: 12px 0; font-size: 14px; color: var(--faint); }
 .page-home .side-notice { display: none; }
 
-.footer { background: #fff; border-top: 1px solid var(--card-line); }
+.footer { background: #f7f8fa; border-top: 1px solid var(--card-line); }
 .footer-in { max-width: var(--wrap); margin: 0 auto; padding: 24px 16px 32px; font-size: 14px; color: var(--muted); display: flex; flex-direction: column; gap: 8px; }
 .footer-in nav { display: flex; gap: 18px; }
 .footer-in a:hover { color: var(--text); text-decoration: underline; }
@@ -365,6 +365,9 @@ body:not(.page-home) #view { background: #fff; border: 1px solid var(--card-line
 }
 .bt tr.read td.c-title .t { color: #6b4c9a; }
 .bt td.c-adm { white-space: nowrap; }
+.bt td.empty { display: table-cell; height: auto; padding: 44px 16px; }
+.bt td.empty .icon { display: block; margin: 0 auto 10px; }
+.bt td.empty .btn { margin-top: 14px; }
 .bt td.c-adm button { height: 28px; padding: 0 4px; font-size: 13px; color: var(--muted); }
 .bt td.c-adm button:hover { color: var(--text); text-decoration: underline; }
 .bt td.c-adm button + button { margin-left: 2px; }
@@ -666,6 +669,10 @@ mark { background: #fff1b8; color: inherit; padding: 0 1px; }
   *, *::before, *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
 }
 
+/* 관리자 화면은 표가 넓어서 오른쪽 칸(로그인·광고)을 빼고 가운데를 넓힘 */
+.page-admin .body-in { grid-template-columns: var(--left-w) minmax(0, 1fr); }
+.page-admin .side { display: none; }
+
 /* =========================================================
    1279px 이하: 왼쪽 게시판 목록 대신 가로 탭, 2단(가운데 + 오른쪽)
    ========================================================= */
@@ -673,6 +680,7 @@ mark { background: #fff1b8; color: inherit; padding: 0 1px; }
   .lside { display: none; }
   .gnb { display: block; }
   .body-in { grid-template-columns: minmax(0, 1fr) var(--side-w); }
+  .page-admin .body-in { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 1279px) and (min-width: 1024px) {
   :root { --side-w: 280px; }
