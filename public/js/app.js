@@ -1,10 +1,10 @@
 // 화면 이동(해시 주소), 틀(위쪽 막대·왼쪽 메뉴·모바일 탭), 홈·게시판·검색·알림·전체 메뉴
 import * as be from './backend.js';
 import { BOARDS, COMMUNITY_TABS } from './boards.js';
-import { SITE_NAME, SITE_DESC, QNA_OPEN } from './config.js';
+import { SITE_NAME, SITE_DESC, QNA_OPEN, ACADEMY_BAND } from './config.js';
 import {
   esc, $, $$, toast, icon, empty, pageHead, tagHtml, rowHtml, listItemHtml, shortDate, ago, fullDate, getBanners, safeLink, safeImg, modal, confirmBox,
-  newBadge, highlight, dday, readSet,
+  newBadge, highlight, dday, readSet, BOARD_ICON,
 } from './ui.js';
 import { renderPost } from './post.js';
 import { renderWrite } from './write.js';
@@ -95,60 +95,78 @@ document.addEventListener('click', (e) => {
   if (e.target.closest('[data-back]')) { if (history.length > 1) history.back(); else location.hash = '#/'; }
 });
 
-/* ---------------- 틀: 위쪽 막대·왼쪽 메뉴·모바일 탭 ---------------- */
+/* ---------------- 틀: 머리줄·왼쪽 게시판 목록·오른쪽 칸 ---------------- */
 function renderChrome(page, arg, q) {
   const me = be.currentUser();
   const admin = be.isAdmin();
   const key = currentKey(page, arg);
+  const sub = page === 'me' ? `me:${q.get('tab') || 'info'}` : page === 'notifications' ? 'me:notif' : '';
   const writeHref = `#/write?board=${WRITE_KEYS.includes(key) ? key : 'talk'}`;
 
-  $('#gnb-nav').innerHTML = me
-    ? `<a href="#/me"><b>${esc(me.nickname)}</b>님</a><a href="#/notifications">알림<i class="dot hidden" data-bell></i></a>
-       ${admin ? '<a href="#/admin">관리자<span class="count num" data-queue></span></a>' : ''}<a href="#/me?tab=settings">설정</a>`
-    : '<a href="#/login">로그인</a><a href="#/join">회원가입</a>';
+  // 머리줄 오른쪽: 굵은 글자 메뉴
+  $('#gnb-nav').innerHTML = `<a href="${ACADEMY_BAND}" target="_blank" rel="noopener">태산학원 밴드</a>${me
+    ? `<a href="#/notifications">알림<i class="dot hidden" data-bell></i></a>${admin ? '<a href="#/admin">관리자<span class="count num" data-queue></span></a>' : ''}<a href="#/me" class="me-link"><b>${esc(me.nickname)}</b>님</a>`
+    : '<a href="#/login">로그인</a><a href="#/join">회원가입</a>'}`;
   $('#gnb-m').innerHTML = `<a href="#/search" aria-label="검색">${icon('search')}</a>
     ${me ? `<a href="#/notifications" aria-label="알림">${icon('bell')}<i class="dot hidden" data-bell></i></a>` : `<a href="#/login" aria-label="로그인">${icon('user')}</a>`}
     <a href="#/menu" aria-label="전체 메뉴">${icon('menu')}</a>`;
 
+  // 좁은 화면: 가로 탭
   const tabs = [['home', '홈', '#/'], ['rec', '인기글', '#/community/rec'], ['all', '전체글', '#/community/all'],
     ...COMMUNITY_TABS.slice(1).map((t) => [t.id, t.name, `#/community/${t.id}`]), ...(QNA_OPEN ? [['qna', '문제풀이', '#/community/qna']] : []),
     ['data', '자료실', '#/study'], ['notice', '공지', '#/notices'], ...(admin ? [['admin', '관리자', '#/admin']] : [])];
   $('#lnb').innerHTML = tabs.map(([k, n, h]) => `<a href="${h}" data-k="${k}" class="${k === key ? 'on' : ''}">${n}</a>`).join('');
   showTab();
 
-  // 오른쪽: 로그인·내 정보, 인기글, 공지, 안내
+  // 넓은 화면: 왼쪽 게시판 목록
+  const item = ([k, n, h, ic, extra = '']) => `<a href="${h}" data-k="${k}" class="${k === key || k === sub ? 'on' : ''}"${k === key || k === sub ? ' aria-current="page"' : ''}>${icon(ic)}<span>${n}</span>${extra}</a>`;
+  const boards = [...COMMUNITY_TABS.slice(1).map((t) => [t.id, t.name, `#/community/${t.id}`, BOARD_ICON[t.id] || 'talk']),
+    ...(QNA_OPEN ? [['qna', '문제풀이', '#/community/qna', 'info']] : []), ['data', '자료실', '#/study', 'book'], ['notice', '공지사항', '#/notices', 'megaphone']];
+  const mine = [['me:posts', '내가 쓴 글', '#/me?tab=posts', 'pen'], ...(be.has('listMyComments') ? [['me:comments', '내 댓글', '#/me?tab=comments', 'chat'], ['me:bookmarks', '스크랩', '#/me?tab=bookmarks', 'bookmark']] : []),
+    ['me:notif', '알림', '#/notifications', 'bell', '<i class="dot hidden" data-bell></i>'], ['me:info', '내 정보', '#/me', 'user']];
+  $('#lside').innerHTML = `
+    ${me ? `<a class="btn soft block" href="${writeHref}">${icon('pen', 'sm')}글쓰기</a>` : ''}
+    <div class="ls-group">${[['home', '홈', '#/', 'home'], ['rec', '인기글', '#/community/rec', 'flame'], ['all', '전체글', '#/community/all', 'list']].map(item).join('')}</div>
+    <div class="ls-group"><h2>게시판</h2>${boards.map(item).join('')}</div>
+    ${me ? `<div class="ls-group"><h2>내 활동</h2>${mine.map(item).join('')}</div>` : ''}
+    ${admin ? `<div class="ls-group">${item(['admin', '관리자', '#/admin', 'settings', '<span class="count num" data-queue></span>'])}</div>` : ''}
+    <div class="ls-foot"><a href="#/rules">이용규칙</a><a href="#/data-rules">자료실 규칙</a><a href="#/privacy"><b>개인정보 처리방침</b></a></div>`;
+
+  // 오른쪽: 로그인·내 정보, 광고, 댓글 많은 글, 공지
   $('#side').innerHTML = `
-    <section class="box me-box">${me
+    <section class="card me-box">${me
     ? `<div class="me-name"><b>${esc(me.nickname)}</b>님<small>${esc(me.grade)}${me.role === 'admin' ? ' · 운영진' : ''}</small></div>
        <nav class="me-links"><a href="#/me">내 정보</a><a href="#/me?tab=posts">내 글</a><a href="#/notifications">알림<i class="dot hidden" data-bell></i></a>${admin ? '<a href="#/admin">관리자<span class="count num" data-queue></span></a>' : ''}</nav>
-       <a class="btn block" href="${writeHref}">${icon('pen', 'sm')}글쓰기</a>`
-    : `<p>회원만 글 내용을 볼 수 있습니다.</p><a class="btn block" href="#/login">로그인</a>
-       <nav class="me-links"><a href="#/join">회원가입</a><a href="#/find-id">아이디 찾기</a><a href="#/reset-password">비밀번호 찾기</a></nav>`}</section>
-    <div class="ad-slot ad-side" data-ad="card" data-off="0"></div>
-    <section class="box side-hot"><h3 class="box-h"><a href="#/community/rec">인기글</a><a class="more" href="#/community/rec">더보기</a></h3><ol class="mini" id="side-hot"><li class="none">불러오는 중</li></ol></section>
-    <section class="box"><h3 class="box-h"><a href="#/notices">공지사항</a><a class="more" href="#/notices">더보기</a></h3><ul class="mini" id="side-notice"></ul></section>
-    <section class="box"><h3 class="box-h">안내</h3><nav class="info-links"><a href="#/rules">이용규칙</a><a href="#/data-rules">자료실 규칙</a><a href="#/privacy">개인정보 처리방침</a></nav><p class="side-addr">운영 태산학원 · 042-321-5788</p></section>`;
+       <a class="btn soft block me-write" href="${writeHref}">${icon('pen', 'sm')}글쓰기</a>`
+    : `<p>태산입시 회원이 되면 모든 글과 자료를 볼 수 있어요.</p><a class="btn soft block lg" href="#/login">${icon('user', 'sm')}로그인</a>
+       <nav class="me-links"><a href="#/find-id">아이디 찾기</a><a href="#/reset-password">비밀번호 찾기</a><a class="join" href="#/join">회원가입</a></nav>`}</section>
+    <div class="ad-slot" data-ad="rail" data-off="4"></div>
+    <section class="card side-box"><h2 class="box-h">댓글이 많은 글</h2><ol class="mini" id="side-hot"><li class="none">불러오는 중</li></ol></section>
+    <section class="card side-box side-notice"><h2 class="box-h"><a href="#/notices">공지사항</a><a class="more" href="#/notices" aria-label="공지사항 더보기">${icon('right', 'sm')}</a></h2><ul class="mini" id="side-notice"></ul></section>
+    <div class="ad-slot" data-ad="note" data-off="6"></div>`;
   fillSide();
-  mountAds();
   if (admin) refreshQueue();
 }
 
-// 오른쪽 인기글·공지(1분 동안은 받아 둔 것을 씀)
+// 오른쪽 댓글 많은 글·공지(1분 동안은 받아 둔 것을 씀)
 let sideCache = { t: 0, who: null, hot: [], notice: [] };
 async function fillSide() {
   const who = be.currentUser()?.uid || '';
   if (Date.now() - sideCache.t > 60000 || sideCache.who !== who) {
     try {
       const [recent, notices] = await Promise.all([be.listPosts({ limit: 200 }), be.listPosts({ board: 'notice', limit: 5 })]);
-      const h = hot(recent).slice(0, 7);
+      const week = Date.now() - 7 * 86400000;
+      const h = recent.filter((p) => p.board !== 'notice' && p.createdAt > week && p.commentCount)
+        .sort((a, b) => b.commentCount - a.commentCount || b.createdAt - a.createdAt).slice(0, 6);
+      const list = h.length ? h : hot(recent).slice(0, 6);
       // 비어 있으면 다음 화면에서 다시 받음
-      sideCache = { t: h.length ? Date.now() : 0, who, hot: h, notice: notices.slice(0, 4) };
+      sideCache = { t: list.length ? Date.now() : 0, who, hot: list, notice: notices.slice(0, 4) };
     } catch { sideCache.t = 0; }
   }
-  const item = (p, i) => `<li><a href="#/post/${esc(p.id)}">${i === undefined ? '' : `<span class="rank${i < 3 ? ' top' : ''}">${i + 1}</span>`}<span class="t">${esc(p.title)}</span>${p.commentCount ? `<span class="cmt">${p.commentCount}</span>` : ''}</a></li>`;
+  const item = (p) => `<li><a href="#/post/${esc(p.id)}"><span class="t">${esc(p.title)}</span>${p.commentCount ? `<span class="cmt-n" aria-label="댓글 ${p.commentCount}개">${icon('chat')}${p.commentCount}</span>` : ''}</a></li>`;
   const h = $('#side-hot'), n = $('#side-notice');
-  if (h) h.innerHTML = sideCache.hot.map((p, i) => item(p, i)).join('') || '<li class="none">최근 7일 동안 올라온 글이 없습니다</li>';
-  if (n) n.innerHTML = sideCache.notice.map((p) => item(p)).join('') || '<li class="none">공지가 없습니다</li>';
+  if (h) h.innerHTML = sideCache.hot.map(item).join('') || '<li class="none">최근 7일 동안 올라온 글이 없습니다</li>';
+  if (n) n.innerHTML = sideCache.notice.map(item).join('') || '<li class="none">공지가 없습니다</li>';
 }
 
 // 모바일 게시판 탭: 현재 탭을 가운데로, 없으면 맨 앞으로
@@ -200,17 +218,27 @@ function rowsBox(list, none, opts) {
   return list.slice(0, SLOTS).map((p, i) => rowHtml(p, opts?.rank ? i + 1 : 0, opts)).join('');
 }
 
+// 새 글: 게시판 이름·제목·댓글 수·글쓴이·시간
+function feedRows(list) {
+  if (!list.length) return '<div class="row"><span class="t" style="color:var(--muted)">아직 올라온 글이 없습니다</span></div>';
+  return list.map((p) => `<a class="row feed-row" href="#/post/${esc(p.id)}"><span class="bd">${esc(BOARDS[p.board]?.name || '')}</span><span class="t">${esc(p.title)}</span>${p.commentCount ? `<span class="cmt-n" aria-label="댓글 ${p.commentCount}개">${icon('chat')}${p.commentCount}</span>` : ''}${newBadge(p)}<span class="by">${esc(p.nickname)}</span><time>${ago(p.createdAt)}</time></a>`).join('');
+}
+
 async function renderHome(ctx) {
   const { view } = ctx;
   const boards = ['news', 'admission', 'talk', 'school'];
-  const panel = (id, title, href, more = '전체 보기') => `<section class="panel"><header class="panel-h"><h2>${title}</h2>${href ? `<a href="${href}">${more}${icon('right', 'sm')}</a>` : ''}</header><div id="${id}">${'<div class="row"><span class="skeleton" style="width:60%"></span></div>'.repeat(SLOTS)}</div></section>`;
+  const panel = (id, title, href, { ic = '', more = '' } = {}) => `<section class="card panel"><header class="panel-h"><h2>${ic ? icon(ic) : ''}${href ? `<a href="${href}">${title}</a>` : title}</h2>${href ? `<a class="more" href="${href}" aria-label="${more || '전체 보기'}">${more ? `${more}` : ''}${icon('right', 'sm')}</a>` : ''}</header><div class="panel-b" id="${id}">${'<div class="row"><span class="skeleton" style="width:60%"></span></div>'.repeat(SLOTS)}</div></section>`;
   view.innerHTML = `<div class="home">
-    <section class="cover" id="cover"><h1 class="cover-title" id="cover-title">${esc(SITE_NAME)}</h1><p class="cover-sub" id="cover-sub">${esc(SITE_DESC)}</p><div class="cover-stats" id="cover-stats"></div></section>
-    <div class="home-top">${panel('h-hot', '인기글 <small>최근 7일</small>', '#/community/rec')}${panel('h-events', '입시 일정', be.isAdmin() ? '#/admin?tab=events' : '', '일정 관리')}</div>
-    <div class="home-grid">${boards.map((b) => panel(`h-${b}`, BOARDS[b].name, boardHref(b))).join('')}</div>
-    <div class="home-grid">${panel('h-notice', '공지사항', '#/notices')}${panel('h-data', '자료실 새 자료', '#/study')}</div>
+    <section class="cover" id="cover"><h1 class="cover-title" id="cover-title">${esc(SITE_NAME)}</h1><p class="cover-sub" id="cover-sub">${esc(SITE_DESC)}</p></section>
+    <div class="ad-pair"><div class="ad-slot" data-ad="pic" data-off="0"></div><div class="ad-slot" data-ad="pic" data-off="1"></div></div>
+    <div class="home-two">${panel('h-hot', '인기글', '#/community/rec', { ic: 'flame' })}${panel('h-events', '입시 일정', be.isAdmin() ? '#/admin?tab=events' : '', { ic: 'calendar', more: be.isAdmin() ? '일정 관리' : '' })}</div>
+    <div class="ad-slot" data-ad="line" data-off="2"></div>
+    <section class="card panel feed"><header class="panel-h"><h2>${icon('list')}<a href="#/community/all">새 글</a><small id="feed-stats"></small></h2><a class="more" href="#/community/all" aria-label="전체글 보기">${icon('right', 'sm')}</a></header><div class="panel-b" id="h-new">${'<div class="row"><span class="skeleton" style="width:70%"></span></div>'.repeat(8)}</div></section>
+    <div class="home-two">${boards.map((b) => panel(`h-${b}`, BOARDS[b].name, boardHref(b), { ic: BOARD_ICON[b] })).join('')}</div>
+    <div class="home-two">${panel('h-notice', '공지사항', '#/notices', { ic: 'megaphone' })}${panel('h-data', '자료실 새 자료', '#/study', { ic: 'book' })}</div>
   </div>`;
   applyCover();
+  mountAds();
   const [notices, recent, data, banners, ...per] = await Promise.all([
     be.listPosts({ board: 'notice', limit: SLOTS }),
     be.listPosts({ limit: 200 }),
@@ -221,11 +249,12 @@ async function renderHome(ctx) {
   if (!ctx.alive()) return;
   const day = Date.now() - 86400000, week = Date.now() - 7 * 86400000;
   const today = recent.filter((p) => p.createdAt > day).length, thisWeek = recent.filter((p) => p.createdAt > week).length;
-  $('#cover-stats').innerHTML = `<span>오늘 새 글<b>${today}</b></span><span>이번 주<b>${thisWeek}</b></span>`;
-  $('#h-hot').innerHTML = rowsBox(hot(recent), '최근 7일 동안 올라온 글이 없습니다', { rank: true, by: true });
+  $('#feed-stats').innerHTML = `오늘 <b class="num">${today}</b> · 이번 주 <b class="num">${thisWeek}</b>`;
+  $('#h-hot').innerHTML = rowsBox(hot(recent), '최근 7일 동안 올라온 글이 없습니다', { rank: true, tag: false });
+  $('#h-new').innerHTML = feedRows(recent.filter((p) => p.board !== 'notice').slice(0, 8));
   $('#h-notice').innerHTML = rowsBox(notices, '공지가 없습니다');
-  $('#h-data').innerHTML = rowsBox(data, '공개된 자료가 없습니다');
-  boards.forEach((b, i) => { $(`#h-${b}`).innerHTML = rowsBox(per[i].filter((p) => !p.pinned), '등록된 글이 없습니다'); });
+  $('#h-data').innerHTML = rowsBox(data, '공개된 자료가 없습니다', { tag: false });
+  boards.forEach((b, i) => { $(`#h-${b}`).innerHTML = rowsBox(per[i].filter((p) => !p.pinned), '등록된 글이 없습니다', { tag: false }); });
   // 입시 일정: 오늘 이후 가까운 순
   const events = banners.filter((x) => x.kind === 'event' && dday(x.date)).sort((a, b) => a.date.localeCompare(b.date));
   const ev = (x) => {
@@ -266,7 +295,7 @@ async function renderBoard(ctx, board) {
   const writeHref = `#/write?board=${board}${cat ? `&category=${encodeURIComponent(cat)}` : ''}`;
   const base = virtual ? `#/community/${board}` : boardHref(board);
   const qs = (patch) => { const u = new URLSearchParams(q); Object.entries(patch).forEach(([k, v]) => (v ? u.set(k, v) : u.delete(k))); const s = u.toString(); return s ? `${base}?${s}` : base; };
-  const cols = `<colgroup><col style="width:96px"><col><col style="width:116px"><col style="width:72px"><col style="width:52px"><col style="width:62px">${admin ? '<col style="width:84px">' : ''}</colgroup>`;
+  const cols = `<colgroup><col style="width:80px"><col><col style="width:100px"><col style="width:58px"><col style="width:46px"><col style="width:50px">${admin ? '<col style="width:68px">' : ''}</colgroup>`;
 
   view.innerHTML = `${pageHead(b.name, { desc: BOARD_DESC[board], actions: writable ? `<a class="btn" href="${writeHref}">${icon('pen', 'sm')}글쓰기</a>` : '' })}
     ${board === 'data' ? `<div class="notice-box" style="margin-bottom:16px">${icon('info')}<div>직접 만들었거나 배포 허락을 받은 자료만 올릴 수 있고, 관리자가 확인한 뒤 공개됩니다. <a href="#/data-rules">자료실 규칙</a></div></div>` : ''}
@@ -313,7 +342,7 @@ async function renderBoard(ctx, board) {
   const read = readSet();
   const tr = (p, pin) => `<tr class="${pin ? 'pin' : ''}${read.has(p.id) ? ' read' : ''}">
     <td class="c-cat">${pin ? '<span class="tag notice">공지</span>' : tagHtml(p)}</td>
-    <td class="c-title"><a href="#/post/${esc(p.id)}"><span class="t">${word && field !== 'author' ? highlight(p.title, word) : esc(p.title)}</span>${p.hasPoll ? icon('poll') : ''}${p.imageCount ?? p.images?.length ? icon('image') : ''}${p.fileCount ?? p.files?.length ? icon('clip') : ''}${p.commentCount ? `<span class="cmt">${p.commentCount}</span>` : ''}${newBadge(p)}${p.board === 'data' && !p.approved ? '<span class="tag warn">승인 대기</span>' : ''}</a></td>
+    <td class="c-title"><a href="#/post/${esc(p.id)}"><span class="t">${word && field !== 'author' ? highlight(p.title, word) : esc(p.title)}</span>${p.hasPoll ? icon('poll') : ''}${p.imageCount ?? p.images?.length ? icon('image') : ''}${p.fileCount ?? p.files?.length ? icon('clip') : ''}${p.commentCount ? `<span class="cmt-n" aria-label="댓글 ${p.commentCount}개">${icon('chat')}${p.commentCount}</span>` : ''}${newBadge(p)}${p.board === 'data' && !p.approved ? '<span class="tag warn">승인 대기</span>' : ''}</a></td>
     <td class="c-author" data-uid="${admin ? esc(p.uid) : ''}">${esc(p.nickname)}<small>${esc(p.grade)}</small></td>
     <td class="r">${shortDate(p.createdAt)}</td><td class="r">${(p.viewCount || 0).toLocaleString()}</td><td class="r">${(p.likeCount || 0).toLocaleString()}</td>
     ${admin ? `<td class="c-adm" data-pid="${esc(p.id)}"><button type="button" data-hide>숨김</button><button type="button" data-del>삭제</button></td>` : ''}
