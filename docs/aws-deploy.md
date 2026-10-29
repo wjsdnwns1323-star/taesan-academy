@@ -14,6 +14,10 @@
 
 표, 사용자 풀, 파일 버킷은 실수로 지워지지 않게 삭제 보호를 걸어 두었습니다.
 
+## 0. 준비(요금 알림)
+
+배포 전에 콘솔 **Billing and Cost Management → 예산(Budgets) → 예산 생성 → 월 비용 예산** 에서 월 1만 원(예: 8달러) 정도로 만들고 알림 이메일을 넣습니다. 생각보다 요금이 나오면 바로 메일이 옵니다.
+
 ## 1. 처음 배포
 
 1. AWS 콘솔에 로그인한 뒤 오른쪽 위 리전을 **아시아 태평양(서울) ap-northeast-2**로 바꿉니다.
@@ -22,7 +26,6 @@
 
 ```bash
 git clone https://github.com/wjsdnwns1323-star/taesan-academy.git && cd taesan-academy
-git checkout claude/unione-repository-add-issue-iuzriw   # main에 합치기 전이라면
 bash aws/deploy.sh
 ```
 
@@ -38,9 +41,9 @@ bash aws/scripts/create-admin.sh qwer
 
 ## 3. 인증 문자 열기(꼭 필요)
 
-새 AWS 계정은 **문자 샌드박스** 상태라, 미리 등록한 번호로만 문자가 갑니다. 회원가입을 열기 전에 아래 두 가지를 해야 합니다.
+새 AWS 계정은 **문자 샌드박스** 상태라, 미리 등록한 번호로만 문자가 갑니다. 회원가입을 열기 전에 아래 두 가지를 해야 합니다. 서울의 Cognito는 **도쿄(ap-northeast-1) SNS**로만 문자를 보낼 수 있어서, 인증문자는 모두 도쿄에서 나갑니다. 아래 신청도 콘솔 리전을 **도쿄**로 바꾼 뒤 합니다.
 
-1. 콘솔에서 **Amazon SNS → 문자 메시지(SMS) → 샌드박스 종료(Exit SMS sandbox)** 를 눌러 신청합니다. 용도는 "회원가입 휴대폰 인증(일회용 비밀번호)", 대상 국가는 대한민국, 예상 발송량은 하루 수십 건 정도로 적습니다.
+1. 콘솔 리전을 **아시아 태평양(도쿄) ap-northeast-1**로 바꾸고 **Amazon SNS → 문자 메시지(SMS) → 샌드박스 종료(Exit SMS sandbox)** 를 눌러 신청합니다. 용도는 "회원가입 휴대폰 인증(일회용 비밀번호)", 대상 국가는 대한민국, 예상 발송량은 하루 수십 건 정도로 적습니다.
 2. 같은 화면의 **월 지출 한도(Account spend limit)** 가 처음에는 1달러입니다. 한 달 예상 문자 수에 맞춰 올려 달라고 함께 신청합니다(예: 20달러).
 
 샌드박스가 풀리기 전에는 SNS 화면에서 내 휴대폰 번호를 "샌드박스 대상 번호"로 등록하면 그 번호로는 시험할 수 있습니다.
@@ -58,7 +61,8 @@ bash aws/scripts/create-admin.sh qwer
 DOMAIN=taesan.uinone.net CERT_ARN=arn:aws:acm:us-east-1:123456789012:certificate/... bash aws/deploy.sh
 ```
 
-4. DNS에서 `taesan` 레코드를 지금의 GitHub Pages 대신 **CNAME → 배포 결과의 `xxxx.cloudfront.net`** 으로 바꿉니다. 바꾸고 나면 GitHub 저장소 Settings → Pages 의 사용자 도메인은 비워 두어도 됩니다.
+4. DNS에서 `taesan` 레코드를 지금의 GitHub Pages 대신 **CNAME → 배포 결과의 `xxxx.cloudfront.net`** 으로 바꿉니다.
+5. 새 주소에서 가입·로그인·글쓰기·사진 올리기가 되면, GitHub 저장소 **Settings → Pages** 의 사용자 도메인을 비우고 Pages를 끕니다(그 뒤로는 화면도 AWS에서만 나갑니다).
 
 ## 5. 화면만 다시 올리기
 

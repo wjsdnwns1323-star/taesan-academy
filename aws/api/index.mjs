@@ -15,7 +15,7 @@ import {
 import { SNSClient, PublishCommand } from '@aws-sdk/client-sns';
 import { createApp, ApiError, Conflict } from './core.mjs';
 
-const { TABLE, BUCKET, USER_POOL_ID, CLIENT_ID, SMS_DAILY_MAX, QNA_OPEN, AWS_REGION, DYNAMO_ENDPOINT } = process.env;
+const { TABLE, BUCKET, USER_POOL_ID, CLIENT_ID, SMS_DAILY_MAX, QNA_OPEN, AWS_REGION, SMS_REGION, DYNAMO_ENDPOINT } = process.env;
 
 /* ---------------- DynamoDB 저장소 ---------------- */
 export function createDynamoStore(table, client) {
@@ -258,7 +258,7 @@ function getApp() {
       store: createDynamoStore(TABLE, ddb),
       files: createS3Files(BUCKET, new S3Client({})),
       idp: createCognitoIdp({ poolId: USER_POOL_ID, clientId: CLIENT_ID, region: AWS_REGION, client: new CognitoIdentityProviderClient({}) }),
-      sms: createSnsSms(new SNSClient({})),
+      sms: createSnsSms(new SNSClient(SMS_REGION ? { region: SMS_REGION } : {})),
       env: { qnaOpen: QNA_OPEN === 'true', smsDailyMax: parseInt(SMS_DAILY_MAX, 10) || 300 },
     });
   }

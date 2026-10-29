@@ -21,6 +21,10 @@ Parameters:
     Type: Number
     Default: 300
     Description: 하루에 보낼 수 있는 가입 인증문자 최대 개수(요금 보호).
+  SmsRegion:
+    Type: String
+    Default: ap-northeast-1
+    Description: 인증문자를 보내는 SNS 리전. 서울(ap-northeast-2)의 Cognito는 도쿄(ap-northeast-1) SNS로만 문자를 보낼 수 있습니다.
   QnaOpen:
     Type: String
     Default: 'false'
@@ -148,7 +152,7 @@ Resources:
       SmsConfiguration:
         SnsCallerArn: !GetAtt SmsRole.Arn
         ExternalId: !Sub '${AWS::StackName}-sms'
-        SnsRegion: !Ref AWS::Region
+        SnsRegion: !Ref SmsRegion
       VerificationMessageTemplate:
         SmsMessage: '[태산입시] 인증번호는 {####} 입니다'
       AdminCreateUserConfig:
@@ -213,6 +217,7 @@ Resources:
           USER_POOL_ID: !Ref UserPool
           CLIENT_ID: !Ref UserPoolClient
           SMS_DAILY_MAX: !Ref SmsDailyMax
+          SMS_REGION: !Ref SmsRegion
           QNA_OPEN: !Ref QnaOpen
       Policies:
         - DynamoDBCrudPolicy: { TableName: !Ref Table }
