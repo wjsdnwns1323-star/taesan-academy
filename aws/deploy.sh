@@ -4,6 +4,7 @@
 #   bash aws/deploy.sh
 # 사이트 주소(taesan.uinone.net)를 붙일 때는 us-east-1 에서 발급한 인증서 ARN을 함께 넘깁니다.
 #   DOMAIN=taesan.uinone.net CERT_ARN=arn:aws:acm:us-east-1:...:certificate/... bash aws/deploy.sh
+# 사이트 주소가 taesan.uinone.net 이 아니면 SITE_ORIGIN=https://다른주소 를 함께 넘깁니다.
 # 화면만 다시 올릴 때: bash aws/deploy.sh site
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -20,6 +21,9 @@ if [ "${1:-}" != "site" ]; then
   [ -n "${DOMAIN:-}" ] && PARAMS+=("DomainName=$DOMAIN")
   [ -n "${CERT_ARN:-}" ] && PARAMS+=("CertificateArn=$CERT_ARN")
   [ -n "${SMS_DAILY_MAX:-}" ] && PARAMS+=("SmsDailyMax=$SMS_DAILY_MAX")
+  # 서버를 부를 수 있는 사이트 주소(CORS). 기본은 https://taesan.uinone.net, DOMAIN 을 주면 그 주소
+  SITE_ORIGIN=${SITE_ORIGIN:-${DOMAIN:+https://$DOMAIN}}
+  [ -n "$SITE_ORIGIN" ] && grep -q "^  SiteOrigin:" template.yaml && PARAMS+=("SiteOrigin=$SITE_ORIGIN")
   sam deploy --template-file template.yaml --stack-name "$STACK" --region "$REGION" --resolve-s3 \
     --capabilities CAPABILITY_IAM CAPABILITY_AUTO_EXPAND --no-fail-on-empty-changeset --no-confirm-changeset \
     ${PARAMS[@]+--parameter-overrides "${PARAMS[@]}"}
