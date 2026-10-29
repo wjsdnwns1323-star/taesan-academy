@@ -11,6 +11,7 @@ import { renderWrite } from './write.js';
 import { renderLogin, renderJoin, renderMe, renderFindId, renderResetPassword } from './account.js';
 import { renderAdmin } from './admin.js';
 import { renderDoc } from './docs.js';
+import { mountAds } from './ads.js';
 
 const view = $('#view');
 const AUTH_PAGES = new Set(['login', 'join', 'find-id', 'reset-password']);
@@ -82,7 +83,7 @@ async function route() {
       $('#retry').addEventListener('click', () => route());
     }
   }
-  if (ctx.alive()) { refreshBell(); document.title = titleOf(page, arg); }
+  if (ctx.alive()) { refreshBell(); mountAds(); document.title = titleOf(page, arg); }
 }
 
 function titleOf(page, arg) {
@@ -123,10 +124,12 @@ function renderChrome(page, arg, q) {
        <a class="btn block" href="${writeHref}">${icon('pen', 'sm')}글쓰기</a>`
     : `<p>회원만 글 내용을 볼 수 있습니다.</p><a class="btn block" href="#/login">로그인</a>
        <nav class="me-links"><a href="#/join">회원가입</a><a href="#/find-id">아이디 찾기</a><a href="#/reset-password">비밀번호 찾기</a></nav>`}</section>
+    <div class="ad-slot ad-side" data-ad="card" data-off="0"></div>
     <section class="box side-hot"><h3 class="box-h"><a href="#/community/rec">인기글</a><a class="more" href="#/community/rec">더보기</a></h3><ol class="mini" id="side-hot"><li class="none">불러오는 중</li></ol></section>
     <section class="box"><h3 class="box-h"><a href="#/notices">공지사항</a><a class="more" href="#/notices">더보기</a></h3><ul class="mini" id="side-notice"></ul></section>
     <section class="box"><h3 class="box-h">안내</h3><nav class="info-links"><a href="#/rules">이용규칙</a><a href="#/data-rules">자료실 규칙</a><a href="#/privacy">개인정보 처리방침</a></nav><p class="side-addr">운영 태산학원 · 042-321-5788</p></section>`;
   fillSide();
+  mountAds();
   if (admin) refreshQueue();
 }
 
