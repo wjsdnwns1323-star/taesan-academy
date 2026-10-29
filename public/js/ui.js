@@ -126,9 +126,9 @@ export function highlight(text, word) {
 }
 
 // 홈 상자·검색 결과용 한 줄
-export function rowHtml(p, rank, { by = false } = {}) {
-  return `<a class="row" href="#/post/${esc(p.id)}">${rank ? `<span class="rank${rank <= 3 ? ' top' : ''}">${rank}</span>` : ''}${tagHtml(p)}<span class="t">${esc(p.title)}</span>
-    ${p.commentCount ? `<span class="cmt">${p.commentCount}</span>` : ''}${newBadge(p)}${by ? `<span class="by">${esc(p.nickname)}</span>` : ''}<time>${shortDate(p.createdAt)}</time></a>`;
+export function rowHtml(p, rank, { by = false, tag = true } = {}) {
+  return `<a class="row" href="#/post/${esc(p.id)}">${rank ? `<span class="rank${rank <= 3 ? ' top' : ''}">${rank}</span>` : ''}${tag ? tagHtml(p) : ''}<span class="t">${esc(p.title)}</span>
+    ${p.commentCount ? `<span class="cmt-n" aria-label="댓글 ${p.commentCount}개">${icon('chat')}${p.commentCount}</span>` : ''}${newBadge(p)}${by ? `<span class="by">${esc(p.nickname)}</span>` : ''}<time>${shortDate(p.createdAt)}</time></a>`;
 }
 
 // 목록형(검색·내 글·스크랩)
