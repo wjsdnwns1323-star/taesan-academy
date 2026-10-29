@@ -522,6 +522,7 @@ export function createApp({ store, files, idp, sms, env = {} }) {
     const poll = checkPoll(b.poll, b.board);
     const images = await attachments(b.images || [], LIMIT.images, u, true);
     const fls = await attachments(b.files || [], LIMIT.files, u, false);
+    if (!isAdmin(u)) await limit(`post#${u.uid}`, 50); // 도배 막기: 하루 글 50개
     const t = now(), id = newId(t);
     const meta = {
       id, board: b.board, category: b.category, title: b.title.trim(), uid: u.uid, nickname: u.nickname, grade: u.grade, createdAt: t,
@@ -727,6 +728,7 @@ export function createApp({ store, files, idp, sms, env = {} }) {
       if (!parent || parent.deleted) throw E.notFound('답글을 달 댓글을 찾을 수 없습니다.');
       if (parent.parentId) throw bad('답글에는 다시 답글을 달 수 없습니다.');
     }
+    if (!isAdmin(u)) await limit(`comment#${u.uid}`, 300); // 도배 막기: 하루 댓글 300개
     const t = now(), cid = newId(t);
     await store.transact([
       { put: { pk: `P#${id}`, sk: `C#${cid}`, id: cid, uid: u.uid, nickname: u.nickname, grade: u.grade, body, image, createdAt: t, likeCount: 0, parentId,

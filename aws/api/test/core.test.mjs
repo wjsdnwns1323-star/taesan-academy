@@ -657,3 +657,14 @@ test('보안: 권한 표(비회원·다른 회원·정지 회원이 못 하는 �
     await t.fail(404, m, path, body, b.token);
   }
 });
+
+test('도배 막기: 하루 글 50개·댓글 300개(관리자는 제외)', async () => {
+  const t = await setup();
+  const a = await t.join('spam01');
+  for (let i = 0; i < 50; i++) await t.ok('POST', '/posts', post({ title: `글 ${i}` }), a.token);
+  assert.equal((await t.fail(429, 'POST', '/posts', post(), a.token)).error, 'too-many-requests');
+  const b = await t.join('spam02');
+  const { id } = await t.ok('POST', '/posts', post(), b.token);
+  for (let i = 0; i < 300; i++) await t.ok('POST', `/posts/${id}/comments`, { body: `댓글 ${i}` }, b.token);
+  await t.fail(429, 'POST', `/posts/${id}/comments`, { body: '하나 더' }, b.token);
+});
