@@ -730,3 +730,66 @@ mark { background: #fff1b8; color: inherit; padding: 0 1px; }
   .to-top { right: 14px; bottom: calc(14px + env(safe-area-inset-bottom)); }
   #toast { bottom: calc(64px + env(safe-area-inset-bottom)); }
 }
+
+/* ---------------- 태산학원 홍보 광고: 메뉴 아래 가로 띠 1개 + 오른쪽 칸 1개 ---------------- */
+.ad-slot:empty { display: none; }
+.ad-top-wrap { width: 100%; max-width: var(--wrap); margin: 0 auto; padding: 20px 16px 0; }
+.app.bare .ad-top-wrap { display: none; }
+.ad-side { width: 100%; }
+.ad-wide, .ad-card { position: relative; display: block; overflow: hidden; isolation: isolate; color: var(--text); background: var(--ad-bg, #f3f5f9); border: 1px solid #e3e6eb; }
+.ad-wide:hover, .ad-card:hover { text-decoration: none; border-color: #c9ced6; }
+.ad-slot.swap > a { animation: ad-in 0.4s ease; }
+@keyframes ad-in { from { opacity: 0; } to { opacity: 1; } }
+.ad-mark { position: absolute; top: 6px; right: 6px; z-index: 4; font-size: 10px; font-weight: 700; letter-spacing: 0.04em; line-height: 14px; padding: 0 3px; color: #8a919c; border: 1px solid #cdd1d8; background: rgba(255, 255, 255, 0.8); }
+.ad-wide::before, .ad-card::before { content: ''; position: absolute; inset: 0; z-index: -1;
+  background: radial-gradient(circle at 78% 120%, rgba(27, 58, 122, 0.05) 0 22%, transparent 22.5% 36%, rgba(27, 58, 122, 0.035) 36.5% 52%, transparent 52.5%); }
+.t-cool { --ad-bg: #f3f5f9; --ad-hl: #1b3a7a; }
+.t-warm { --ad-bg: #f7f3ec; --ad-hl: #8a4b08; }
+.t-sage { --ad-bg: #eff5f1; --ad-hl: #1f5c45; }
+.t-lav { --ad-bg: #f4f2f8; --ad-hl: #4b3a8f; }
+.ad-wide img, .ad-card img { display: block; max-width: none; pointer-events: none; }
+
+/* 가로 띠 */
+.ad-wide { height: 96px; padding: 0 24px; }
+.aw-txt { position: relative; z-index: 2; height: 100%; display: flex; flex-direction: column; justify-content: center; gap: 4px; max-width: calc(100% - 300px); }
+.aw-top { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--faint); }
+.aw-top b { color: var(--text); font-weight: 800; display: inline-flex; align-items: center; gap: 8px; }
+.aw-top b::after { content: ''; width: 1px; height: 10px; background: #c5cad2; }
+.aw-title { font-size: 20px; font-weight: 800; line-height: 1.3; letter-spacing: -0.03em; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.aw-when { font-size: 14px; font-weight: 700; color: var(--ad-hl); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.aw-ph { position: absolute; right: 140px; bottom: 0; z-index: 1; display: flex; align-items: flex-end; }
+.aw-ph img { height: 90px; width: auto; }
+.aw-ph.many img { height: 84px; }
+.aw-ph.many img + img { margin-left: -26px; }
+.aw-ph.big { right: 150px; bottom: -10px; font-size: 64px; font-weight: 900; letter-spacing: -0.05em; line-height: 1; color: rgba(27, 58, 122, 0.08); }
+.aw-by { display: none; }
+.aw-cta { position: absolute; right: 22px; top: 50%; transform: translateY(-50%); z-index: 2; font-size: 13px; font-weight: 700; padding: 7px 12px; color: var(--ad-hl); background: #fff; border: 1px solid currentColor; }
+.aw-cta::after { content: ' ›'; }
+
+/* 오른쪽 칸 선생님 카드 */
+.ad-card { display: flex; flex-direction: column; aspect-ratio: 15 / 16; background: linear-gradient(180deg, #f5f7fa, #e9edf3); }
+.ac-motto { position: relative; z-index: 2; padding: 20px 14px 0; text-align: center; font-size: 17px; font-weight: 800; line-height: 1.35; letter-spacing: -0.03em; color: var(--text); }
+.ac-ph { position: relative; flex: 1; min-height: 0; margin-top: 6px; }
+.ac-ph img { position: absolute; left: 50%; bottom: 0; height: 100%; width: auto; transform: translateX(-50%); }
+.ac-name { position: relative; z-index: 2; flex: none; height: 42px; display: flex; align-items: center; justify-content: center; gap: 5px; background: #2b3240; color: #fff; font-size: 15px; font-weight: 400; white-space: nowrap; }
+.ac-name b { font-weight: 800; }
+.ad-card .ad-mark { top: auto; bottom: 48px; }
+
+@media (prefers-reduced-motion: reduce) { .ad-slot.swap > a { animation: none; } }
+@media (max-width: 1023px) {
+  .ad-top-wrap { padding: 14px 16px 0; }
+}
+@media (max-width: 640px) {
+  .ad-wide { height: 84px; padding: 0 14px; }
+  .aw-txt { max-width: calc(100% - 108px); gap: 2px; }
+  .aw-top { font-size: 11px; }
+  .aw-title { font-size: 15px; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .aw-when { font-size: 12px; }
+  .aw-cta { display: none; }
+  .aw-ph { right: 28px; }
+  .aw-ph img { height: 80px; }
+  .aw-ph.many img { height: 74px; }
+  .aw-ph.many img + img { margin-left: -36px; }
+  .aw-ph.many img:nth-child(n+3) { display: none; }
+  .aw-ph.big { right: 8px; font-size: 48px; }
+}
