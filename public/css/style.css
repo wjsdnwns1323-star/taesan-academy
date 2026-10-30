@@ -861,3 +861,19 @@ mark { background: #fff1b8; color: inherit; padding: 0 1px; }
   .al-cta { display: none; }
   .ad-line .ad-ph { height: 56px; margin-right: 16px; }
 }
+
+/* =========================================================
+   반짝이는 제목: 인기글(.hot) 주황·금색, 열혈 회원 글(.fan) 남색·하늘색
+   글자 위로 밝은 빛이 천천히 지나감. 움직임 줄이기 설정이면 색만
+   ========================================================= */
+.t.hot, .t.fan {
+  font-weight: 700;
+  background: linear-gradient(100deg, var(--g1) 0%, var(--g1) 40%, var(--g2) 50%, var(--g1) 60%, var(--g1) 100%) 0 0 / 250% 100%;
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent; color: var(--g1);
+  animation: glint 3.2s linear infinite;
+}
+.t.hot { --g1: #c2410c; --g2: #fbbf24; }
+.t.fan { --g1: #1b3a7a; --g2: #60a5fa; animation-delay: -1.6s; }
+@keyframes glint { from { background-position: 100% 0; } to { background-position: -150% 0; } }
+@media (prefers-reduced-motion: reduce) { .t.hot, .t.fan { animation: none; background: none; -webkit-text-fill-color: currentColor; } }
