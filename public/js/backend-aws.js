@@ -361,6 +361,7 @@ export async function closeReport(id) { await api('POST', `/reports/${encodeURIC
 export const listBanners = () => get('/banners');
 export async function addBanner(b) { await api('POST', '/banners', { body: { kind: b.kind, image: b.image || '', text: b.text || '', link: b.link || '', date: b.date || '' } }); }
 export async function saveCover(c) { await api('PUT', '/banners/cover', { body: { text: c.text || '', sub: c.sub || '', image: c.image || '' } }); }
+export const getAdsDraft = () => get('/admin/ads-draft');
 export async function saveAds(items) { await api('PUT', '/banners/ads', { body: { items } }); }
 export async function deleteBanner(id) { await api('DELETE', `/banners/${encodeURIComponent(id)}`); }
 

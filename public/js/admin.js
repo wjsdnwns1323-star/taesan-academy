@@ -208,7 +208,8 @@ const adCard = (a, i) => `<fieldset class="form-card ad-edit" data-i="${i}">
 </fieldset>`;
 
 async function adsTab(ctx, box) {
-  const saved = (await be.listBanners()).find((b) => b.id === 'ads');
+  const [banners, draft] = await Promise.all([be.listBanners(), be.getAdsDraft().catch(() => null)]);
+  const saved = banners.find((b) => b.id === 'ads');
   if (!ctx.alive()) return;
   let items = (saved?.items?.length ? saved.items : PROMOS).map((a) => ({ ...a, link: a.link || (a.post ? `${ACADEMY_BAND}/${a.post}` : '') }));
   const read = () => $$('.ad-edit', box).map((fs, i) => ({
@@ -221,12 +222,14 @@ async function adsTab(ctx, box) {
   const draw = () => {
     box.innerHTML = `<div class="form-page" style="margin-top:24px">
       <p class="hint" style="margin-bottom:12px">홈 가운데·오른쪽에 차례로 나오는 태산학원 광고입니다. ${saved ? '관리자가 고친 목록이 쓰이고 있습니다.' : '지금은 기본 광고가 나오고 있습니다.'} 고친 뒤 맨 아래 '저장'을 눌러야 사이트에 반영됩니다. 실적 문구는 확인된 숫자만 넣어 주세요.</p>
+      ${draft?.items?.length ? `<div class="ad-draft"><p><strong>AI 초안 ${draft.items.length}개</strong> · ${esc(fullDate(draft.createdAt))} · 밴드 최근 글 ${draft.posts || 0}개로 만듦<br><small>불러오면 아래 목록이 초안으로 바뀝니다. 숫자·날짜를 밴드 글과 맞춰 본 뒤 '저장'을 눌러야 사이트에 나옵니다.</small></p><button type="button" class="btn line" id="ad-draft">AI 초안 불러오기</button></div>` : ''}
       <form id="adf" novalidate style="display:grid;gap:16px">${items.map(adCard).join('')}
         <div class="form-actions"><button type="button" class="btn line" id="ad-add">광고 추가</button>${saved ? '<button type="button" class="btn line" id="ad-reset">기본 광고로 되돌리기</button>' : ''}<span style="flex:1"></span><p class="err" id="aderr"></p><button class="btn lg">저장</button></div></form></div>`;
   };
   draw();
   box.addEventListener('click', async (e) => {
     const fs = e.target.closest('.ad-edit'), i = fs ? +fs.dataset.i : -1;
+    if (e.target.closest('#ad-draft')) { items = draft.items.map((a) => ({ ...a })); draw(); toast('초안을 불러왔습니다. 확인 후 저장해 주세요'); return; }
     if (e.target.closest('#ad-add')) { if (items.length >= 20) return toast('광고는 20개까지입니다'); items = [...read(), { tone: 'navy', who: [] }]; draw(); $$('.ad-edit', box).at(-1).scrollIntoView({ block: 'center' }); }
     else if (e.target.closest('[data-del]')) { items = read(); items.splice(i, 1); draw(); }
     else if (e.target.closest('[data-up]') && i > 0) { items = read(); [items[i - 1], items[i]] = [items[i], items[i - 1]]; draw(); }

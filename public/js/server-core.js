@@ -61,6 +61,22 @@ const clean = (item) => {
   return out;
 };
 
+// 광고 목록 검사(관리자 저장·AI 초안 공용): 글자 수, https 링크, 선생님 사진 둘까지
+export function cleanAds(list) {
+  if (!Array.isArray(list) || list.length > 20) throw bad('광고는 20개까지입니다.');
+  return list.map((a, i) => {
+    const x = { id: String(a.id || `ad${i}`).slice(0, 20), tone: ['navy', 'ink', 'teal'].includes(a.tone) ? a.tone : 'navy' };
+    for (const [k, max] of [['tag', 12], ['title', 40], ['short', 30], ['hook', 30], ['when', 40], ['by', 20], ['link', 300]]) {
+      if (!str(a[k] ?? '', max)) throw bad(`${i + 1}번째 광고의 글자 수가 너무 많습니다.`);
+      x[k] = (a[k] ?? '').trim();
+    }
+    if (!x.title || !x.hook) throw bad(`${i + 1}번째 광고의 제목과 한 줄 문구를 입력해 주세요.`);
+    if (x.link && !/^https:\/\//.test(x.link)) throw bad('링크는 https:// 로 시작해야 합니다.');
+    x.who = (Array.isArray(a.who) ? a.who : []).filter((w) => /^[a-z-]{1,30}$/.test(w)).slice(0, 2);
+    return x;
+  });
+}
+
 /* ---------------- 앱 ---------------- */
 // store: 저장소, files: 파일 주소 발급, idp: 로그인(Cognito 또는 체험용), sms: 문자 보내기(아이디 찾기),
 // env: { demo, qnaOpen, smsDailyMax, now }
@@ -871,21 +887,14 @@ export function createApp({ store, files, idp, sms, env = {} }) {
   // 홍보 광고 목록(관리자가 문구를 고침): banners/ads 한 문서에 통째로 저장. 비우면 기본 광고(ads.js)로 돌아감
   on('PUT', 'banners/ads', async (ctx) => {
     await admin(ctx);
-    const list = ctx.body.items;
-    if (!Array.isArray(list) || list.length > 20) throw bad('광고는 20개까지입니다.');
-    const items = list.map((a, i) => {
-      const x = { id: String(a.id || `ad${i}`).slice(0, 20), tone: ['navy', 'ink', 'teal'].includes(a.tone) ? a.tone : 'navy' };
-      for (const [k, max] of [['tag', 12], ['title', 40], ['short', 30], ['hook', 30], ['when', 40], ['by', 20], ['link', 300]]) {
-        if (!str(a[k] ?? '', max)) throw bad(`${i + 1}번째 광고의 글자 수가 너무 많습니다.`);
-        x[k] = (a[k] ?? '').trim();
-      }
-      if (!x.title || !x.hook) throw bad(`${i + 1}번째 광고의 제목과 한 줄 문구를 입력해 주세요.`);
-      if (x.link && !/^https:\/\//.test(x.link)) throw bad('링크는 https:// 로 시작해야 합니다.');
-      x.who = (Array.isArray(a.who) ? a.who : []).filter((w) => /^[a-z-]{1,30}$/.test(w)).slice(0, 2);
-      return x;
-    });
-    await store.put({ pk: 'BANNER', sk: 'ads', id: 'ads', kind: 'ads', items, createdAt: now() });
+    if (!Array.isArray(ctx.body.items)) throw bad('광고 목록이 올바르지 않습니다.');
+    await store.put({ pk: 'BANNER', sk: 'ads', id: 'ads', kind: 'ads', items: cleanAds(ctx.body.items), createdAt: now() });
     return { ok: true };
+  });
+  // AI가 매주 밴드 글로 만든 광고 초안(관리자만 봄, 저장해야 게시)
+  on('GET', 'admin/ads-draft', async (ctx) => {
+    await admin(ctx);
+    return clean(await store.get('ADSDRAFT', 'latest')) || null;
   });
   on('DELETE', 'banners/:id', async (ctx, { id }) => {
     await admin(ctx);

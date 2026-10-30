@@ -13,7 +13,9 @@ import {
   AdminInitiateAuthCommand, AdminSetUserPasswordCommand, ForgotPasswordCommand, ConfirmForgotPasswordCommand, RevokeTokenCommand,
 } from '@aws-sdk/client-cognito-identity-provider';
 import { SNSClient, PublishCommand } from '@aws-sdk/client-sns';
+import { SSMClient, GetParametersCommand } from '@aws-sdk/client-ssm';
 import { createApp, ApiError, Conflict } from './core.mjs';
+import { runAdsDraft } from './ads-draft.mjs';
 
 const { TABLE, BUCKET, USER_POOL_ID, CLIENT_ID, SMS_DAILY_MAX, QNA_OPEN, AWS_REGION, DYNAMO_ENDPOINT } = process.env;
 
@@ -282,4 +284,18 @@ export const makeHandler = (appOf) => async (event) => {
   return { statusCode: res.status, headers, body: json };
 };
 
-export const handler = makeHandler(getApp);
+const api = makeHandler(getApp);
+
+// 매주 광고 초안(EventBridge 일정): 비밀 값은 SSM 에서 그때그때 읽음. 값이 없으면 조용히 건너뜀
+const SECRET = { '/taesan/band-token': 'bandToken', '/taesan/band-key': 'bandKey', '/taesan/anthropic-key': 'aiKey' };
+async function adsDraft() {
+  const r = await new SSMClient({}).send(new GetParametersCommand({ Names: Object.keys(SECRET), WithDecryption: true }));
+  const secrets = Object.fromEntries((r.Parameters || []).map((p) => [SECRET[p.Name], p.Value]));
+  if (Object.keys(secrets).length < 3) { console.log('ads-draft: 키가 아직 없어 건너뜀', r.InvalidParameters); return { saved: false }; }
+  const ddb = new DynamoDBClient(DYNAMO_ENDPOINT ? { endpoint: DYNAMO_ENDPOINT } : {});
+  const out = await runAdsDraft({ store: createDynamoStore(TABLE, ddb), secrets });
+  console.log('ads-draft', JSON.stringify(out));
+  return out;
+}
+
+export const handler = (event, context) => (event?.job === 'ads-draft' ? adsDraft() : api(event, context));
