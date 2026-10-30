@@ -1,7 +1,7 @@
 // 화면 이동(해시 주소), 틀(위쪽 막대·왼쪽 메뉴·모바일 탭), 홈·게시판·검색·알림·전체 메뉴
 import * as be from './backend.js';
 import { BOARDS, COMMUNITY_TABS } from './boards.js';
-import { SITE_NAME, SITE_DESC, QNA_OPEN, ACADEMY_BAND } from './config.js';
+import { SITE_NAME, SITE_TAGLINE, SITE_DESC, QNA_OPEN, ACADEMY_BAND } from './config.js';
 import {
   esc, $, $$, toast, icon, empty, pageHead, tagHtml, rowHtml, listItemHtml, shortDate, ago, fullDate, getBanners, safeLink, safeImg, modal, confirmBox,
   newBadge, highlight, dday, readSet, BOARD_ICON,
@@ -91,7 +91,7 @@ async function route() {
 
 function titleOf(page, arg) {
   const h1 = $('#view h1')?.textContent?.trim();
-  return page === 'home' || !h1 ? SITE_NAME : `${h1} · ${SITE_NAME}`;
+  return page === 'home' || !h1 ? `${SITE_NAME} · ${SITE_TAGLINE}` : `${h1} · ${SITE_NAME}`;
 }
 
 document.addEventListener('click', (e) => {

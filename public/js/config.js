@@ -10,6 +10,7 @@ export const firebaseConfig = {
 };
 
 export const SITE_NAME = '태산입시';
+export const SITE_TAGLINE = '대전 중고등 입시 커뮤니티';
 export const SITE_DESC = '대전 학생과 학부모가 입시 정보와 고민을 나누는 곳';
 // 문제풀이 게시판: 학생 회원이 어느 정도 모이면 true 로 바꿔 엽니다
 export const QNA_OPEN = false;
