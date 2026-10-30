@@ -1,10 +1,10 @@
 // 화면 이동(해시 주소), 틀(위쪽 막대·왼쪽 메뉴·모바일 탭), 홈·게시판·검색·알림·전체 메뉴
 import * as be from './backend.js';
 import { BOARDS, COMMUNITY_TABS } from './boards.js';
-import { SITE_NAME, SITE_DESC, QNA_OPEN, ACADEMY_BAND } from './config.js';
+import { SITE_NAME, SITE_TAGLINE, SITE_DESC, QNA_OPEN, ACADEMY_BAND } from './config.js';
 import {
   esc, $, $$, toast, icon, empty, pageHead, tagHtml, rowHtml, listItemHtml, shortDate, ago, fullDate, getBanners, safeLink, safeImg, modal, confirmBox,
-  newBadge, highlight, dday, readSet, BOARD_ICON,
+  newBadge, highlight, dday, readSet, BOARD_ICON, markHeat, heatCls,
 } from './ui.js';
 import { renderPost } from './post.js';
 import { renderWrite } from './write.js';
@@ -91,7 +91,7 @@ async function route() {
 
 function titleOf(page, arg) {
   const h1 = $('#view h1')?.textContent?.trim();
-  return page === 'home' || !h1 ? SITE_NAME : `${h1} · ${SITE_NAME}`;
+  return page === 'home' || !h1 ? `${SITE_NAME} · ${SITE_TAGLINE}` : `${h1} · ${SITE_NAME}`;
 }
 
 document.addEventListener('click', (e) => {
@@ -158,6 +158,7 @@ async function fillSide() {
   if (Date.now() - sideCache.t > 60000 || sideCache.who !== who) {
     try {
       const [recent, notices] = await Promise.all([be.listPosts({ limit: 200 }), be.listPosts({ board: 'notice', limit: 5 })]);
+      markHeat(recent);
       const week = Date.now() - 7 * 86400000;
       const h = recent.filter((p) => p.board !== 'notice' && p.createdAt > week && p.commentCount)
         .sort((a, b) => b.commentCount - a.commentCount || b.createdAt - a.createdAt).slice(0, 6);
@@ -166,7 +167,7 @@ async function fillSide() {
       sideCache = { t: list.length ? Date.now() : 0, who, hot: list, notice: notices.slice(0, 4) };
     } catch { sideCache.t = 0; }
   }
-  const item = (p) => `<li><a href="#/post/${esc(p.id)}"><span class="t">${esc(p.title)}</span>${p.commentCount ? `<span class="cmt-n" aria-label="댓글 ${p.commentCount}개">${icon('chat')}${p.commentCount}</span>` : ''}</a></li>`;
+  const item = (p) => `<li><a href="#/post/${esc(p.id)}"><span class="t${heatCls(p)}">${esc(p.title)}</span>${p.commentCount ? `<span class="cmt-n" aria-label="댓글 ${p.commentCount}개">${icon('chat')}${p.commentCount}</span>` : ''}</a></li>`;
   const h = $('#side-hot'), n = $('#side-notice');
   if (h) h.innerHTML = sideCache.hot.map(item).join('') || '<li class="none">최근 7일 동안 올라온 글이 없습니다</li>';
   if (n) n.innerHTML = sideCache.notice.map(item).join('') || '<li class="none">공지가 없습니다</li>';
@@ -224,7 +225,7 @@ function rowsBox(list, none, opts) {
 // 새 글: 게시판 이름·제목·댓글 수·글쓴이·시간
 function feedRows(list) {
   if (!list.length) return '<div class="row"><span class="t" style="color:var(--muted)">아직 올라온 글이 없습니다</span></div>';
-  return list.map((p) => `<a class="row feed-row" href="#/post/${esc(p.id)}"><span class="bd">${esc(BOARDS[p.board]?.name || '')}</span><span class="t">${esc(p.title)}</span>${p.commentCount ? `<span class="cmt-n" aria-label="댓글 ${p.commentCount}개">${icon('chat')}${p.commentCount}</span>` : ''}${newBadge(p)}<span class="by">${esc(p.nickname)}</span><time>${ago(p.createdAt)}</time></a>`).join('');
+  return list.map((p) => `<a class="row feed-row" href="#/post/${esc(p.id)}"><span class="bd">${esc(BOARDS[p.board]?.name || '')}</span><span class="t${heatCls(p)}">${esc(p.title)}</span>${p.commentCount ? `<span class="cmt-n" aria-label="댓글 ${p.commentCount}개">${icon('chat')}${p.commentCount}</span>` : ''}${newBadge(p)}<span class="by">${esc(p.nickname)}</span><time>${ago(p.createdAt)}</time></a>`).join('');
 }
 
 async function renderHome(ctx) {
@@ -250,6 +251,7 @@ async function renderHome(ctx) {
     ...boards.map((b) => be.listPosts({ board: b, limit: SLOTS + 3 })),
   ]);
   if (!ctx.alive()) return;
+  markHeat(recent);
   const day = Date.now() - 86400000, week = Date.now() - 7 * 86400000;
   const today = recent.filter((p) => p.createdAt > day).length, thisWeek = recent.filter((p) => p.createdAt > week).length;
   $('#feed-stats').innerHTML = `오늘 <b class="num">${today}</b> · 이번 주 <b class="num">${thisWeek}</b>`;
@@ -325,6 +327,7 @@ async function renderBoard(ctx, board) {
   else if (board === 'all') all = (await be.listPosts({ limit: 500 })).filter((p) => p.board !== 'notice');
   else all = await be.listPosts({ board, limit: 500 });
   if (!ctx.alive()) return;
+  markHeat(all);
 
   // 말머리 개수 카드(누르면 그 말머리만)
   if (b.categories.length && board !== 'notice') {
@@ -345,7 +348,7 @@ async function renderBoard(ctx, board) {
   const read = readSet();
   const tr = (p, pin) => `<tr class="${pin ? 'pin' : ''}${read.has(p.id) ? ' read' : ''}">
     <td class="c-cat">${pin ? '<span class="tag notice">공지</span>' : tagHtml(p)}</td>
-    <td class="c-title"><a href="#/post/${esc(p.id)}"><span class="t">${word && field !== 'author' ? highlight(p.title, word) : esc(p.title)}</span>${p.hasPoll ? icon('poll') : ''}${p.imageCount ?? p.images?.length ? icon('image') : ''}${p.fileCount ?? p.files?.length ? icon('clip') : ''}${p.commentCount ? `<span class="cmt-n" aria-label="댓글 ${p.commentCount}개">${icon('chat')}${p.commentCount}</span>` : ''}${newBadge(p)}${p.board === 'data' && !p.approved ? '<span class="tag warn">승인 대기</span>' : ''}</a></td>
+    <td class="c-title"><a href="#/post/${esc(p.id)}"><span class="t${heatCls(p)}">${word && field !== 'author' ? highlight(p.title, word) : esc(p.title)}</span>${p.hasPoll ? icon('poll') : ''}${p.imageCount ?? p.images?.length ? icon('image') : ''}${p.fileCount ?? p.files?.length ? icon('clip') : ''}${p.commentCount ? `<span class="cmt-n" aria-label="댓글 ${p.commentCount}개">${icon('chat')}${p.commentCount}</span>` : ''}${newBadge(p)}${p.board === 'data' && !p.approved ? '<span class="tag warn">승인 대기</span>' : ''}</a></td>
     <td class="c-author" data-uid="${admin ? esc(p.uid) : ''}">${esc(p.nickname)}<small>${esc(p.grade)}</small></td>
     <td class="r">${shortDate(p.createdAt)}</td><td class="r">${(p.viewCount || 0).toLocaleString()}</td><td class="r">${(p.likeCount || 0).toLocaleString()}</td>
     ${admin ? `<td class="c-adm" data-pid="${esc(p.id)}"><button type="button" data-hide>숨김</button><button type="button" data-del>삭제</button></td>` : ''}
@@ -425,7 +428,7 @@ function renderMenu({ view }) {
       : '<p>로그인하면 글 내용을 볼 수 있습니다.</p><div class="grid-2"><a class="btn line" href="#/login">로그인</a><a class="btn" href="#/join">회원가입</a></div>'}</section>
     <div class="menu-group"><h2>게시판</h2>${a('#/community/rec', '인기글')}${a('#/community/all', '전체글')}${COMMUNITY_TABS.slice(1).map((t) => a(`#/community/${t.id}`, t.name)).join('')}${QNA_OPEN ? a('#/community/qna', '문제풀이') : ''}${a('#/study', '자료실')}${a('#/notices', '공지사항')}</div>
     ${me ? `<div class="menu-group"><h2>내 활동</h2>${a('#/me', '내 정보')}${a('#/me?tab=posts', '내가 쓴 글')}${be.has('listMyComments') ? a('#/me?tab=comments', '내 댓글') + a('#/me?tab=bookmarks', '스크랩') : ''}${a('#/notifications', '알림')}</div>` : ''}
-    ${me?.role === 'admin' ? `<div class="menu-group"><h2>관리</h2>${a('#/admin?tab=users', '회원 관리')}${a('#/admin?tab=posts', '글 관리')}${a('#/admin?tab=cover', '표지')}${be.has('events') ? a('#/admin?tab=events', '입시 일정') : ''}${a('#/write?board=notice', '공지 쓰기')}</div>` : ''}
+    ${me?.role === 'admin' ? `<div class="menu-group"><h2>관리</h2>${a('#/admin?tab=users', '회원 관리')}${a('#/admin?tab=posts', '글 관리')}${a('#/admin?tab=cover', '표지')}${be.has('events') ? a('#/admin?tab=ads', '광고') + a('#/admin?tab=events', '입시 일정') : ''}${a('#/write?board=notice', '공지 쓰기')}</div>` : ''}
     <div class="menu-group"><h2>안내</h2>${a('#/rules', '이용규칙')}${a('#/data-rules', '자료실 규칙')}${a('#/privacy', '개인정보 처리방침')}
       ${me ? '<button type="button" id="logout" style="color:var(--muted)">로그아웃</button>' : ''}</div>`;
   $('#logout')?.addEventListener('click', async () => { await be.signOut(); toast('로그아웃했습니다'); location.hash = '#/'; });

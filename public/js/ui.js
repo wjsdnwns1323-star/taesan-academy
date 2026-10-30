@@ -1,6 +1,7 @@
 // 화면 공통 도구: 이스케이프, 날짜, 아이콘, 목록 한 줄, 빈 화면, 알림 메시지, 대화상자
 import { category, BOARDS } from './boards.js';
 import { fileUrl } from './backend.js';
+import { HEAT } from './config.js';
 
 export const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 export const $ = (sel, root = document) => root.querySelector(sel);
@@ -125,9 +126,21 @@ export function highlight(text, word) {
   return t.replace(new RegExp(e, 'gi'), (m) => `<mark>${m}</mark>`);
 }
 
+// 반짝이는 제목: 많이 읽힌 글은 ' hot', 열혈 회원 글은 ' fan'(공지는 제외)
+// 열혈 회원은 불러온 글 목록에서 최근 30일 글 수로 셈(markHeat). 여러 목록을 보면 가장 큰 수를 씀
+const heat = new Map();
+export function markHeat(list) {
+  const since = Date.now() - 30 * 86400000, n = new Map();
+  for (const p of list) if (p.createdAt >= since && p.nickname) n.set(p.nickname, (n.get(p.nickname) || 0) + 1);
+  for (const [k, c] of n) if (c > (heat.get(k) || 0)) heat.set(k, c);
+}
+export const heatCls = (p) => (p.board === 'notice' ? ''
+  : (p.viewCount || 0) >= HEAT.views || (p.likeCount || 0) >= HEAT.likes ? ' hot'
+  : (heat.get(p.nickname) || 0) >= HEAT.posts ? ' fan' : '');
+
 // 홈 상자·검색 결과용 한 줄
 export function rowHtml(p, rank, { by = false, tag = true } = {}) {
-  return `<a class="row" href="#/post/${esc(p.id)}">${rank ? `<span class="rank${rank <= 3 ? ' top' : ''}">${rank}</span>` : ''}${tag ? tagHtml(p) : ''}<span class="t">${esc(p.title)}</span>
+  return `<a class="row" href="#/post/${esc(p.id)}">${rank ? `<span class="rank${rank <= 3 ? ' top' : ''}">${rank}</span>` : ''}${tag ? tagHtml(p) : ''}<span class="t${heatCls(p)}">${esc(p.title)}</span>
     ${p.commentCount ? `<span class="cmt-n" aria-label="댓글 ${p.commentCount}개">${icon('chat')}${p.commentCount}</span>` : ''}${newBadge(p)}${by ? `<span class="by">${esc(p.nickname)}</span>` : ''}<time>${shortDate(p.createdAt)}</time></a>`;
 }
 

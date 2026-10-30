@@ -205,7 +205,7 @@ Resources:
       Runtime: nodejs22.x
       Architectures: [arm64]
       MemorySize: 1024
-      Timeout: 20
+      Timeout: 60  # API 는 HTTP API 한도(30초)로 끊기고, 매주 광고 초안(AI 호출)만 길게 씀
       Environment:
         Variables:
           TABLE: !Ref Table
@@ -230,7 +230,15 @@ Resources:
                 - cognito-idp:AdminInitiateAuth
                 - cognito-idp:AdminSetUserPassword
               Resource: !GetAtt UserPool.Arn
+            - Effect: Allow
+              Action: ssm:GetParameters  # 광고 초안용 밴드·Claude 키(aws/scripts/set-ai-keys.sh 로 넣음)
+              Resource: !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/taesan/*'
       Events:
+        AdsDraft:
+          Type: Schedule
+          Properties:
+            Schedule: cron(0 0 ? * MON *)  # 매주 월요일 오전 9시(한국)
+            Input: '{"job":"ads-draft"}'
         Api:
           Type: HttpApi
           Properties:

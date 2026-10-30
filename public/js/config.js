@@ -10,6 +10,7 @@ export const firebaseConfig = {
 };
 
 export const SITE_NAME = '태산입시';
+export const SITE_TAGLINE = '대전 중고등 입시 커뮤니티';
 export const SITE_DESC = '대전 학생과 학부모가 입시 정보와 고민을 나누는 곳';
 // 문제풀이 게시판: 학생 회원이 어느 정도 모이면 true 로 바꿔 엽니다
 export const QNA_OPEN = false;
@@ -17,6 +18,9 @@ export const ACADEMY_NAME = '태산학원';
 // 태산학원 홍보 광고: 누르면 이 밴드 주소가 새 창으로 열림. 광고를 모두 끄려면 ADS_ON 을 false 로
 export const ACADEMY_BAND = 'https://www.band.us/band/61446116/post';
 export const ADS_ON = true;
+
+// 제목이 반짝이는 글: 인기글(조회 views 이상 또는 좋아요 likes 이상)은 주황, 열혈 회원(최근 30일 글 posts개 이상)의 글은 남색
+export const HEAT = { views: 200, likes: 10, posts: 5 };
 
 // 아이디 로그인용 내부 이메일 도메인(실제로 메일이 가지 않습니다). 바꾸면 기존 회원이 로그인할 수 없습니다.
 export const LOGIN_DOMAIN = 'member.taesan-academy.app';

@@ -98,6 +98,10 @@ export async function seedDemo({ app, store, setClock }) {
     await call('POST', '/banners', { kind: 'event', date: ymd(days), text, link: '' }, adm);
   }
   await call('POST', '/banners', { kind: 'text', text: '11월 고입 설명회 일정을 소식 게시판에 정리해 두었어요', link: '#/community/news' }, adm);
+  // AI 광고 초안 예시(실제 서버에서는 매주 밴드 글로 만들어짐)
+  await store.put({ pk: 'ADSDRAFT', sk: 'latest', id: 'ads-draft', posts: 3, createdAt: Date.now(), items: [
+    { id: 'aidemo0', tone: 'teal', tag: '예비고1', title: '국어 1% 완성반\n모의고사 + 핵심개념 16주', short: '국어 1% 완성반\n16주 완성', hook: '16주 완성 국어 1% 완성반', when: '11.21(토) 개강', by: '국어 김태현', link: '', who: ['kim-taehyun'] },
+  ] });
 }
 
 export const DEMO_PASSWORD = PW;

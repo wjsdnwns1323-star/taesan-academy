@@ -1,12 +1,14 @@
 // 관리자: 회원 관리(정보 열람·정지·권한), 글 관리(승인·신고·숨김·삭제), 배너(표지) 편집
 import * as be from './backend.js';
 import { BOARDS } from './boards.js';
+import { PROMOS, TEACHERS, loadPromos } from './ads.js';
+import { ACADEMY_BAND } from './config.js';
 import { esc, $, $$, ago, fullDate, toast, icon, empty, pageHead, tagHtml, safeImg, safeLink, confirmBox, dday, resetBanners } from './ui.js';
 
 export async function renderAdmin(ctx) {
   const { view, q } = ctx;
   if (!be.isAdmin()) { view.innerHTML = `${pageHead('관리자')}${empty('관리자만 볼 수 있습니다', 'lock')}`; return; }
-  const tabs = [['home', '현황'], ['users', '회원 관리'], ['posts', '글 관리'], ['cover', '표지·안내'], ...(be.has('events') ? [['events', '입시 일정'], ['audit', '열람 기록']] : [])];
+  const tabs = [['home', '현황'], ['users', '회원 관리'], ['posts', '글 관리'], ['cover', '표지·안내'], ...(be.has('events') ? [['ads', '광고'], ['events', '입시 일정'], ['audit', '열람 기록']] : [])];
   const tab = tabs.some(([id]) => id === q.get('tab')) ? q.get('tab') : 'home';
   view.innerHTML = `${pageHead('관리자', { actions: '<a class="btn line keep" href="#/write?board=notice">공지 쓰기</a>' })}
     <nav class="tabs">${tabs.map(([id, n]) => `<a href="#/admin?tab=${id}" class="${id === tab ? 'on' : ''}">${n}</a>`).join('')}</nav>
@@ -16,6 +18,7 @@ export async function renderAdmin(ctx) {
   if (tab === 'users') await usersTab(ctx, box);
   if (tab === 'posts') await postsTab(ctx, box);
   if (tab === 'cover') await coverTab(ctx, box);
+  if (tab === 'ads') await adsTab(ctx, box);
   if (tab === 'events') await eventsTab(ctx, box);
   if (tab === 'audit') await auditTab(ctx, box);
 }
@@ -177,6 +180,71 @@ async function coverTab(ctx, box) {
       await be.saveCover({ text: f.text.value.trim(), sub: f.sub.value.trim(), image: f.noimg.checked ? '' : image });
       toast('저장했습니다'); setTimeout(() => location.reload(), 600);
     } catch (err) { $('#cerr').textContent = be.errorText(err); }
+  });
+}
+
+/* ---------------- 홍보 광고 문구 ---------------- */
+// 광고 하나 = 칸 묶음 하나. 저장하면 목록 전체를 한 번에 올림
+const TONES = [['navy', '남색'], ['ink', '검정'], ['teal', '청록']];
+const adCard = (a, i) => `<fieldset class="form-card ad-edit" data-i="${i}">
+  <legend>광고 ${i + 1}</legend>
+  <div class="grid-2">
+    <div class="field"><label class="lbl">제목 <small>사진 광고에 크게 · 줄바꿈 가능 · 40자</small></label><textarea name="title" rows="2" maxlength="40" required>${esc(a.title || '')}</textarea></div>
+    <div class="field"><label class="lbl">짧은 제목 <small>오른쪽·휴대폰용 · 30자</small></label><textarea name="short" rows="2" maxlength="30">${esc(a.short || '')}</textarea></div>
+  </div>
+  <div class="grid-2">
+    <div class="field"><label class="lbl">한 줄 문구 <small>오른쪽 남색 띠 · 30자</small></label><input name="hook" maxlength="30" value="${esc(a.hook || '')}" required></div>
+    <div class="field"><label class="lbl">날짜·장소 <small>' · '로 나누면 그 자리에서 줄바꿈</small></label><input name="when" maxlength="40" value="${esc(a.when || '')}"></div>
+  </div>
+  <div class="grid-2">
+    <div class="field"><label class="lbl">꼬리표 <small>예: 예비고1</small></label><input name="tag" maxlength="12" value="${esc(a.tag || '')}"></div>
+    <div class="field"><label class="lbl">강사·담당 <small>예: 영어 이건준</small></label><input name="by" maxlength="20" value="${esc(a.by || '')}"></div>
+  </div>
+  <div class="field"><label class="lbl">누르면 열 주소 <small>밴드 글 주소 · 비우면 태산학원 밴드</small></label><input name="link" maxlength="300" placeholder="https://band.us/..." value="${esc(a.link || '')}"></div>
+  <div class="field"><span class="lbl">선생님 사진 <small>둘까지 · 고르지 않으면 글자 광고에만 나옴</small></span>
+    <div class="inline wrap">${Object.entries(TEACHERS).map(([id, n]) => `<label class="check"><input type="checkbox" name="who" value="${id}"${a.who?.includes(id) ? ' checked' : ''}>${esc(n)}</label>`).join('')}</div></div>
+  <div class="inline wrap"><span class="lbl">바탕색</span>${TONES.map(([v, n]) => `<label class="check"><input type="radio" name="tone-${i}" value="${v}"${(a.tone || 'navy') === v ? ' checked' : ''}>${n}</label>`).join('')}
+    <span style="flex:1"></span><button type="button" class="btn sm line" data-up>위로</button><button type="button" class="btn sm danger" data-del>삭제</button></div>
+</fieldset>`;
+
+async function adsTab(ctx, box) {
+  const [banners, draft] = await Promise.all([be.listBanners(), be.getAdsDraft().catch(() => null)]);
+  const saved = banners.find((b) => b.id === 'ads');
+  if (!ctx.alive()) return;
+  let items = (saved?.items?.length ? saved.items : PROMOS).map((a) => ({ ...a, link: a.link || (a.post ? `${ACADEMY_BAND}/${a.post}` : '') }));
+  const read = () => $$('.ad-edit', box).map((fs, i) => ({
+    id: items[i]?.id || `ad${Date.now().toString(36)}${i}`,
+    title: fs.querySelector('[name=title]').value, short: fs.querySelector('[name=short]').value, hook: fs.querySelector('[name=hook]').value,
+    when: fs.querySelector('[name=when]').value, tag: fs.querySelector('[name=tag]').value, by: fs.querySelector('[name=by]').value,
+    link: fs.querySelector('[name=link]').value.trim(), who: $$('[name=who]:checked', fs).map((c) => c.value).slice(0, 2),
+    tone: fs.querySelector(`[name=tone-${i}]:checked`)?.value || 'navy',
+  }));
+  const draw = () => {
+    box.innerHTML = `<div class="form-page" style="margin-top:24px">
+      <p class="hint" style="margin-bottom:12px">홈 가운데·오른쪽에 차례로 나오는 태산학원 광고입니다. ${saved ? '관리자가 고친 목록이 쓰이고 있습니다.' : '지금은 기본 광고가 나오고 있습니다.'} 고친 뒤 맨 아래 '저장'을 눌러야 사이트에 반영됩니다. 실적 문구는 확인된 숫자만 넣어 주세요.</p>
+      ${draft?.items?.length ? `<div class="ad-draft"><p><strong>AI 초안 ${draft.items.length}개</strong> · ${esc(fullDate(draft.createdAt))} · 밴드 최근 글 ${draft.posts || 0}개로 만듦<br><small>불러오면 아래 목록이 초안으로 바뀝니다. 숫자·날짜를 밴드 글과 맞춰 본 뒤 '저장'을 눌러야 사이트에 나옵니다.</small></p><button type="button" class="btn line" id="ad-draft">AI 초안 불러오기</button></div>` : ''}
+      <form id="adf" novalidate style="display:grid;gap:16px">${items.map(adCard).join('')}
+        <div class="form-actions"><button type="button" class="btn line" id="ad-add">광고 추가</button>${saved ? '<button type="button" class="btn line" id="ad-reset">기본 광고로 되돌리기</button>' : ''}<span style="flex:1"></span><p class="err" id="aderr"></p><button class="btn lg">저장</button></div></form></div>`;
+  };
+  draw();
+  box.addEventListener('click', async (e) => {
+    const fs = e.target.closest('.ad-edit'), i = fs ? +fs.dataset.i : -1;
+    if (e.target.closest('#ad-draft')) { items = draft.items.map((a) => ({ ...a })); draw(); toast('초안을 불러왔습니다. 확인 후 저장해 주세요'); return; }
+    if (e.target.closest('#ad-add')) { if (items.length >= 20) return toast('광고는 20개까지입니다'); items = [...read(), { tone: 'navy', who: [] }]; draw(); $$('.ad-edit', box).at(-1).scrollIntoView({ block: 'center' }); }
+    else if (e.target.closest('[data-del]')) { items = read(); items.splice(i, 1); draw(); }
+    else if (e.target.closest('[data-up]') && i > 0) { items = read(); [items[i - 1], items[i]] = [items[i], items[i - 1]]; draw(); }
+    else if (e.target.closest('#ad-reset')) {
+      if (!await confirmBox('기본 광고로 되돌리기', '고친 광고 목록을 지우고 처음 넣어 둔 광고로 돌아갑니다.', '되돌리기', true)) return;
+      try { await be.deleteBanner('ads'); resetBanners(); toast('되돌렸습니다'); ctx.go(`#/admin?tab=ads&r=${Date.now()}`); } catch (err) { toast(be.errorText(err)); }
+    }
+  });
+  box.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    items = read();
+    const bad = items.findIndex((a) => !a.title.trim() || !a.hook.trim());
+    if (bad >= 0) { $('#aderr').textContent = `${bad + 1}번째 광고의 제목과 한 줄 문구를 입력해 주세요.`; return; }
+    try { await be.saveAds(items); resetBanners(); await loadPromos(); toast('저장했습니다. 홈에서 바로 보입니다'); ctx.go(`#/admin?tab=ads&r=${Date.now()}`); }
+    catch (err) { $('#aderr').textContent = be.errorText(err); }
   });
 }
 
