@@ -880,3 +880,9 @@ mark { background: #fff1b8; color: inherit; padding: 0 1px; }
 .t.fan { --g1: #1b3a7a; --g2: #60a5fa; animation-delay: -1.6s; }
 @keyframes glint { from { background-position: 100% 0; } to { background-position: -150% 0; } }
 @media (prefers-reduced-motion: reduce) { .t.hot, .t.fan { animation: none; background: none; -webkit-text-fill-color: currentColor; } }
+
+/* 관리자 광고 칸 */
+.ad-edit { border: 1px solid var(--border); min-width: 0; }
+.ad-edit legend { padding: 0 6px; font-size: 13px; font-weight: 800; color: var(--brand); }
+.ad-edit .inline.wrap { flex-wrap: wrap; align-items: center; gap: 6px 14px; }
+.ad-edit textarea { resize: vertical; min-height: 0; height: auto; }

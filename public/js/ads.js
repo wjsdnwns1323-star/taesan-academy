@@ -2,7 +2,8 @@
 // 문구는 태산학원 밴드 게시물(정리본: Drive '태산학원_웹콘텐츠') 그대로. 가채점 실적은 '가채점'을 붙임
 // 자리: pic(홈 가운데 사진 광고 2개) · line(홈 가운데 글자 띠) · rail(오른쪽 사진 광고) · note(오른쪽 짧은 글자 광고)
 import { ACADEMY_BAND, ADS_ON } from './config.js';
-import { esc } from './ui.js';
+import { esc, getBanners } from './ui.js';
+import { listBanners } from './backend.js';
 
 const photo = (id) => `images/ads/${id}.webp`;
 
@@ -20,12 +21,18 @@ export const PROMOS = [
   { id: 'gwanjeo', tone: 'teal', tag: '관저고2', title: '관저고2 국어\n전원 90점 이상', short: '관저고2 국어\n전원 90점 이상', hook: '관저고2 국어 전원 90점 이상', when: '수강생 50% 이상 1등급', who: ['kim-dohyun'], by: '국어 김도현', post: 3576 },
 ];
 
-// 사진이 있는 광고만 사진 자리에(사진이 없는 선생님 광고는 원본 사진을 받으면 who 에 넣어 켬)
-const WITH_PHOTO = PROMOS.filter((p) => p.who.length);
+// 관리자가 '광고' 칸에서 고친 목록이 있으면 그것을, 없으면 위 기본 목록을 씀
+export const TEACHERS = { 'lee-geonjun': '영어 이건준', 'kim-taehyun': '국어 김태현', 'kim-dohyun': '국어 김도현', 'choi-sunghoon': '물리 최성훈', 'jeong-jikhan': '통합사회 정직한' };
+let promos = PROMOS;
+export async function loadPromos() {
+  const saved = (await getBanners(listBanners)).find((b) => b.id === 'ads');
+  promos = saved?.items?.length ? saved.items : PROMOS;
+  return promos;
+}
 
 const lines = (s) => s.split('\n').map((l) => `<span>${esc(l)}</span>`).join('');
 const oneLine = (s) => esc(s.replace(/\n/g, ' '));
-const link = (x) => (x.post ? `${ACADEMY_BAND}/${x.post}` : ACADEMY_BAND);
+const link = (x) => x.link || (x.post ? `${ACADEMY_BAND}/${x.post}` : ACADEMY_BAND);
 const go = (x, inner, cls) =>
   `<a class="${cls}" href="${link(x)}" target="_blank" rel="noopener" aria-label="${oneLine(x.title)} · 태산학원 밴드(새 창)">${inner}<span class="ad-mark">AD</span></a>`;
 // 사진은 둘까지만(셋이면 글자를 가림)
@@ -36,10 +43,10 @@ const when = (s) => s.split(' · ').map((x) => `<span>${esc(x)}</span>`).join(' 
 const LAYOUT = {
   // 사진 광고(가운데 두 개, 오른쪽 하나): 짙은 바탕, 큰 글자, 오른쪽 아래 선생님 사진
   // 선생님이 여럿이면 사진이 넓어서 짧은 제목을 씀
-  pic: (p) => go(p, `<span class="ap-top">태산학원 · ${esc(p.tag)}</span><strong class="ap-title">${lines(p.who.length > 1 ? p.short : p.title)}</strong><span class="ap-when">${when(p.when)}</span>${faces(p)}<span class="ap-by">${esc(p.by)}</span>`, `ad-pic t-${p.tone}`),
+  pic: (p) => go(p, `<span class="ap-top">태산학원 · ${esc(p.tag)}</span><strong class="ap-title">${lines(p.who.length > 1 ? p.short || p.title : p.title)}</strong><span class="ap-when">${when(p.when)}</span>${faces(p)}<span class="ap-by">${esc(p.by)}</span>`, `ad-pic t-${p.tone}`),
   // 글자 띠(가운데): 옅은 바탕에 한 줄 제목, 오른쪽에 작은 사진
   // 휴대폰처럼 좁으면 짧은 제목(sm)으로 바뀜
-  line: (p) => go(p, `<span class="al-txt"><strong class="al-title"><span class="lg">${oneLine(p.title)}</span><span class="sm">${oneLine(p.short)}</span></strong><span class="al-sub">${esc(p.by)} · ${esc(p.when)}</span></span>${p.who.length ? faces(p) : ''}<span class="al-cta">자세히 보기</span>`, 'ad-line'),
+  line: (p) => go(p, `<span class="al-txt"><strong class="al-title"><span class="lg">${oneLine(p.title)}</span><span class="sm">${oneLine(p.short || p.title)}</span></strong><span class="al-sub">${esc(p.by)} · ${esc(p.when)}</span></span>${p.who.length ? faces(p) : ''}<span class="al-cta">자세히 보기</span>`, 'ad-line'),
   // 짧은 글자 광고(오른쪽): 남색 바탕 한 줄
   note: (p) => go(p, `<strong>${esc(p.hook)}</strong>`, 'ad-note'),
 };
@@ -48,7 +55,8 @@ LAYOUT.rail = (p) => LAYOUT.pic({ ...p, title: p.short || p.title }).replace('cl
 // 처음 열 때마다 시작 광고가 다르게, 이후 7초마다 다음 광고로
 let tick = Math.floor(Math.random() * 1000);
 const still = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
-const listFor = (kind) => (kind === 'pic' || kind === 'rail' ? WITH_PHOTO : PROMOS);
+// 사진이 있는 광고만 사진 자리에(사진이 없는 선생님 광고는 원본 사진을 받으면 who 에 넣어 켬)
+const listFor = (kind) => (kind === 'pic' || kind === 'rail' ? promos.filter((p) => p.who?.length) : promos);
 
 // 한 화면에 같은 광고가 두 번 나오지 않게: 이번 차례에 이미 쓴 광고는 건너뜀
 let used = new Set();
@@ -56,6 +64,7 @@ function paint(el) {
   const kind = el.dataset.ad;
   if (!LAYOUT[kind]) return;
   const list = listFor(kind);
+  if (!list.length) return;
   let i = tick + (+el.dataset.off || 0), item = list[i % list.length];
   for (let k = 0; k < list.length && used.has(item.id); k++) item = list[++i % list.length];
   used.add(item.id);
@@ -65,7 +74,8 @@ function paint(el) {
   el.innerHTML = LAYOUT[kind](item);
 }
 
-export function mountAds() {
+export async function mountAds() {
+  if (ADS_ON) await loadPromos();
   used = new Set();
   document.querySelectorAll('[data-ad]').forEach((el) => (ADS_ON ? paint(el) : el.remove()));
 }

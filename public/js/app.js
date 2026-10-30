@@ -428,7 +428,7 @@ function renderMenu({ view }) {
       : '<p>로그인하면 글 내용을 볼 수 있습니다.</p><div class="grid-2"><a class="btn line" href="#/login">로그인</a><a class="btn" href="#/join">회원가입</a></div>'}</section>
     <div class="menu-group"><h2>게시판</h2>${a('#/community/rec', '인기글')}${a('#/community/all', '전체글')}${COMMUNITY_TABS.slice(1).map((t) => a(`#/community/${t.id}`, t.name)).join('')}${QNA_OPEN ? a('#/community/qna', '문제풀이') : ''}${a('#/study', '자료실')}${a('#/notices', '공지사항')}</div>
     ${me ? `<div class="menu-group"><h2>내 활동</h2>${a('#/me', '내 정보')}${a('#/me?tab=posts', '내가 쓴 글')}${be.has('listMyComments') ? a('#/me?tab=comments', '내 댓글') + a('#/me?tab=bookmarks', '스크랩') : ''}${a('#/notifications', '알림')}</div>` : ''}
-    ${me?.role === 'admin' ? `<div class="menu-group"><h2>관리</h2>${a('#/admin?tab=users', '회원 관리')}${a('#/admin?tab=posts', '글 관리')}${a('#/admin?tab=cover', '표지')}${be.has('events') ? a('#/admin?tab=events', '입시 일정') : ''}${a('#/write?board=notice', '공지 쓰기')}</div>` : ''}
+    ${me?.role === 'admin' ? `<div class="menu-group"><h2>관리</h2>${a('#/admin?tab=users', '회원 관리')}${a('#/admin?tab=posts', '글 관리')}${a('#/admin?tab=cover', '표지')}${be.has('events') ? a('#/admin?tab=ads', '광고') + a('#/admin?tab=events', '입시 일정') : ''}${a('#/write?board=notice', '공지 쓰기')}</div>` : ''}
     <div class="menu-group"><h2>안내</h2>${a('#/rules', '이용규칙')}${a('#/data-rules', '자료실 규칙')}${a('#/privacy', '개인정보 처리방침')}
       ${me ? '<button type="button" id="logout" style="color:var(--muted)">로그아웃</button>' : ''}</div>`;
   $('#logout')?.addEventListener('click', async () => { await be.signOut(); toast('로그아웃했습니다'); location.hash = '#/'; });

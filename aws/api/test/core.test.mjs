@@ -324,6 +324,15 @@ test('배너', async () => {
   assert.equal(list.find((x) => x.id === 'cover').sub, '설명');
   await t.ok('DELETE', `/banners/${list.find((x) => x.kind === 'text').id}`, null, adm.token);
   assert.equal((await t.ok('GET', '/banners')).length, 1);
+  // 홍보 광고 목록: 관리자만, https 링크만, 사진은 둘까지
+  await t.fail(403, 'PUT', '/banners/ads', { items: [{ title: '광고', hook: '한 줄' }] }, a.token);
+  await t.fail(400, 'PUT', '/banners/ads', { items: [{ title: '광고', hook: '한 줄', link: 'javascript:alert(1)' }] }, adm.token);
+  await t.fail(400, 'PUT', '/banners/ads', { items: [{ title: '', hook: '한 줄' }] }, adm.token);
+  await t.ok('PUT', '/banners/ads', { items: [{ title: '국어 1% 완성반', hook: '16주 완성', who: ['kim-taehyun', 'lee-geonjun', 'kim-dohyun', '<x>'], tone: 'red' }] }, adm.token);
+  const ads = (await t.ok('GET', '/banners')).find((x) => x.id === 'ads');
+  assert.deepEqual([ads.items[0].who, ads.items[0].tone], [['kim-taehyun', 'lee-geonjun'], 'navy']);
+  await t.ok('DELETE', '/banners/ads', null, adm.token);
+  assert.equal((await t.ok('GET', '/banners')).length, 1);
 });
 
 test('파일: 내 파일만 첨부, 글 지우면 파일도 삭제', async () => {

@@ -868,6 +868,25 @@ export function createApp({ store, files, idp, sms, env = {} }) {
     await store.put({ pk: 'BANNER', sk: id, id, kind, image, text, sub: '', link, date: kind === 'event' ? date : '', createdAt: t });
     return { id };
   });
+  // 홍보 광고 목록(관리자가 문구를 고침): banners/ads 한 문서에 통째로 저장. 비우면 기본 광고(ads.js)로 돌아감
+  on('PUT', 'banners/ads', async (ctx) => {
+    await admin(ctx);
+    const list = ctx.body.items;
+    if (!Array.isArray(list) || list.length > 20) throw bad('광고는 20개까지입니다.');
+    const items = list.map((a, i) => {
+      const x = { id: String(a.id || `ad${i}`).slice(0, 20), tone: ['navy', 'ink', 'teal'].includes(a.tone) ? a.tone : 'navy' };
+      for (const [k, max] of [['tag', 12], ['title', 40], ['short', 30], ['hook', 30], ['when', 40], ['by', 20], ['link', 300]]) {
+        if (!str(a[k] ?? '', max)) throw bad(`${i + 1}번째 광고의 글자 수가 너무 많습니다.`);
+        x[k] = (a[k] ?? '').trim();
+      }
+      if (!x.title || !x.hook) throw bad(`${i + 1}번째 광고의 제목과 한 줄 문구를 입력해 주세요.`);
+      if (x.link && !/^https:\/\//.test(x.link)) throw bad('링크는 https:// 로 시작해야 합니다.');
+      x.who = (Array.isArray(a.who) ? a.who : []).filter((w) => /^[a-z-]{1,30}$/.test(w)).slice(0, 2);
+      return x;
+    });
+    await store.put({ pk: 'BANNER', sk: 'ads', id: 'ads', kind: 'ads', items, createdAt: now() });
+    return { ok: true };
+  });
   on('DELETE', 'banners/:id', async (ctx, { id }) => {
     await admin(ctx);
     await store.del('BANNER', id);
